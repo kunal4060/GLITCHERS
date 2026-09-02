@@ -1,14 +1,25 @@
-const BACKEND_URL = 'http://localhost:5000/api';
+import { Platform } from 'react-native';
+
+const DEFAULT_HOST = Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://localhost:5000/api';
 
 class ApiClient {
+  private baseUrl: string = DEFAULT_HOST;
   private token: string = 'dev-token';
+
+  public setBaseUrl(url: string) {
+    this.baseUrl = url.endsWith('/') ? url.slice(0, -1) : url;
+  }
+
+  public getBaseUrl(): string {
+    return this.baseUrl;
+  }
 
   public setToken(token: string) {
     this.token = token;
   }
 
   public async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const url = `${BACKEND_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+    const url = `${this.baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
     const headers = {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${this.token}`,
@@ -28,7 +39,7 @@ class ApiClient {
     }
   }
 
-  // Convenience methods
+  // Generic methods
   public get<T>(endpoint: string) {
     return this.request<T>(endpoint, { method: 'GET' });
   }
@@ -43,6 +54,78 @@ class ApiClient {
 
   public delete<T>(endpoint: string) {
     return this.request<T>(endpoint, { method: 'DELETE' });
+  }
+
+  // Domain-specific typed API methods
+  public async fetchTimetableClasses() {
+    return this.get<{ classes: any[] }>('/timetable/classes');
+  }
+
+  public async fetchTasks() {
+    return this.get<{ tasks: any[] }>('/tasks');
+  }
+
+  public async createTaskFromText(text: string) {
+    return this.post<{ task: any }>('/tasks', { text });
+  }
+
+  public async fetchExpenses() {
+    return this.get<{ expenses: any[]; totalSpent: number }>('/expenses');
+  }
+
+  public async createExpenseFromText(text: string) {
+    return this.post<{ expense: any }>('/expenses', { text });
+  }
+
+  public async fetchBudget() {
+    return this.get<{ configured: boolean; status: any; budget: any }>('/budgets/current');
+  }
+
+  public async fetchDebts() {
+    return this.get<{ debts: any[]; summary: any }>('/debts');
+  }
+
+  public async splitBill(data: { totalAmount: number; description: string; numberOfPeople: number; friends: string[] }) {
+    return this.post<any>('/debts/split', data);
+  }
+
+  public async fetchEmails() {
+    return this.get<{ emails: any[] }>('/emails');
+  }
+
+  public async syncEmails() {
+    return this.post<any>('/emails/sync');
+  }
+
+  public async sendAIChat(message: string, conversationId?: string) {
+    return this.post<{ message: string; intent: string; actionRisk: string; toolCalls: any[] }>('/ai/chat', {
+      message,
+      conversationId,
+    });
+  }
+
+  public async fetchExams() {
+    return this.get<{ exams: any[] }>('/exams');
+  }
+
+  public async fetchAssignments() {
+    return this.get<{ assignments: any[] }>('/assignments');
+  }
+
+  public async fetchDocuments() {
+    return this.get<{ documents: any[] }>('/documents');
+  }
+
+  public async fetchSettings() {
+    return this.get<any>('/settings');
+  }
+
+  public async updateSettings(data: any) {
+    return this.patch<any>('/settings', data);
+  }
+
+  public async syncBatch(operations: any[]) {
+    return this.post<any>('/sync/batch', { operations });
   }
 }
 

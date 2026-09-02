@@ -1,11 +1,15 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useDashboardStore } from '../store/dashboardStore';
 import { useAuthStore } from '../store/authStore';
 
 export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user } = useAuthStore();
-  const { classes, tasks, expenses, budget, debts, emails } = useDashboardStore();
+  const { classes, tasks, expenses, budget, debts, emails, isBackendConnected, syncWithBackend } = useDashboardStore();
+
+  useEffect(() => {
+    syncWithBackend();
+  }, [syncWithBackend]);
 
   const totalSpent = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
   const remaining = budget ? Math.max(0, budget.monthlyLimit - totalSpent) : 0;
@@ -16,10 +20,19 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Header Greeting */}
+      {/* Header Greeting & Connection Status */}
       <View style={styles.header}>
-        <Text style={styles.greeting}>Good Morning,</Text>
-        <Text style={styles.userName}>{user?.fullName || 'Student'}</Text>
+        <View style={styles.topRow}>
+          <View>
+            <Text style={styles.greeting}>Good Morning,</Text>
+            <Text style={styles.userName}>{user?.fullName || 'Student'}</Text>
+          </View>
+          <View style={[styles.statusPill, isBackendConnected ? styles.statusOnline : styles.statusOffline]}>
+            <Text style={[styles.statusPillText, isBackendConnected ? styles.statusOnlineText : styles.statusOfflineText]}>
+              {isBackendConnected ? '● Live API' : '○ Local Sync'}
+            </Text>
+          </View>
+        </View>
         <Text style={styles.subtext}>{user?.university || 'Engineering College'}</Text>
       </View>
 
@@ -127,6 +140,13 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0F172A' },
   content: { padding: 16, paddingBottom: 100 },
   header: { marginBottom: 20 },
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  statusPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  statusOnline: { backgroundColor: 'rgba(16, 185, 129, 0.15)' },
+  statusOffline: { backgroundColor: 'rgba(148, 163, 184, 0.15)' },
+  statusPillText: { fontSize: 11, fontWeight: 'bold' },
+  statusOnlineText: { color: '#10B981' },
+  statusOfflineText: { color: '#94A3B8' },
   greeting: { fontSize: 16, color: '#94A3B8' },
   userName: { fontSize: 26, fontWeight: 'bold', color: '#F8FAFC' },
   subtext: { fontSize: 13, color: '#64748B', marginTop: 2 },

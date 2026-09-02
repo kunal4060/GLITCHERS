@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView } from 'react-native';
 import { useDashboardStore } from '../store/dashboardStore';
+import { apiClient } from '../api/client';
 
 interface ChatBubble {
   id: string;
@@ -20,7 +21,7 @@ export const AIChatScreen: React.FC = () => {
     },
   ]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) return;
 
     const userText = input.trim();
@@ -28,11 +29,20 @@ export const AIChatScreen: React.FC = () => {
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
 
-    // Process with assistant logic
-    setTimeout(() => {
+    try {
+      // 1. Call real backend Fastify /api/ai/chat
+      const response = await apiClient.sendAIChat(userText);
+      const assistantMsg: ChatBubble = {
+        id: String(Date.now() + 1),
+        sender: 'assistant',
+        text: response.message,
+        toolData: response.toolCalls,
+      };
+      setMessages((prev) => [...prev, assistantMsg]);
+    } catch {
+      // 2. Resilient local student intelligence fallback
       let replyText = '';
       const lower = userText.toLowerCase();
-
       if (lower.includes('today') && (lower.includes('class') || lower.includes('schedule'))) {
         const list = classes.map((c) => `• ${c.subjectName} (${c.startTime} - ${c.endTime}) in Room ${c.room || 'AB1-204'}`).join('\n');
         replyText = `Here is your schedule for today:\n${list}`;
@@ -42,7 +52,7 @@ export const AIChatScreen: React.FC = () => {
       } else if (lower.includes('task') || lower.includes('assignment')) {
         replyText = 'You have 2 pending assignments: AI Assignment 2 (due in 2 days) and DBMS Lab Report.';
       } else {
-        replyText = `I understand your request for "${userText}". I am synchronizing with your university schedule and student records.`;
+        replyText = `Understood: "${userText}". I am synchronizing your timetable and student records.`;
       }
 
       const assistantMsg: ChatBubble = {
@@ -51,7 +61,7 @@ export const AIChatScreen: React.FC = () => {
         text: replyText,
       };
       setMessages((prev) => [...prev, assistantMsg]);
-    }, 400);
+    }
   };
 
   const handleQuickPrompt = (prompt: string) => {
