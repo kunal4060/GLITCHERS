@@ -15,6 +15,10 @@ import { chatbotRoutes } from './routes/chatbot.js';
 import { searchRoutes } from './routes/search.js';
 import { syncRoutes } from './routes/sync.js';
 import { privacyRoutes } from './routes/privacy.js';
+import { examRoutes } from './routes/exams.js';
+import { assignmentRoutes } from './routes/assignments.js';
+import { documentRoutes } from './routes/documents.js';
+import { settingsRoutes } from './routes/settings.js';
 
 export function buildApp(): FastifyInstance {
   const app = Fastify({
@@ -54,6 +58,10 @@ export function buildApp(): FastifyInstance {
   app.register(searchRoutes, { prefix: '/api/search' });
   app.register(syncRoutes, { prefix: '/api/sync' });
   app.register(privacyRoutes, { prefix: '/api/privacy' });
+  app.register(examRoutes, { prefix: '/api/exams' });
+  app.register(assignmentRoutes, { prefix: '/api/assignments' });
+  app.register(documentRoutes, { prefix: '/api/documents' });
+  app.register(settingsRoutes, { prefix: '/api/settings' });
 
   // Error Handler
   app.setErrorHandler((error: any, request, reply) => {

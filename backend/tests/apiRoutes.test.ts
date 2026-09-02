@@ -114,4 +114,98 @@ describe('Fastify Modular API Routes Integration Tests', () => {
     expect(Array.isArray(body.results)).toBe(true);
     expect(body.results.length).toBeGreaterThan(0);
   });
+
+  test('GET and POST /api/exams manages student exam schedule', async () => {
+    const postRes = await app.inject({
+      method: 'POST',
+      url: '/api/exams',
+      payload: {
+        subject: 'Artificial Intelligence',
+        date: '2026-09-22',
+        time: '14:00',
+        room: 'Hall 4',
+        syllabus: 'Search algorithms, Knowledge Representation, ML foundations',
+        importance: 'CRITICAL',
+      },
+    });
+    expect(postRes.statusCode).toBe(200);
+    const postBody = JSON.parse(postRes.body);
+    expect(postBody.exam.subject).toBe('Artificial Intelligence');
+
+    const getRes = await app.inject({
+      method: 'GET',
+      url: '/api/exams',
+    });
+    expect(getRes.statusCode).toBe(200);
+    const getBody = JSON.parse(getRes.body);
+    expect(getBody.exams.length).toBeGreaterThanOrEqual(1);
+  });
+
+  test('GET and POST /api/assignments tracks deadlines and submission platform', async () => {
+    const postRes = await app.inject({
+      method: 'POST',
+      url: '/api/assignments',
+      payload: {
+        title: 'Compiler Design Syntax Tree Lab',
+        subject: 'Compiler Design',
+        deadline: new Date(Date.now() + 86400000 * 4).toISOString(),
+        submissionPlatform: 'Canvas LMS',
+        priority: 'HIGH',
+      },
+    });
+    expect(postRes.statusCode).toBe(200);
+    const postBody = JSON.parse(postRes.body);
+    expect(postBody.assignment.submissionPlatform).toBe('Canvas LMS');
+
+    const getRes = await app.inject({
+      method: 'GET',
+      url: '/api/assignments',
+    });
+    expect(getRes.statusCode).toBe(200);
+    const getBody = JSON.parse(getRes.body);
+    expect(getBody.assignments.length).toBeGreaterThanOrEqual(1);
+  });
+
+  test('GET and POST /api/documents manages academic circulars and syllabus', async () => {
+    const uploadRes = await app.inject({
+      method: 'POST',
+      url: '/api/documents/upload',
+      payload: {
+        title: 'End-Term Practical Exam Schedule.pdf',
+        type: 'PDF',
+      },
+    });
+    expect(uploadRes.statusCode).toBe(200);
+    const uploadBody = JSON.parse(uploadRes.body);
+    expect(uploadBody.document.title).toContain('End-Term');
+
+    const getRes = await app.inject({
+      method: 'GET',
+      url: '/api/documents',
+    });
+    expect(getRes.statusCode).toBe(200);
+    const getBody = JSON.parse(getRes.body);
+    expect(getBody.documents.length).toBeGreaterThanOrEqual(1);
+  });
+
+  test('GET and PATCH /api/settings manages student preferences and quiet hours', async () => {
+    const patchRes = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings',
+      payload: {
+        universityDomain: 'iit.edu',
+        quietHours: { startTime: '23:30', endTime: '06:30' },
+      },
+    });
+    expect(patchRes.statusCode).toBe(200);
+
+    const getRes = await app.inject({
+      method: 'GET',
+      url: '/api/settings',
+    });
+    expect(getRes.statusCode).toBe(200);
+    const getBody = JSON.parse(getRes.body);
+    expect(getBody.preferences.universityDomain).toBe('iit.edu');
+    expect(getBody.preferences.quietHours.startTime).toBe('23:30');
+  });
 });

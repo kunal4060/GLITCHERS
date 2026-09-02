@@ -5,12 +5,15 @@ import { Text } from 'react-native';
 import { DashboardScreen } from '../screens/DashboardScreen';
 import { TimetableScreen } from '../screens/TimetableScreen';
 import { TasksScreen } from '../screens/TasksScreen';
+import { ExamsAndAssignmentsScreen } from '../screens/ExamsAndAssignmentsScreen';
 import { FinanceScreen } from '../screens/FinanceScreen';
 import { EmailScreen } from '../screens/EmailScreen';
 import { CalendarScreen } from '../screens/CalendarScreen';
 import { DocumentsScreen } from '../screens/DocumentsScreen';
 import { AIChatScreen } from '../screens/AIChatScreen';
+import { SearchScreen } from '../screens/SearchScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
+import { SettingsScreen } from '../screens/SettingsScreen';
 import { PrivacyScreen } from '../screens/PrivacyScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { theme } from '../theme/theme';
@@ -69,6 +72,13 @@ export const RootNavigator: React.FC = () => {
         }}
       />
       <Tab.Screen
+        name="Exams"
+        component={ExamsAndAssignmentsScreen}
+        options={{
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>📝</Text>,
+        }}
+      />
+      <Tab.Screen
         name="Finance"
         component={FinanceScreen}
         options={{
@@ -97,10 +107,24 @@ export const RootNavigator: React.FC = () => {
         }}
       />
       <Tab.Screen
+        name="Search"
+        component={SearchScreen}
+        options={{
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>🔍</Text>,
+        }}
+      />
+      <Tab.Screen
         name="Alerts"
         component={NotificationsScreen}
         options={{
           tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>🔔</Text>,
+        }}
+      />
+      <Tab.Screen
+        name="Settings"
+        children={() => <SettingsScreen onRestartOnboarding={() => setShowOnboarding(true)} />}
+        options={{
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>⚙️</Text>,
         }}
       />
       <Tab.Screen
