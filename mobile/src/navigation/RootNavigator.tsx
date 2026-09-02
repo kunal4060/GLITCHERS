@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text } from 'react-native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Text, TouchableOpacity, View } from 'react-native';
 
 import { DashboardScreen } from '../screens/DashboardScreen';
 import { TimetableScreen } from '../screens/TimetableScreen';
 import { TasksScreen } from '../screens/TasksScreen';
-import { ExamsAndAssignmentsScreen } from '../screens/ExamsAndAssignmentsScreen';
 import { FinanceScreen } from '../screens/FinanceScreen';
-import { EmailScreen } from '../screens/EmailScreen';
-import { CalendarScreen } from '../screens/CalendarScreen';
-import { DocumentsScreen } from '../screens/DocumentsScreen';
 import { AIChatScreen } from '../screens/AIChatScreen';
+
+// Secondary & Modal Screens
+import { CalendarScreen } from '../screens/CalendarScreen';
+import { ExamsAndAssignmentsScreen } from '../screens/ExamsAndAssignmentsScreen';
+import { EmailScreen } from '../screens/EmailScreen';
+import { DocumentsScreen } from '../screens/DocumentsScreen';
 import { SearchScreen } from '../screens/SearchScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
@@ -19,6 +22,83 @@ import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { theme } from '../theme/theme';
 
 const Tab = createBottomTabNavigator();
+const Stack = createNativeStackNavigator();
+
+function MainTabs({ navigation }: { navigation: any }) {
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        headerStyle: { backgroundColor: theme.colors.background },
+        headerTintColor: theme.colors.text,
+        headerTitleStyle: { fontWeight: 'bold' },
+        tabBarStyle: {
+          backgroundColor: theme.colors.surface,
+          borderTopColor: theme.colors.surfaceBorder,
+          height: 64,
+          paddingBottom: 10,
+          paddingTop: 6,
+        },
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.textMuted,
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        headerRight: () => (
+          <View style={{ flexDirection: 'row', gap: 12, marginRight: 16 }}>
+            <TouchableOpacity onPress={() => navigation.navigate('Search')}>
+              <Text style={{ fontSize: 18 }}>🔍</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('Alerts')}>
+              <Text style={{ fontSize: 18 }}>🔔</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
+              <Text style={{ fontSize: 18 }}>⚙️</Text>
+            </TouchableOpacity>
+          </View>
+        ),
+      }}
+    >
+      <Tab.Screen
+        name="Dashboard"
+        component={DashboardScreen}
+        options={{
+          title: 'Home',
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>🏠</Text>,
+        }}
+      />
+      <Tab.Screen
+        name="Timetable"
+        component={TimetableScreen}
+        options={{
+          title: 'Timetable',
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>🗓</Text>,
+        }}
+      />
+      <Tab.Screen
+        name="Tasks"
+        component={TasksScreen}
+        options={{
+          title: 'Tasks',
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>✅</Text>,
+        }}
+      />
+      <Tab.Screen
+        name="Finance"
+        component={FinanceScreen}
+        options={{
+          title: 'Finance',
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>💰</Text>,
+        }}
+      />
+      <Tab.Screen
+        name="AI Companion"
+        component={AIChatScreen}
+        options={{
+          title: 'AI Companion',
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>🤖</Text>,
+        }}
+      />
+    </Tab.Navigator>
+  );
+}
 
 export const RootNavigator: React.FC = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -28,112 +108,25 @@ export const RootNavigator: React.FC = () => {
   }
 
   return (
-    <Tab.Navigator
+    <Stack.Navigator
       screenOptions={{
         headerStyle: { backgroundColor: theme.colors.background },
         headerTintColor: theme.colors.text,
         headerTitleStyle: { fontWeight: 'bold' },
-        tabBarStyle: {
-          backgroundColor: theme.colors.background,
-          borderTopColor: theme.colors.surfaceBorder,
-          height: 62,
-          paddingBottom: 8,
-        },
-        tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.textMuted,
+        contentStyle: { backgroundColor: theme.colors.background },
       }}
     >
-      <Tab.Screen
-        name="Dashboard"
-        component={DashboardScreen}
-        options={{
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>🏠</Text>,
-        }}
-      />
-      <Tab.Screen
-        name="Timetable"
-        component={TimetableScreen}
-        options={{
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>🗓</Text>,
-        }}
-      />
-      <Tab.Screen
-        name="Calendar"
-        component={CalendarScreen}
-        options={{
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>📅</Text>,
-        }}
-      />
-      <Tab.Screen
-        name="Tasks"
-        component={TasksScreen}
-        options={{
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>✅</Text>,
-        }}
-      />
-      <Tab.Screen
-        name="Exams"
-        component={ExamsAndAssignmentsScreen}
-        options={{
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>📝</Text>,
-        }}
-      />
-      <Tab.Screen
-        name="Finance"
-        component={FinanceScreen}
-        options={{
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>💰</Text>,
-        }}
-      />
-      <Tab.Screen
-        name="Email"
-        component={EmailScreen}
-        options={{
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>📧</Text>,
-        }}
-      />
-      <Tab.Screen
-        name="Docs"
-        component={DocumentsScreen}
-        options={{
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>📄</Text>,
-        }}
-      />
-      <Tab.Screen
-        name="AI Chat"
-        component={AIChatScreen}
-        options={{
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>🤖</Text>,
-        }}
-      />
-      <Tab.Screen
-        name="Search"
-        component={SearchScreen}
-        options={{
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>🔍</Text>,
-        }}
-      />
-      <Tab.Screen
-        name="Alerts"
-        component={NotificationsScreen}
-        options={{
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>🔔</Text>,
-        }}
-      />
-      <Tab.Screen
-        name="Settings"
-        children={() => <SettingsScreen onRestartOnboarding={() => setShowOnboarding(true)} />}
-        options={{
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>⚙️</Text>,
-        }}
-      />
-      <Tab.Screen
-        name="Privacy"
-        component={PrivacyScreen}
-        options={{
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>🔐</Text>,
-        }}
-      />
-    </Tab.Navigator>
+      <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
+      <Stack.Screen name="Calendar" component={CalendarScreen} options={{ title: 'Academic Calendar' }} />
+      <Stack.Screen name="Exams" component={ExamsAndAssignmentsScreen} options={{ title: 'Exams & Assignments' }} />
+      <Stack.Screen name="Email" component={EmailScreen} options={{ title: 'University Notices & Emails' }} />
+      <Stack.Screen name="Docs" component={DocumentsScreen} options={{ title: 'Document Intelligence' }} />
+      <Stack.Screen name="Search" component={SearchScreen} options={{ title: 'Global Search' }} />
+      <Stack.Screen name="Alerts" component={NotificationsScreen} options={{ title: 'Notification Center' }} />
+      <Stack.Screen name="Settings">
+        {() => <SettingsScreen onRestartOnboarding={() => setShowOnboarding(true)} />}
+      </Stack.Screen>
+      <Stack.Screen name="Privacy" component={PrivacyScreen} options={{ title: 'Privacy & Security Controls' }} />
+    </Stack.Navigator>
   );
 };

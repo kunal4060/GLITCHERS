@@ -123,13 +123,43 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         </View>
       </View>
 
+      {/* Student Life Control Center Grid */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>STUDENT CONTROL CENTER</Text>
+        <View style={styles.gridRow}>
+          <TouchableOpacity style={styles.gridCard} onPress={() => navigation.navigate('Calendar')}>
+            <Text style={styles.gridIcon}>📅</Text>
+            <Text style={styles.gridTitle}>Calendar</Text>
+            <Text style={styles.gridSub}>Sync Schedule</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.gridCard} onPress={() => navigation.navigate('Exams')}>
+            <Text style={styles.gridIcon}>📝</Text>
+            <Text style={styles.gridTitle}>Exams & Asg</Text>
+            <Text style={styles.gridSub}>Deadlines</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.gridCard} onPress={() => navigation.navigate('Email')}>
+            <Text style={styles.gridIcon}>📧</Text>
+            <Text style={styles.gridTitle}>Email Notices</Text>
+            <Text style={styles.gridSub}>Circulars</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.gridCard} onPress={() => navigation.navigate('Docs')}>
+            <Text style={styles.gridIcon}>📄</Text>
+            <Text style={styles.gridTitle}>Documents</Text>
+            <Text style={styles.gridSub}>Syllabus AI</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {/* Quick Action Buttons */}
       <View style={styles.quickActions}>
-        <TouchableOpacity style={styles.quickBtn} onPress={() => navigation.navigate('AI Chat')}>
-          <Text style={styles.quickBtnText}>🤖 Ask AI Companion</Text>
+        <TouchableOpacity style={styles.quickBtn} onPress={() => navigation.navigate('AI Companion')}>
+          <Text style={styles.quickBtnText}>🤖 Ask AI Student Companion</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.quickBtnSecondary} onPress={() => navigation.navigate('Timetable')}>
-          <Text style={styles.quickBtnSecondaryText}>🗓 View Full Timetable</Text>
+          <Text style={styles.quickBtnSecondaryText}>🗓 View Full Timetable & Rooms</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -187,6 +217,19 @@ const styles = StyleSheet.create({
   debtBox: { flex: 1, backgroundColor: '#1E293B', borderRadius: 12, padding: 14, borderWidth: 1 },
   debtBoxLabel: { fontSize: 12, color: '#94A3B8' },
   debtBoxValue: { fontSize: 18, fontWeight: 'bold', marginTop: 4 },
+  gridRow: { flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
+  gridCard: {
+    flex: 1,
+    backgroundColor: '#1E293B',
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  gridIcon: { fontSize: 22, marginBottom: 4 },
+  gridTitle: { fontSize: 11, fontWeight: 'bold', color: '#F8FAFC', textAlign: 'center' },
+  gridSub: { fontSize: 9, color: '#94A3B8', marginTop: 2, textAlign: 'center' },
   quickActions: { marginTop: 10, gap: 10 },
   quickBtn: { backgroundColor: '#3B82F6', borderRadius: 12, padding: 14, alignItems: 'center' },
   quickBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
