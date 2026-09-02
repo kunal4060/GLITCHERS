@@ -1,0 +1,4 @@
+{
+  "name": "ponytail",
+  "description": "Lazy senior dev mode for AI agents. Forces the simplest, shortest solution that actually works: YAGNI, stdlib first, no unrequested abstractions."
+}
