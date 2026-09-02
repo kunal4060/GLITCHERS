@@ -71,3 +71,62 @@ export function calculateEqualSplit(totalAmount: number, numberOfPeople: number)
   if (numberOfPeople <= 0) throw new Error('Number of people must be greater than 0');
   return Math.round((totalAmount / numberOfPeople) * 100) / 100;
 }
+
+export interface BurnRateForecast {
+  dailyAllowance: number;
+  averageDailySpend: number;
+  projectedEndSpend: number;
+  daysUntilDepletion: number | null;
+  topCategory: string | null;
+  recommendation: string;
+}
+
+export function calculateBurnRateForecast(
+  budget: Budget,
+  expenses: Expense[],
+  daysPassedInMonth = 15,
+  daysRemainingInMonth = 15
+): BurnRateForecast {
+  const totalSpent = calculateTotalSpent(expenses);
+  const remaining = Math.max(0, budget.monthlyLimit - totalSpent);
+  const safeDaysRemaining = Math.max(1, daysRemainingInMonth);
+  const safeDaysPassed = Math.max(1, daysPassedInMonth);
+
+  const dailyAllowance = Math.round((remaining / safeDaysRemaining) * 100) / 100;
+  const averageDailySpend = Math.round((totalSpent / safeDaysPassed) * 100) / 100;
+  const projectedEndSpend = Math.round(totalSpent + averageDailySpend * safeDaysRemaining);
+
+  let daysUntilDepletion: number | null = null;
+  if (averageDailySpend > 0 && remaining > 0) {
+    daysUntilDepletion = Math.floor(remaining / averageDailySpend);
+  } else if (remaining === 0) {
+    daysUntilDepletion = 0;
+  }
+
+  // Determine top category
+  const breakdown = calculateCategoryBreakdown(expenses);
+  let topCategory: string | null = null;
+  let highestAmount = 0;
+  for (const [cat, amt] of Object.entries(breakdown)) {
+    if (amt > highestAmount) {
+      highestAmount = amt;
+      topCategory = cat;
+    }
+  }
+
+  let recommendation = `You have ₹${dailyAllowance} daily allowance for the next ${safeDaysRemaining} days.`;
+  if (averageDailySpend > dailyAllowance * 1.3) {
+    recommendation = `Warning: High daily burn rate (₹${averageDailySpend}/day). Cut non-essential spending in ${topCategory || 'general'} to prevent budget depletion in ${daysUntilDepletion} days.`;
+  } else if (averageDailySpend <= dailyAllowance) {
+    recommendation = `Great pacing! Current spending rate (₹${averageDailySpend}/day) is safely within your ₹${dailyAllowance} daily allowance.`;
+  }
+
+  return {
+    dailyAllowance,
+    averageDailySpend,
+    projectedEndSpend,
+    daysUntilDepletion,
+    topCategory,
+    recommendation,
+  };
+}

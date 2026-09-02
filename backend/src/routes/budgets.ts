@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { inMemoryStore } from '../repositories/inMemoryStore.js';
 import { authMiddleware } from '../middleware/auth.js';
-import { calculateBudgetStatus } from '../services/finance/calculator.js';
+import { calculateBudgetStatus, calculateBurnRateForecast } from '../services/finance/calculator.js';
 import type { Budget } from '@glitchers/shared';
 import { randomUUID } from 'crypto';
 
@@ -17,14 +17,23 @@ export const budgetRoutes: FastifyPluginAsync = async (fastify) => {
       return {
         configured: false,
         status: null,
+        burnRateForecast: null,
       };
     }
 
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const daysPassed = now.getDate();
+    const daysRemaining = daysInMonth - daysPassed;
+
     const status = calculateBudgetStatus(budget, expenses);
+    const burnRateForecast = calculateBurnRateForecast(budget, expenses, daysPassed, daysRemaining);
+
     return {
       configured: true,
       budget,
       status,
+      burnRateForecast,
     };
   });
 

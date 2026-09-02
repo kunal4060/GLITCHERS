@@ -2,8 +2,9 @@ import type { FastifyPluginAsync } from 'fastify';
 import { inMemoryStore } from '../repositories/inMemoryStore.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { detectScheduleConflicts } from '../services/timetable/conflictDetector.js';
-import { ClassSessionSchema } from '@glitchers/shared';
+import { ClassSessionSchema, type ClassSession } from '@glitchers/shared';
 import { randomUUID } from 'crypto';
+import { extractClassesFromText } from '../services/timetable/timetableExtractor.js';
 
 export const timetableRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', authMiddleware);
@@ -11,20 +12,26 @@ export const timetableRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/classes', async (req) => {
     const userId = req.userId!;
     const classes = inMemoryStore.classes.get(userId) || [];
-    return { classes };
+    const conflicts = detectScheduleConflicts(classes);
+
+    return {
+      classes,
+      conflicts,
+    };
   });
 
   fastify.post<{ Body: any }>('/classes', async (req, reply) => {
     const userId = req.userId!;
-    const validation = ClassSessionSchema.omit({ id: true, userId: true }).safeParse(req.body);
-    if (!validation.success) {
-      return reply.status(400).send({ error: validation.error.format() });
+    const parsed = ClassSessionSchema.omit({ id: true, userId: true }).safeParse(req.body);
+
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'Invalid class payload', details: parsed.error.format() });
     }
 
-    const newClass = {
+    const newClass: ClassSession = {
+      ...parsed.data,
       id: randomUUID(),
       userId,
-      ...validation.data,
     };
 
     const userClasses = inMemoryStore.classes.get(userId) || [];
@@ -41,38 +48,14 @@ export const timetableRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.post<{ Body: { timetableText?: string } }>('/upload', async (req) => {
     const userId = req.userId!;
-    const extractedClasses = [
-      {
-        id: randomUUID(),
-        userId,
-        subjectName: 'Computer Networks',
-        day: 'WEDNESDAY' as const,
-        startTime: '10:00',
-        endTime: '11:00',
-        room: 'AB1-305',
-        faculty: 'Dr. Nair',
-        classType: 'LECTURE' as const,
-        isCancelled: false,
-      },
-      {
-        id: randomUUID(),
-        userId,
-        subjectName: 'Software Engineering',
-        day: 'THURSDAY' as const,
-        startTime: '14:00',
-        endTime: '15:00',
-        room: 'AB2-102',
-        faculty: 'Prof. Roy',
-        classType: 'LECTURE' as const,
-        isCancelled: false,
-      },
-    ];
+    const text = req.body?.timetableText || 'Monday: 10:00 - 11:00 AM DBMS Lecture Room AB1-204 Dr. Sharma\nMonday: 14:00 - 16:00 OS Lab Room AB2-301 Prof. Verma';
+    const extractedClasses = extractClassesFromText(text, userId);
 
     const currentClasses = inMemoryStore.classes.get(userId) || [];
-    const combined = [...currentClasses, ...extractedClasses];
-    inMemoryStore.classes.set(userId, combined);
+    const merged = [...currentClasses, ...extractedClasses];
+    inMemoryStore.classes.set(userId, merged);
 
-    const conflicts = detectScheduleConflicts(combined);
+    const conflicts = detectScheduleConflicts(merged);
 
     return {
       success: true,

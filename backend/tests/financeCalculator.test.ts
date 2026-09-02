@@ -4,6 +4,7 @@ import {
   calculateBudgetStatus,
   calculateDebtTotals,
   calculateEqualSplit,
+  calculateBurnRateForecast,
 } from '../src/services/finance/calculator.js';
 import type { Expense, Budget, Debt } from '@glitchers/shared';
 
@@ -122,5 +123,35 @@ describe('Finance Calculator & Deterministic Math', () => {
 
     const shareWithCents = calculateEqualSplit(100, 3);
     expect(shareWithCents).toBe(33.33);
+  });
+
+  test('calculateBurnRateForecast projects daily runway accurately', () => {
+    const budget: Budget = {
+      id: 'b1',
+      userId: 'u1',
+      monthlyLimit: 10000,
+      currentSpending: 0,
+      month: '2026-09',
+      alertThresholds: [75, 90, 100],
+    };
+    const expenses: Expense[] = [
+      {
+        id: 'e1',
+        userId: 'u1',
+        amount: 3000,
+        category: 'FOOD',
+        description: 'Hostel mess bill',
+        date: new Date().toISOString(),
+        type: 'EXPENSE',
+      },
+    ];
+
+    // 10 days passed, 20 days left: spent 3000 -> avg 300/day. remaining 7000 / 20 = 350 daily allowance
+    const forecast = calculateBurnRateForecast(budget, expenses, 10, 20);
+    expect(forecast.dailyAllowance).toBe(350);
+    expect(forecast.averageDailySpend).toBe(300);
+    expect(forecast.projectedEndSpend).toBe(9000);
+    expect(forecast.topCategory).toBe('FOOD');
+    expect(forecast.recommendation).toContain('Great pacing');
   });
 });
