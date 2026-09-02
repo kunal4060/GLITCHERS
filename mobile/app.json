@@ -25,6 +25,10 @@
         "android.permission.SCHEDULE_EXACT_ALARM"
       ]
     },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
     "plugins": []
   }
 }
