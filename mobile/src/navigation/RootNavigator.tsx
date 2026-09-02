@@ -27,6 +27,7 @@ const Stack = createNativeStackNavigator();
 function MainTabs({ navigation }: { navigation: any }) {
   return (
     <Tab.Navigator
+      id="main-tabs"
       screenOptions={{
         headerStyle: { backgroundColor: theme.colors.background },
         headerTintColor: theme.colors.text,
@@ -109,6 +110,7 @@ export const RootNavigator: React.FC = () => {
 
   return (
     <Stack.Navigator
+      id="root-stack"
       screenOptions={{
         headerStyle: { backgroundColor: theme.colors.background },
         headerTintColor: theme.colors.text,

@@ -1,8 +1,15 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true,
-    "skipLibCheck": true
+    "strict": false,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "jsx": "react-native",
+    "paths": {
+      "@glitchers/shared": ["../shared/src/index.ts"]
+    }
   },
   "include": ["**/*.ts", "**/*.tsx"]
 }

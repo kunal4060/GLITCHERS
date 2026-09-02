@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { useDashboardStore } from '../store/dashboardStore';
 import { useAuthStore } from '../store/authStore';
 
-export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
   const { user } = useAuthStore();
   const { classes, tasks, expenses, budget, debts, emails, isBackendConnected, syncWithBackend } = useDashboardStore();
 
