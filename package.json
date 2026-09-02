@@ -1,0 +1,21 @@
+{
+  "name": "glitchers-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI Student Life Companion - Monorepo",
+  "workspaces": [
+    "shared",
+    "backend",
+    "mobile"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "backend:dev": "npm run dev --workspace=backend",
+    "mobile:start": "npm run start --workspace=mobile"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}
