@@ -102,6 +102,10 @@ class ApiClient {
     return this.get<{ emails: any[] }>('/emails');
   }
 
+  public async summarizeEmails() {
+    return this.post<{ bullets: string[]; summary: string; count: number }>('/emails/summarize', {});
+  }
+
   public async syncEmails() {
     return this.post<any>('/emails/sync');
   }

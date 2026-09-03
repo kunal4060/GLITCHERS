@@ -31,10 +31,21 @@ interface DashboardState {
   addDebt: (debt: Debt) => Promise<void>;
   markDebtPaid: (debtId: string) => void;
 
+  cgpa: string;
+  credits: number;
+  setCgpa: (cgpa: string) => void;
+  setCredits: (credits: number) => void;
+  updateAcademics: (cgpa: string, credits: number) => void;
+
   syncWithBackend: () => Promise<void>;
 }
 
 export const useDashboardStore = create<DashboardState>((set, get) => ({
+  cgpa: '8.71',
+  credits: 42,
+  setCgpa: (cgpa) => set({ cgpa }),
+  setCredits: (credits) => set({ credits }),
+  updateAcademics: (cgpa, credits) => set({ cgpa, credits }),
   classes: [
     {
       id: 'c1',

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Modal, TextInput } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { designTokens } from '../theme/designTokens';
 import { GradientBackground } from '../components/common/GradientBackground';
 import { NinjaAvatar } from '../components/NinjaAvatar';
 import { useAuthStore } from '../store/authStore';
+import { useDashboardStore } from '../store/dashboardStore';
 import { apiClient } from '../api/client';
 
 interface SettingsScreenProps {
@@ -14,14 +15,51 @@ interface SettingsScreenProps {
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboarding, navigation }) => {
   const { user } = useAuthStore();
+  const { cgpa, credits, setCgpa, setCredits } = useDashboardStore();
+
   const [semester, setSemester] = useState('FALL SEMESTER 2026-27');
   const [quietHoursEnabled, setQuietHoursEnabled] = useState(true);
   const [floatingAssistantEnabled, setFloatingAssistantEnabled] = useState(true);
   const [syncing, setSyncing] = useState(false);
 
+  // Edit Modal State
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editType, setEditType] = useState<'CGPA' | 'CREDITS'>('CGPA');
+  const [editValue, setEditValue] = useState('');
+
   const studentName = user?.fullName || 'KUNAL BALKRUSHN UGALE';
-  const cgpa = '8.71';
-  const credits = 42;
+
+  const handleOpenEditCgpa = () => {
+    setEditType('CGPA');
+    setEditValue(cgpa);
+    setModalVisible(true);
+  };
+
+  const handleOpenEditCredits = () => {
+    setEditType('CREDITS');
+    setEditValue(String(credits));
+    setModalVisible(true);
+  };
+
+  const handleSaveAcademics = () => {
+    const val = editValue.trim();
+    if (editType === 'CGPA') {
+      const num = parseFloat(val);
+      if (isNaN(num) || num < 0 || num > 10) {
+        Alert.alert('Invalid CGPA', 'Please enter a valid CGPA between 0.00 and 10.00');
+        return;
+      }
+      setCgpa(num.toFixed(2));
+    } else {
+      const num = parseInt(val, 10);
+      if (isNaN(num) || num < 0 || num > 300) {
+        Alert.alert('Invalid Credits', 'Please enter a valid credit count (e.g. 42)');
+        return;
+      }
+      setCredits(num);
+    }
+    setModalVisible(false);
+  };
 
   const handleChangeSemester = () => {
     Alert.alert('Change Semester', 'Select active academic semester:', [
@@ -53,9 +91,29 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
 
         {/* Ninja Hero Profile Section */}
         <View style={styles.heroSection}>
-          <NinjaAvatar size="large" cgpa={cgpa} credits={credits} showBadges={true} />
+          <NinjaAvatar
+            size="large"
+            cgpa={cgpa}
+            credits={credits}
+            showBadges={true}
+            onPressCgpa={handleOpenEditCgpa}
+            onPressCredits={handleOpenEditCredits}
+          />
 
           <Text style={styles.studentName}>{studentName}</Text>
+
+          {/* Academic Edit Bar */}
+          <View style={styles.academicChipsRow}>
+            <TouchableOpacity style={styles.academicChip} onPress={handleOpenEditCgpa} activeOpacity={0.7}>
+              <Ionicons name="school-outline" size={14} color={designTokens.colors.primaryDark} />
+              <Text style={styles.academicChipLabel}>CGPA: <Text style={styles.academicChipValue}>{cgpa}</Text> ✎</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.academicChip} onPress={handleOpenEditCredits} activeOpacity={0.7}>
+              <Ionicons name="ribbon-outline" size={14} color={designTokens.colors.primaryDark} />
+              <Text style={styles.academicChipLabel}>Credits: <Text style={styles.academicChipValue}>{credits}</Text> ✎</Text>
+            </TouchableOpacity>
+          </View>
 
           {/* Semester Pill */}
           <View style={styles.semesterPill}>
@@ -145,6 +203,53 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
           </TouchableOpacity>
         )}
       </ScrollView>
+
+      {/* Edit CGPA / Credits Modal */}
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>
+              {editType === 'CGPA' ? 'Edit CGPA' : 'Edit Credits'}
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              {editType === 'CGPA'
+                ? 'Enter your current cumulative GPA (0.00 – 10.00)'
+                : 'Enter your total completed academic credits'}
+            </Text>
+
+            <TextInput
+              style={styles.modalInput}
+              value={editValue}
+              onChangeText={setEditValue}
+              keyboardType="decimal-pad"
+              autoFocus
+              placeholder={editType === 'CGPA' ? '8.71' : '42'}
+              placeholderTextColor="#94A3B8"
+            />
+
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.modalCancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalSaveBtn}
+                onPress={handleSaveAcademics}
+              >
+                <Text style={styles.modalSaveBtnText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </GradientBackground>
   );
 };
@@ -176,6 +281,32 @@ const styles = StyleSheet.create({
     marginTop: 14,
     textAlign: 'center',
     letterSpacing: 0.5,
+  },
+  academicChipsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+  },
+  academicChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FAF7F2',
+    borderWidth: 1,
+    borderColor: 'rgba(41, 51, 50, 0.12)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: designTokens.radii.pill,
+  },
+  academicChipLabel: {
+    fontSize: 12,
+    color: designTokens.colors.textSecondary,
+    fontWeight: '600',
+  },
+  academicChipValue: {
+    fontSize: 13,
+    color: designTokens.colors.primaryDark,
+    fontWeight: '800',
   },
   semesterPill: {
     backgroundColor: designTokens.colors.primarySoft,
@@ -274,5 +405,72 @@ const styles = StyleSheet.create({
     color: designTokens.colors.textSecondary,
     fontSize: 13,
     fontWeight: '700',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(30, 41, 39, 0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(41, 51, 50, 0.08)',
+    ...designTokens.shadows.card,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: designTokens.colors.textPrimary,
+    marginBottom: 6,
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: designTokens.colors.textSecondary,
+    marginBottom: 18,
+    lineHeight: 18,
+  },
+  modalInput: {
+    backgroundColor: '#F8F6F2',
+    borderWidth: 1.5,
+    borderColor: designTokens.colors.primary,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 18,
+    fontWeight: '700',
+    color: designTokens.colors.textPrimary,
+    marginBottom: 20,
+  },
+  modalBtnRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  modalCancelBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  modalCancelBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: designTokens.colors.textSecondary,
+  },
+  modalSaveBtn: {
+    backgroundColor: designTokens.colors.primaryDark,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  modalSaveBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

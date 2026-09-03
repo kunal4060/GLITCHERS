@@ -102,7 +102,7 @@ describe('Fastify Modular API Routes Integration Tests', () => {
     const body = JSON.parse(res.body);
     expect(body.intent).toBe('GET_SCHEDULE');
     expect(body.message).toBeDefined();
-  });
+  }, 15000);
 
   test('GET /api/search returns cross-entity results', async () => {
     const res = await app.inject({

@@ -280,10 +280,23 @@ INSTRUCTIONS:
 
         const geminiRes = await model.generateContent(`${systemPrompt}\n\nStudent question: "${userMessage}"`);
         const geminiReply = geminiRes.response.text();
+        let detectedIntent: RouterIntentType = 'GENERAL_QUERY';
+        if (text.includes('class') || text.includes('schedule') || text.includes('timetable')) {
+          detectedIntent = 'GET_SCHEDULE';
+        } else if (text.includes('expense') || text.includes('spent') || text.includes('cost') || text.includes('spending')) {
+          detectedIntent = 'GET_EXPENSES';
+        } else if (text.includes('budget') || text.includes('allowance')) {
+          detectedIntent = 'GET_BUDGET';
+        } else if (text.includes('task') || text.includes('assignment') || text.includes('todo')) {
+          detectedIntent = 'GET_TASKS';
+        } else if (text.includes('debt') || text.includes('owe') || text.includes('borrow')) {
+          detectedIntent = 'GET_DEBTS';
+        }
+
         if (geminiReply && geminiReply.trim()) {
           return {
             message: geminiReply.trim(),
-            intent: 'GENERAL_QUERY',
+            intent: detectedIntent,
             requiresConfirmation: false,
             confirmationPayload: null,
           };

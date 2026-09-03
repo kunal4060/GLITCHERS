@@ -8,6 +8,7 @@ import {
 } from '../services/email/emailProcessor.js';
 import type { EmailSummary } from '@glitchers/shared';
 import { randomUUID } from 'crypto';
+import { env } from '../config/env.js';
 
 export const emailRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', authMiddleware);
@@ -68,4 +69,75 @@ export const emailRoutes: FastifyPluginAsync = async (fastify) => {
       emailSummary,
     };
   });
+
+  fastify.post('/summarize', async (req) => {
+    const userId = req.userId!;
+    const emails = inMemoryStore.emails.get(userId) || [];
+
+    if (emails.length === 0) {
+      return {
+        bullets: ['No new emails or university announcements found.'],
+        summary: 'Your inbox is clear of academic notices.',
+        count: 0,
+      };
+    }
+
+    // Try summarizing using Gemini 3.6 Flash
+    if (env.GEMINI_API_KEY && !env.GEMINI_API_KEY.startsWith('dev-')) {
+      try {
+        const { GoogleGenerativeAI } = await import('@google/generative-ai');
+        const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
+
+        const emailText = emails
+          .map((e, idx) => `[Email ${idx + 1}] Subject: ${e.subject}\nSender: ${e.sender}\nUrgency: ${e.importance}\nContent: ${e.summary}`)
+          .join('\n\n');
+
+        const prompt = `You are an AI university email summarizer for a college student.
+Below are the recent official university emails:
+
+${emailText}
+
+Task:
+Summarize all the emails into 3 to 4 concise, high-impact bullet points for the student dashboard.
+Each bullet point MUST start with "• " and clearly highlight:
+- Key action required or announcement
+- Any specific deadline, dates, time, or location
+- Urgency level if critical/high
+
+Do not include greetings or markdown headers, just the list of bullet points.`;
+
+        const res = await model.generateContent(prompt);
+        const text = res.response.text();
+        const lines = text
+          .split('\n')
+          .map((l) => l.trim())
+          .filter((l) => l.startsWith('•') || l.startsWith('-') || l.startsWith('*'))
+          .map((l) => '• ' + l.replace(/^[-*•]\s*/, '').trim());
+
+        if (lines.length > 0) {
+          return {
+            bullets: lines,
+            summary: text,
+            count: emails.length,
+          };
+        }
+      } catch (err) {
+        console.warn('Gemini email summarization failed, falling back to local summaries:', err);
+      }
+    }
+
+    // Deterministic fallback
+    const bullets = emails.map((e) => {
+      const imp = e.importance === 'HIGH' || e.importance === 'CRITICAL' ? `[${e.importance}] ` : '';
+      return `• ${imp}**${e.subject}**: ${e.summary}`;
+    });
+
+    return {
+      bullets,
+      summary: bullets.join('\n'),
+      count: emails.length,
+    };
+  });
 };
+

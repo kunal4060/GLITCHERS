@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { designTokens } from '../theme/designTokens';
 import { GlassCard } from '../components/common/GlassCard';
@@ -7,7 +7,9 @@ import { StatCard } from '../components/common/StatCard';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { NinjaAvatar } from '../components/NinjaAvatar';
 import { GradientBackground } from '../components/common/GradientBackground';
+import { AIGemSymbol } from '../components/common/AIGemSymbol';
 import { useDashboardStore } from '../store/dashboardStore';
+import { apiClient } from '../api/client';
 
 export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
   const {
@@ -21,9 +23,34 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
     completeTask,
   } = useDashboardStore();
 
+  const [emailBullets, setEmailBullets] = useState<string[]>([
+    'End-Term Exam slot booking begins Monday 10:00 AM; report clashes by Friday.',
+    'Hostel mess dues payment window extended until next Wednesday without late fine.',
+    'Annual TechFest 48-hour AI Hackathon registrations open with ₹1L prizes (due Sep 10).',
+  ]);
+  const [isSummarizingEmails, setIsSummarizingEmails] = useState(false);
+
+  const handleSummarizeEmails = async () => {
+    setIsSummarizingEmails(true);
+    try {
+      const res = await apiClient.summarizeEmails();
+      if (res.bullets && res.bullets.length > 0) {
+        setEmailBullets(res.bullets);
+      }
+    } catch {
+      // Keep existing or generate from local store
+      if (emails.length > 0) {
+        setEmailBullets(emails.map((e) => `[${e.importance}] ${e.subject}: ${e.summary}`));
+      }
+    } finally {
+      setIsSummarizingEmails(false);
+    }
+  };
+
   useEffect(() => {
     syncWithBackend();
-  }, [syncWithBackend]);
+    handleSummarizeEmails();
+  }, []);
 
   const pendingTasks = tasks.filter((t) => t.status === 'TODO');
   const urgentEmail = emails.find((e) => e.importance === 'CRITICAL' || e.importance === 'HIGH');
@@ -214,6 +241,68 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
               ]}
             />
           </View>
+        </View>
+
+        {/* 7. AI Email Summarization with Gemini (Bottom of Home Screen) */}
+        <View style={styles.emailDigestSection}>
+          <View style={styles.emailDigestHeaderRow}>
+            <View style={styles.emailDigestTitleGroup}>
+              <AIGemSymbol size={22} />
+              <Text style={styles.emailDigestHeading}>AI EMAIL SUMMARY</Text>
+            </View>
+            <View style={styles.geminiBadge}>
+              <Text style={styles.geminiBadgeText}>Gemini 3.6 Flash</Text>
+            </View>
+          </View>
+
+          <GlassCard variant="cream" style={styles.emailDigestCard}>
+            <View style={styles.emailCardTop}>
+              <Text style={styles.emailCardSub}>
+                Executive briefing from university circulars & notices:
+              </Text>
+              <TouchableOpacity
+                onPress={handleSummarizeEmails}
+                disabled={isSummarizingEmails}
+                style={[styles.refreshIconBtn, isSummarizingEmails && { opacity: 0.6 }]}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name="sparkles"
+                  size={14}
+                  color={designTokens.colors.primaryDark}
+                />
+                <Text style={styles.refreshBtnText}>
+                  {isSummarizingEmails ? 'Summarizing...' : 'Re-summarize'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {isSummarizingEmails ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color={designTokens.colors.primaryDark} />
+                <Text style={styles.loadingText}>Gemini is extracting key deadlines & notices...</Text>
+              </View>
+            ) : (
+              <View style={styles.bulletsList}>
+                {emailBullets.map((bullet, idx) => (
+                  <View key={idx} style={styles.bulletItem}>
+                    <Text style={styles.bulletDot}>•</Text>
+                    <Text style={styles.bulletText}>{bullet.replace(/^[•\-\*]\s*/, '')}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            <View style={styles.emailCardBottomRow}>
+              <TouchableOpacity
+                style={styles.viewNoticesBtn}
+                onPress={() => navigation?.navigate('Email')}
+                activeOpacity={0.75}
+              >
+                <Text style={styles.viewNoticesBtnText}>View All University Notices ({emails.length}) →</Text>
+              </TouchableOpacity>
+            </View>
+          </GlassCard>
         </View>
 
         {/* Space at bottom for navigation and floating gem */}
@@ -419,5 +508,121 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: designTokens.colors.primary,
     borderRadius: 3,
+  },
+
+  // 7. AI Email Summarization
+  emailDigestSection: {
+    marginTop: 8,
+    marginBottom: designTokens.spacing.lg,
+  },
+  emailDigestHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  emailDigestTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  emailDigestHeading: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: designTokens.colors.textPrimary,
+    letterSpacing: 0.6,
+  },
+  geminiBadge: {
+    backgroundColor: '#E7ECE9',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: designTokens.radii.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(117, 167, 165, 0.25)',
+  },
+  geminiBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: designTokens.colors.primaryDark,
+  },
+  emailDigestCard: {
+    padding: 16,
+    borderRadius: designTokens.radii.card,
+  },
+  emailCardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  emailCardSub: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: designTokens.colors.textSecondary,
+    flex: 1,
+    paddingRight: 8,
+  },
+  refreshIconBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: designTokens.radii.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(41, 51, 50, 0.1)',
+  },
+  refreshBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: designTokens.colors.primaryDark,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 14,
+  },
+  loadingText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: designTokens.colors.primaryDark,
+  },
+  bulletsList: {
+    gap: 8,
+    marginBottom: 12,
+  },
+  bulletItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  bulletDot: {
+    fontSize: 15,
+    color: designTokens.colors.primaryDark,
+    lineHeight: 18,
+    fontWeight: '800',
+  },
+  bulletText: {
+    fontSize: 13,
+    color: designTokens.colors.textPrimary,
+    lineHeight: 19,
+    flex: 1,
+    fontWeight: '500',
+  },
+  emailCardBottomRow: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(41, 51, 50, 0.08)',
+    paddingTop: 10,
+    alignItems: 'flex-end',
+  },
+  viewNoticesBtn: {
+    paddingVertical: 2,
+  },
+  viewNoticesBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: designTokens.colors.primaryDark,
   },
 });

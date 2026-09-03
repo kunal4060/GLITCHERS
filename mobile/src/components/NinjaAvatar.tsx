@@ -1,11 +1,13 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 
 interface NinjaAvatarProps {
   size?: 'small' | 'large';
   cgpa?: string;
   credits?: number;
   showBadges?: boolean;
+  onPressCgpa?: () => void;
+  onPressCredits?: () => void;
 }
 
 export const NinjaAvatar: React.FC<NinjaAvatarProps> = ({
@@ -13,6 +15,8 @@ export const NinjaAvatar: React.FC<NinjaAvatarProps> = ({
   cgpa = '8.71',
   credits = 42,
   showBadges = true,
+  onPressCgpa,
+  onPressCredits,
 }) => {
   const isLarge = size === 'large';
   const containerSize = isLarge ? 160 : 46;
@@ -21,10 +25,15 @@ export const NinjaAvatar: React.FC<NinjaAvatarProps> = ({
     <View style={[styles.wrapper, { width: containerSize, height: containerSize }]}>
       {/* Top Left CGPA Badge */}
       {isLarge && showBadges && (
-        <View style={styles.cgpaBadge}>
+        <TouchableOpacity
+          activeOpacity={onPressCgpa ? 0.7 : 1}
+          onPress={onPressCgpa}
+          disabled={!onPressCgpa}
+          style={styles.cgpaBadge}
+        >
           <Text style={styles.badgeNumber}>{cgpa}</Text>
-          <Text style={styles.badgeLabel}>cgpa</Text>
-        </View>
+          <Text style={styles.badgeLabel}>cgpa{onPressCgpa ? ' ✎' : ''}</Text>
+        </TouchableOpacity>
       )}
 
       {/* Main Circular Avatar Body */}
@@ -55,10 +64,15 @@ export const NinjaAvatar: React.FC<NinjaAvatarProps> = ({
 
       {/* Bottom Right Credits Badge */}
       {isLarge && showBadges && (
-        <View style={styles.creditsBadge}>
+        <TouchableOpacity
+          activeOpacity={onPressCredits ? 0.7 : 1}
+          onPress={onPressCredits}
+          disabled={!onPressCredits}
+          style={styles.creditsBadge}
+        >
           <Text style={styles.badgeNumber}>{credits}</Text>
-          <Text style={styles.badgeLabel}>credits</Text>
-        </View>
+          <Text style={styles.badgeLabel}>credits{onPressCredits ? ' ✎' : ''}</Text>
+        </TouchableOpacity>
       )}
     </View>
   );
