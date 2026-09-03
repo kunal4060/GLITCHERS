@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { designTokens } from '../theme/designTokens';
 import { GlassCard } from '../components/common/GlassCard';
 import { GradientBackground } from '../components/common/GradientBackground';
@@ -62,11 +63,11 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
     }
     // Default starter chips
     return [
+      { label: '📐 Solve 4x + 16 = 36', prompt: 'Solve step by step: 4x + 16 = 36' },
+      { label: '📊 Conclude app data', prompt: 'Conclude all the data of my app, like my expenses and classes and tasks' },
       { label: 'Yesterday expenses', prompt: 'What amount did I expense yesterday?' },
       { label: 'Which classes do I have', prompt: 'Which classes do I have?' },
-      { label: 'Daily expense budget', prompt: 'Calculate my daily expense allowance and remaining budget' },
       { label: 'Spent ₹180 on dinner', prompt: 'Spent ₹180 on dinner' },
-      { label: 'Submit AI assignment', prompt: 'Remind me to submit AI assignment tomorrow. Make it extremely important' },
       { label: 'Split ₹600 with Rahul', prompt: 'Spent ₹600 on lunch with Rahul. Split it equally' },
     ];
   };
@@ -408,6 +409,77 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
     }
   };
 
+  const handleScanBillFromChat = async () => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Permission Needed', 'Please allow gallery access to upload a bill or receipt photo.');
+        return;
+      }
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        base64: true,
+        quality: 0.85,
+      });
+
+      if (!res.canceled && res.assets && res.assets[0] && res.assets[0].base64) {
+        const userMsg: ChatMessage = {
+          id: String(Date.now()),
+          sender: 'user',
+          text: '📄 [Uploaded Bill/Receipt Photo for Analysis]',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+        setMessages((prev) => [...prev, userMsg]);
+        setLoading(true);
+
+        try {
+          const scanRes = await apiClient.scanBill(res.assets[0].base64, res.assets[0].mimeType || 'image/jpeg');
+          if (scanRes && scanRes.success && scanRes.expense) {
+            addExpense(scanRes.expense);
+            const itemsList = scanRes.parsed.items?.map((i) => `• **${i.name}**: ₹${i.price}`).join('\n') || 'Receipt item';
+            const assistantMsg: ChatMessage = {
+              id: String(Date.now() + 1),
+              sender: 'assistant',
+              text: `### 🧾 Bill Analyzed & Added!\n\n**Merchant**: ${scanRes.parsed.merchant}\n**Category**: ${scanRes.parsed.category}\n\n**Itemized Items**:\n${itemsList}\n\n**Total Amount**: **₹${scanRes.parsed.total}**\n\n*All items have been recorded into your Expense Tracker & Budget!*`,
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              actionCard: {
+                type: 'EXPENSE',
+                title: `✓ ${scanRes.parsed.merchant} Bill Added`,
+                subtitle: scanRes.parsed.summary,
+                primaryValue: `₹${scanRes.parsed.total}`,
+                secondaryValue: `${scanRes.parsed.items?.length || 1} items`,
+                badge: 'Auto-Logged via Gemini',
+                navigationScreen: 'Finance',
+              },
+            };
+            setMessages((prev) => [...prev, assistantMsg]);
+          } else {
+            const errorMsg: ChatMessage = {
+              id: String(Date.now() + 1),
+              sender: 'assistant',
+              text: 'I could not parse this receipt image clearly. Please try another clear photo of the bill.',
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            };
+            setMessages((prev) => [...prev, errorMsg]);
+          }
+        } catch {
+          const errorMsg: ChatMessage = {
+            id: String(Date.now() + 1),
+            sender: 'assistant',
+            text: 'I could not process this bill photo. Please try uploading another well-lit receipt.',
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          };
+          setMessages((prev) => [...prev, errorMsg]);
+        } finally {
+          setLoading(false);
+          setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+        }
+      }
+    } catch {
+      Alert.alert('Error', 'Could not open image picker.');
+    }
+  };
+
   return (
     <GradientBackground>
       <View style={styles.container}>
@@ -534,9 +606,18 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
 
       {/* Input Bar */}
       <View style={styles.inputBar}>
+        <TouchableOpacity
+          style={styles.attachBtn}
+          onPress={handleScanBillFromChat}
+          disabled={loading}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="camera-outline" size={20} color={designTokens.colors.primaryDark} />
+        </TouchableOpacity>
+
         <TextInput
           style={styles.input}
-          placeholder="Ask or command anything..."
+          placeholder="Ask math, conclude data, or upload bill..."
           placeholderTextColor="#64748B"
           value={input}
           onChangeText={setInput}
@@ -729,6 +810,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: designTokens.spacing.sm,
     marginBottom: 8,
+  },
+  attachBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(41, 51, 50, 0.12)',
   },
   input: {
     flex: 1,

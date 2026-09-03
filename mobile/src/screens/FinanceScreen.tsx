@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, Modal, ActivityIndicator } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { designTokens } from '../theme/designTokens';
 import { GlassCard } from '../components/common/GlassCard';
 import { StatCard } from '../components/common/StatCard';
 import { GradientBackground } from '../components/common/GradientBackground';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useDashboardStore } from '../store/dashboardStore';
+import { apiClient } from '../api/client';
 import type { Expense, Debt } from '@glitchers/shared';
 
 export const FinanceScreen: React.FC = () => {
@@ -17,6 +19,49 @@ export const FinanceScreen: React.FC = () => {
   const [splitAmount, setSplitAmount] = useState('');
   const [splitPerson, setSplitPerson] = useState('');
   const [splitDesc, setSplitDesc] = useState('');
+
+  // Bill & Receipt Scanner State
+  const [isScanningBill, setIsScanningBill] = useState(false);
+  const [scannedBillResult, setScannedBillResult] = useState<any | null>(null);
+
+  const handleScanBill = async () => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Permission Needed', 'Please allow gallery access to upload a bill or receipt photo.');
+        return;
+      }
+
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        base64: true,
+        quality: 0.85,
+      });
+
+      if (!res.canceled && res.assets && res.assets[0] && res.assets[0].base64) {
+        setIsScanningBill(true);
+        try {
+          const scanRes = await apiClient.scanBill(res.assets[0].base64, res.assets[0].mimeType || 'image/jpeg');
+          if (scanRes && scanRes.success && scanRes.expense) {
+            addExpense(scanRes.expense);
+            setScannedBillResult(scanRes.parsed);
+            Alert.alert(
+              'Bill Scanned & Logged!',
+              `Logged ₹${scanRes.parsed?.total || scanRes.expense.amount} from ${scanRes.parsed?.merchant || 'Merchant'} with ${scanRes.parsed?.items?.length || 1} item(s).`
+            );
+          } else {
+            Alert.alert('Scan Result', 'Could not read receipt details from the photo.');
+          }
+        } catch {
+          Alert.alert('Scan Error', 'Failed to analyze bill image. Please try another clear photo.');
+        } finally {
+          setIsScanningBill(false);
+        }
+      }
+    } catch {
+      Alert.alert('Error', 'Could not open image picker.');
+    }
+  };
 
   // Calculations
   const totalSpent = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
@@ -172,6 +217,69 @@ export const FinanceScreen: React.FC = () => {
           </View>
         )}
       </GlassCard>
+
+      {/* 3b. Gemini AI Bill & Receipt Scanner Banner */}
+      <TouchableOpacity
+        style={styles.scanBillBanner}
+        onPress={handleScanBill}
+        disabled={isScanningBill}
+        activeOpacity={0.8}
+      >
+        <View style={styles.scanBillLeft}>
+          <View style={styles.scanBillIconCircle}>
+            {isScanningBill ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Ionicons name="camera" size={20} color="#FFFFFF" />
+            )}
+          </View>
+          <View style={styles.scanBillTextCol}>
+            <Text style={styles.scanBillTitle}>
+              {isScanningBill ? 'Gemini is reading receipt items...' : 'Upload Bill Photo (Gemini AI)'}
+            </Text>
+            <Text style={styles.scanBillSub}>
+              {isScanningBill ? 'Extracting merchant, prices & individual items' : 'Snap or pick bill to auto-add all items'}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.scanBillBadge}>
+          <Text style={styles.scanBillBadgeText}>AUTO-LOG</Text>
+        </View>
+      </TouchableOpacity>
+
+      {/* Scanned Bill Breakdown Card */}
+      {scannedBillResult && (
+        <GlassCard variant="cream" style={styles.scannedResultCard}>
+          <View style={styles.scannedHeaderRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.scannedMerchant}>{scannedBillResult.merchant || 'Store Bill'}</Text>
+              <Text style={styles.scannedSummary}>{scannedBillResult.summary || 'Itemized purchase'}</Text>
+            </View>
+            <TouchableOpacity onPress={() => setScannedBillResult(null)} style={styles.scannedCloseBtn}>
+              <Ionicons name="close" size={16} color={designTokens.colors.textPrimary} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.scannedItemsTable}>
+            {scannedBillResult.items?.map((item: any, idx: number) => (
+              <View key={idx} style={styles.scannedItemRow}>
+                <Text style={styles.scannedItemName}>{item.name}</Text>
+                <Text style={styles.scannedItemPrice}>₹{item.price}</Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.scannedTotalRow}>
+            <Text style={styles.scannedTotalLabel}>Total Amount Logged</Text>
+            <Text style={styles.scannedTotalValue}>₹{scannedBillResult.total}</Text>
+          </View>
+
+          <View style={styles.scannedSuccessBadge}>
+            <Ionicons name="checkmark-circle" size={14} color="#15803D" />
+            <Text style={styles.scannedSuccessText}>All items logged into your Expense Tracker & Budget</Text>
+          </View>
+        </GlassCard>
+      )}
 
       {/* 4. Borrow / Lend Ledger & Split Action */}
       <View style={styles.sectionHeaderRow}>
@@ -550,4 +658,143 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalSaveText: { ...designTokens.typography.cardTitle, fontSize: 13, color: '#FFFFFF' },
+
+  // Gemini Bill Scanner Styles
+  scanBillBanner: {
+    backgroundColor: '#324846',
+    borderRadius: designTokens.radii.card,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: designTokens.spacing.lg,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+  },
+  scanBillLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+    paddingRight: 8,
+  },
+  scanBillIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scanBillTextCol: {
+    flex: 1,
+  },
+  scanBillTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 2,
+  },
+  scanBillSub: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#D4E2DF',
+  },
+  scanBillBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: designTokens.radii.pill,
+  },
+  scanBillBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  scannedResultCard: {
+    padding: 16,
+    marginBottom: designTokens.spacing.lg,
+    borderRadius: designTokens.radii.card,
+  },
+  scannedHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  scannedMerchant: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: designTokens.colors.textPrimary,
+  },
+  scannedSummary: {
+    fontSize: 12,
+    color: designTokens.colors.textSecondary,
+    marginTop: 2,
+  },
+  scannedCloseBtn: {
+    padding: 4,
+  },
+  scannedItemsTable: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: designTokens.radii.md,
+    padding: 10,
+    marginBottom: 10,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(41, 51, 50, 0.08)',
+  },
+  scannedItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  scannedItemName: {
+    fontSize: 13,
+    color: designTokens.colors.textPrimary,
+    fontWeight: '500',
+    flex: 1,
+  },
+  scannedItemPrice: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: designTokens.colors.primaryDark,
+  },
+  scannedTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(41, 51, 50, 0.1)',
+    marginBottom: 8,
+  },
+  scannedTotalLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: designTokens.colors.textPrimary,
+  },
+  scannedTotalValue: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: designTokens.colors.primaryDark,
+  },
+  scannedSuccessBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: designTokens.radii.pill,
+  },
+  scannedSuccessText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#15803D',
+  },
 });

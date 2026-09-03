@@ -137,6 +137,23 @@ class ApiClient {
     return this.patch<any>('/settings', data);
   }
 
+  public async scanBill(imageBase64: string, mimeType: string = 'image/jpeg') {
+    return this.post<{
+      success: boolean;
+      expense: any;
+      parsed: {
+        merchant: string;
+        items: Array<{ name: string; price: number; quantity?: number }>;
+        total: number;
+        category: string;
+        summary: string;
+      };
+    }>('/expenses/scan-bill', {
+      imageBase64,
+      mimeType,
+    });
+  }
+
   public async syncBatch(operations: any[]) {
     return this.post<any>('/sync/batch', { operations });
   }

@@ -73,4 +73,23 @@ export const expenseRoutes: FastifyPluginAsync = async (fastify) => {
     inMemoryStore.expenses.set(userId, filtered);
     return { success: true };
   });
+
+  /**
+   * Scan Bill / Receipt Image with Gemini Multimodal Vision
+   * Analyzes receipt photo, extracts items, total, merchant, and logs expense.
+   */
+  fastify.post<{
+    Body: { imageBase64?: string; mimeType?: string };
+  }>('/scan-bill', async (req, reply) => {
+    const userId = req.userId!;
+    const { imageBase64, mimeType = 'image/jpeg' } = req.body || {};
+
+    if (!imageBase64) {
+      return reply.status(400).send({ error: 'imageBase64 is required to scan bill' });
+    }
+
+    const cleanBase64 = imageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
+    const result = await geminiAssistant.analyzeBillImage(userId, cleanBase64, mimeType);
+    return result;
+  });
 };

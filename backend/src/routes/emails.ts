@@ -87,7 +87,6 @@ export const emailRoutes: FastifyPluginAsync = async (fastify) => {
       try {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
-        const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
 
         const emailText = emails
           .map((e, idx) => `[Email ${idx + 1}] Subject: ${e.subject}\nSender: ${e.sender}\nUrgency: ${e.importance}\nContent: ${e.summary}`)
@@ -107,8 +106,19 @@ Each bullet point MUST start with "• " and clearly highlight:
 
 Do not include greetings or markdown headers, just the list of bullet points.`;
 
-        const res = await model.generateContent(prompt);
-        const text = res.response.text();
+        let reply = '';
+        for (const modelName of ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-3.5-flash']) {
+          try {
+            const model = genAI.getGenerativeModel({ model: modelName });
+            const res = await model.generateContent(prompt);
+            reply = res.response.text();
+            if (reply && reply.trim()) break;
+          } catch (mErr: any) {
+            console.warn(`Email summarizer model ${modelName} failed (${mErr.message}), trying next...`);
+          }
+        }
+
+        const text = reply;
         const lines = text
           .split('\n')
           .map((l) => l.trim())
