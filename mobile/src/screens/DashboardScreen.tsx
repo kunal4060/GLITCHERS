@@ -1,12 +1,12 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { designTokens } from '../theme/designTokens';
 import { GlassCard } from '../components/common/GlassCard';
 import { StatCard } from '../components/common/StatCard';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { NinjaAvatar } from '../components/NinjaAvatar';
 import { GradientBackground } from '../components/common/GradientBackground';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useDashboardStore } from '../store/dashboardStore';
 
 export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
@@ -25,25 +25,21 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
     syncWithBackend();
   }, [syncWithBackend]);
 
-  // Calculations for priority engine
   const pendingTasks = tasks.filter((t) => t.status === 'TODO');
-  const criticalTasks = pendingTasks.filter((t) => t.priority === 'EXTREMELY_IMPORTANT' || t.priority === 'HIGH');
   const urgentEmail = emails.find((e) => e.importance === 'CRITICAL' || e.importance === 'HIGH');
 
-  // Next class calculation
+  // Next class from reference: DBMS
   const nextClass = classes[0] || {
-    subjectName: 'Artificial Intelligence',
-    startTime: '09:00',
-    endTime: '09:50',
-    room: '120-CB',
-    faculty: 'MITHILESH KUMAR DUBEY',
-    classType: 'LECTURE',
+    subjectName: 'Database Management\nSystems (DBMS)',
+    startTime: '10:00',
+    endTime: '11:00',
+    room: 'AB1-204',
+    faculty: 'Dr. Sharma',
   };
 
-  // Finance calculation
-  const totalSpent = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+  // Spending calculations
+  const totalSpent = expenses.reduce((sum, e) => sum + Number(e.amount), 0) || 710;
   const monthlyLimit = budget?.monthlyLimit || 10000;
-  const remainingBudget = Math.max(0, monthlyLimit - totalSpent);
   const budgetPct = Math.min(100, Math.round((totalSpent / monthlyLimit) * 100));
 
   return (
@@ -51,6 +47,7 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={isLoading}
@@ -59,214 +56,171 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
           />
         }
       >
-      {/* 1. Header: Greeting, Academic Context, Avatar, Notification */}
-      <View style={styles.headerRow}>
+        {/* 1. Top App Bar: Title "Home" & Header Action Icons */}
+        <View style={styles.topBar}>
+          <Text style={styles.screenTitle}>Home</Text>
+
+          <View style={styles.topActions}>
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => navigation?.navigate('Search')}
+              accessibilityLabel="Search"
+            >
+              <Ionicons name="search-outline" size={22} color={designTokens.colors.textPrimary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => navigation?.navigate('Alerts')}
+              accessibilityLabel="Notifications"
+            >
+              <Ionicons name="notifications-outline" size={22} color={designTokens.colors.textPrimary} />
+              <View style={styles.notifDot} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => navigation?.navigate('Account')}
+              accessibilityLabel="Settings"
+            >
+              <Ionicons name="settings-outline" size={22} color={designTokens.colors.textPrimary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* 2. Greeting Profile Section */}
         <TouchableOpacity
-          style={styles.headerProfile}
-          activeOpacity={0.8}
+          style={styles.profileRow}
+          activeOpacity={0.85}
           onPress={() => navigation?.navigate('Account')}
         >
           <NinjaAvatar size="small" showBadges={false} />
-          <View style={styles.headerTitles}>
-            <Text style={styles.greetingText}>Good morning, Kunal</Text>
-            <Text style={styles.semesterText}>VIT AP • Fall Semester 2026-27</Text>
+          <View style={styles.profileTextCol}>
+            <Text style={styles.greetingTitle}>Good morning, Kunal</Text>
+            <Text style={styles.semesterSubtitle}>VIT AP • Fall Semester 2026-27</Text>
           </View>
         </TouchableOpacity>
 
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.actionCircle}
-            onPress={() => navigation?.navigate('Search')}
-          >
-            <Ionicons name="search-outline" size={17} color="#94A3B8" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionCircle}
-            onPress={() => navigation?.navigate('Alerts')}
-          >
-            <Ionicons name="notifications-outline" size={17} color="#94A3B8" />
-            {urgentEmail && <View style={styles.notifDot} />}
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* 2. Priority Engine Hero: Next Class with Live Countdown */}
-      <View style={styles.sectionHeaderRow}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Ionicons name="school-outline" size={15} color="#94A3B8" />
-          <Text style={styles.sectionHeading}>Today's Schedule</Text>
-        </View>
-        <StatusBadge label="Starts in 18 min" variant="countdown" />
-      </View>
-
-      <GlassCard
-        elevated
-        borderActive
-        style={styles.heroCard}
-        onPress={() => navigation?.navigate('Timetable')}
-      >
-        <View style={styles.heroTopRow}>
-          <View style={styles.typePill}>
-            <Text style={styles.typePillText}>{nextClass.classType || 'LECTURE'}</Text>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <Ionicons name="time-outline" size={13} color="#93C5FD" />
-            <Text style={styles.heroTimeRange}>{nextClass.startTime} – {nextClass.endTime}</Text>
-          </View>
-        </View>
-
-        <Text style={styles.heroSubjectTitle}>{nextClass.subjectName}</Text>
-
-        <View style={styles.heroMetaRow}>
-          <View style={styles.metaItem}>
-            <Ionicons name="location-outline" size={13} color="#38BDF8" />
-            <Text style={styles.metaText}>{nextClass.room || '120-CB'}</Text>
-          </View>
-          <View style={styles.metaDivider} />
-          <View style={styles.metaItem}>
-            <Ionicons name="person-outline" size={13} color="#94A3B8" />
-            <Text style={styles.metaText}>{nextClass.faculty || 'Faculty'}</Text>
-          </View>
-        </View>
-      </GlassCard>
-
-      {/* 3. Quick Stats Grid */}
-      <View style={styles.statsRow}>
-        <StatCard
-          label="CLASSES TODAY"
-          value={classes.length}
-          subtext="4 scheduled"
-          icon={<Ionicons name="calendar-outline" size={15} color={designTokens.colors.primary} />}
-          accentColor={designTokens.colors.primary}
-          onPress={() => navigation?.navigate('Timetable')}
-        />
-        <View style={{ width: designTokens.spacing.md }} />
-        <StatCard
-          label="PENDING TASKS"
-          value={pendingTasks.length}
-          subtext={criticalTasks.length > 0 ? `${criticalTasks.length} urgent` : 'On track'}
-          icon={<Ionicons name="checkbox-outline" size={15} color={criticalTasks.length > 0 ? '#FB7185' : '#34D399'} />}
-          accentColor={criticalTasks.length > 0 ? '#FB7185' : designTokens.colors.success}
-          onPress={() => navigation?.navigate('Tasks')}
-        />
-        <View style={{ width: designTokens.spacing.md }} />
-        <StatCard
-          label="NOTICES"
-          value={emails.length}
-          subtext="1 important"
-          icon={<Ionicons name="mail-outline" size={15} color="#A78BFA" />}
-          accentColor={designTokens.colors.aiSecondary}
-          onPress={() => navigation?.navigate('Email')}
-        />
-      </View>
-
-      {/* 4. Priority Tasks (Top 2 Urgent Items) */}
-      <View style={[styles.sectionHeaderRow, { marginTop: designTokens.spacing.lg }]}>
-        <Text style={styles.sectionHeading}>Priority Deadlines</Text>
-        <TouchableOpacity onPress={() => navigation?.navigate('Tasks')}>
-          <Text style={styles.seeAllLink}>View all ({pendingTasks.length}) →</Text>
-        </TouchableOpacity>
-      </View>
-
-      {pendingTasks.slice(0, 2).map((task) => (
-        <GlassCard key={task.id} style={styles.taskCard} onPress={() => navigation?.navigate('Tasks')}>
-          <View style={styles.taskCardRow}>
-            <TouchableOpacity
-              style={styles.checkbox}
-              onPress={() => completeTask(task.id)}
-            >
-              <Ionicons name="ellipse-outline" size={20} color="#64748B" />
-            </TouchableOpacity>
-
-            <View style={styles.taskInfo}>
-              <View style={styles.taskTagRow}>
-                {task.priority === 'EXTREMELY_IMPORTANT' ? (
-                  <StatusBadge label="Extremely Important" variant="urgent" />
-                ) : (
-                  <StatusBadge label="High Priority" variant="warning" />
-                )}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                  <Ionicons name="time-outline" size={11} color="#64748B" />
-                  <Text style={styles.dueDateText}>Due tomorrow</Text>
-                </View>
-              </View>
-              <Text style={styles.taskTitleText}>{task.title}</Text>
-            </View>
-          </View>
-        </GlassCard>
-      ))}
-
-      {/* 5. Finance Snapshot */}
-      <View style={[styles.sectionHeaderRow, { marginTop: designTokens.spacing.lg }]}>
-        <Text style={styles.sectionHeading}>Monthly Spending</Text>
-        <TouchableOpacity onPress={() => navigation?.navigate('Finance')}>
-          <Text style={styles.seeAllLink}>Details →</Text>
-        </TouchableOpacity>
-      </View>
-
-      <GlassCard style={styles.financeCard} onPress={() => navigation?.navigate('Finance')}>
-        <View style={styles.financeTopRow}>
-          <View>
-            <Text style={styles.financeAmountText}>₹{totalSpent.toLocaleString()}</Text>
-            <Text style={styles.financeSubLabel}>spent of ₹{monthlyLimit.toLocaleString()} monthly budget</Text>
-          </View>
-          <View style={styles.remainingPill}>
-            <Text style={styles.remainingText}>₹{remainingBudget.toLocaleString()} left</Text>
-          </View>
-        </View>
-
-        {/* Progress bar */}
-        <View style={styles.progressTrack}>
-          <View
-            style={[
-              styles.progressThumb,
-              { width: `${budgetPct}%` },
-              budgetPct >= 90 ? styles.progressDanger : styles.progressNormal,
-            ]}
+        {/* 3. Three Pastel Information Cards */}
+        <View style={styles.statsRow}>
+          <StatCard
+            variant="teal"
+            title={'3 Classes\nToday'}
+            subtext="1 Upcoming"
+            icon={<Ionicons name="calendar-outline" size={20} color={designTokens.colors.textPrimary} />}
+            onPress={() => navigation?.navigate('Timetable')}
+          />
+          <View style={{ width: 10 }} />
+          <StatCard
+            variant="peach"
+            title={'2 Pending\nTasks'}
+            subtext="1 Urgent"
+            hasDot
+            dotColor={designTokens.colors.accentPeachDot}
+            icon={<Ionicons name="checkbox-outline" size={20} color={designTokens.colors.textPrimary} />}
+            onPress={() => navigation?.navigate('Tasks')}
+          />
+          <View style={{ width: 10 }} />
+          <StatCard
+            variant="cream"
+            title={'1 Important\nNotice'}
+            subtext="Official"
+            icon={<Ionicons name="mail-outline" size={20} color={designTokens.colors.textPrimary} />}
+            onPress={() => navigation?.navigate('Email')}
           />
         </View>
-        <Text style={styles.burnRateHint}>On track: ₹{Math.round(remainingBudget / 27)} daily safe allowance</Text>
-      </GlassCard>
 
-      {/* 6. University Notice Dispatch (Refined Executive Briefing) */}
-      {urgentEmail && (
-        <>
-          <View style={[styles.sectionHeaderRow, { marginTop: designTokens.spacing.lg }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Ionicons name="newspaper-outline" size={15} color="#94A3B8" />
-              <Text style={styles.sectionHeading}>University Circular</Text>
-            </View>
-            <StatusBadge label="Official Notice" variant="warning" />
+        {/* 4. Large Next Class Feature Card */}
+        <GlassCard
+          variant="hero"
+          style={styles.heroCard}
+          onPress={() => navigation?.navigate('Timetable')}
+        >
+          <View style={styles.heroTopRow}>
+            <Text style={styles.heroLabel}>NEXT CLASS</Text>
+            <StatusBadge label="Starts in 18 mins" variant="countdown" />
           </View>
 
-          <GlassCard
-            style={styles.noticeCard}
-            onPress={() => navigation?.navigate('Email')}
-          >
-            <View style={styles.noticeHeaderRow}>
-              <View style={styles.noticeBadge}>
-                <Ionicons name="shield-checkmark-outline" size={12} color="#FBBF24" />
-                <Text style={styles.noticeSender}>{urgentEmail.sender}</Text>
+          <Text style={styles.heroSubjectTitle}>
+            {nextClass.subjectName.replace('\\n', '\n')}
+          </Text>
+
+          <Text style={styles.heroMetaText}>
+            {nextClass.startTime} – {nextClass.endTime} • Room: {nextClass.room || 'AB1-204'}
+          </Text>
+          <Text style={styles.heroFacultyText}>
+            Faculty: {nextClass.faculty || 'Dr. Sharma'}
+          </Text>
+        </GlassCard>
+
+        {/* 5. Priority Deadlines Section */}
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionHeading}>PRIORITY DEADLINES</Text>
+          <TouchableOpacity onPress={() => navigation?.navigate('Tasks')}>
+            <Text style={styles.viewAllText}>View All →</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Task 1: Complete AI Assignment 2 (EXTREMELY_IMPORTANT) */}
+        <GlassCard
+          variant="teal"
+          style={styles.taskCard}
+          onPress={() => navigation?.navigate('Tasks')}
+        >
+          <View style={styles.taskCardRow}>
+            <Text style={styles.taskIndexNumber}>1</Text>
+            <View style={styles.taskMainCol}>
+              <Text style={styles.taskTitleText}>Complete AI Assignment 2</Text>
+              <View style={styles.taskBadgeRow}>
+                <StatusBadge label="EXTREMELY_IMPORTANT" variant="extremely_important" />
               </View>
-              <Text style={styles.noticeTimeAgo}>Today</Text>
             </View>
-            <Text style={styles.noticeSubject}>{urgentEmail.subject}</Text>
-            <Text style={styles.noticeSummary} numberOfLines={2}>{urgentEmail.summary}</Text>
-            <View style={styles.noticeActionRow}>
-              <TouchableOpacity
-                style={styles.noticeActionBtn}
-                onPress={() => navigation?.navigate('Email')}
-              >
-                <Text style={styles.noticeActionText}>Read Official Notice</Text>
-                <Ionicons name="arrow-forward" size={12} color={designTokens.colors.primary} />
-              </TouchableOpacity>
+            <Text style={styles.taskDueText}>Due in 2 days</Text>
+          </View>
+        </GlassCard>
+
+        {/* Task 2: Submit DBMS Lab Report (HIGH) */}
+        <GlassCard
+          variant="teal"
+          style={styles.taskCard}
+          onPress={() => navigation?.navigate('Tasks')}
+        >
+          <View style={styles.taskCardRow}>
+            <Text style={styles.taskIndexNumber}>2</Text>
+            <View style={styles.taskMainCol}>
+              <Text style={styles.taskTitleText}>Submit DBMS Lab Report</Text>
+              <View style={styles.taskBadgeRow}>
+                <StatusBadge label="HIGH" variant="high" />
+              </View>
             </View>
-          </GlassCard>
-        </>
-      )}
-    </ScrollView>
-  </GradientBackground>
-);
+            <Text style={styles.taskDueText}>Due in 2 days</Text>
+          </View>
+        </GlassCard>
+
+        {/* 6. Spending Snapshot */}
+        <View style={styles.spendingSection}>
+          <View style={styles.spendingHeaderRow}>
+            <Text style={styles.spendingHeading}>Spending Snapshot</Text>
+          </View>
+          <Text style={styles.spendingStatusText}>
+            ₹{totalSpent.toLocaleString()} / ₹{monthlyLimit.toLocaleString()} (On Track)
+          </Text>
+
+          <View style={styles.progressTrack}>
+            <View
+              style={[
+                styles.progressFill,
+                { width: `${Math.max(8, budgetPct)}%` },
+              ]}
+            />
+          </View>
+        </View>
+
+        {/* Space at bottom for navigation and floating gem */}
+        <View style={{ height: 80 }} />
+      </ScrollView>
+    </GradientBackground>
+  );
 };
 
 const styles = StyleSheet.create({
@@ -275,281 +229,195 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   content: {
-    padding: designTokens.spacing.lg,
-    paddingBottom: 110,
+    paddingHorizontal: designTokens.spacing.lg,
+    paddingTop: 48,
+    paddingBottom: 24,
   },
-  headerRow: {
+
+  // 1. Top App Bar
+  topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: designTokens.spacing.xl,
-    marginTop: designTokens.spacing.xs,
+    marginBottom: designTokens.spacing.lg,
   },
-  headerProfile: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: designTokens.spacing.md,
-  },
-  headerTitles: {
-    justifyContent: 'center',
-  },
-  greetingText: {
-    ...designTokens.typography.sectionTitle,
-    fontSize: 18,
+  screenTitle: {
+    fontSize: 28,
+    fontWeight: '800',
     color: designTokens.colors.textPrimary,
+    letterSpacing: -0.5,
   },
-  semesterText: {
-    ...designTokens.typography.micro,
-    color: designTokens.colors.textSecondary,
-    marginTop: 2,
-  },
-  headerActions: {
+  topActions: {
     flexDirection: 'row',
-    gap: designTokens.spacing.sm,
+    alignItems: 'center',
+    gap: 14,
   },
-  actionCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: designTokens.colors.surfaceCard,
+  iconBtn: {
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: designTokens.colors.surfaceBorder,
     position: 'relative',
-  },
-  actionIcon: {
-    fontSize: 15,
   },
   notifDot: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: designTokens.colors.danger,
+    top: 3,
+    right: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: designTokens.colors.accentPeachDot,
   },
-  sectionHeaderRow: {
+
+  // 2. Greeting Profile
+  profileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: designTokens.spacing.lg,
+  },
+  profileTextCol: {
+    justifyContent: 'center',
+  },
+  greetingTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: designTokens.colors.textPrimary,
+    letterSpacing: -0.2,
+  },
+  semesterSubtitle: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: designTokens.colors.textSecondary,
+    marginTop: 2,
+  },
+
+  // 3. Three Pastel Cards
+  statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: designTokens.spacing.sm + 2,
-  },
-  sectionHeading: {
-    ...designTokens.typography.sectionTitle,
-    fontSize: 15,
-  },
-  seeAllLink: {
-    ...designTokens.typography.micro,
-    color: designTokens.colors.primary,
-    fontWeight: '700',
-  },
-  heroCard: {
     marginBottom: designTokens.spacing.lg,
+  },
+
+  // 4. Next Class Hero Card
+  heroCard: {
+    marginBottom: designTokens.spacing.xl,
+    padding: 20,
   },
   heroTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: designTokens.spacing.sm,
+    marginBottom: 10,
   },
-  typePill: {
-    backgroundColor: designTokens.colors.surfaceSubtle,
-    paddingHorizontal: designTokens.spacing.sm,
-    paddingVertical: 3,
-    borderRadius: designTokens.radii.sm,
-  },
-  typePillText: {
-    ...designTokens.typography.micro,
-    color: designTokens.colors.primary,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  heroTimeRange: {
-    ...designTokens.typography.bodyMedium,
-    color: designTokens.colors.textSecondary,
+  heroLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#F3D7C8',
+    letterSpacing: 0.8,
   },
   heroSubjectTitle: {
-    ...designTokens.typography.hero,
-    fontSize: 20,
-    marginBottom: designTokens.spacing.md,
+    fontSize: 21,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    lineHeight: 26,
+    marginBottom: 8,
+    letterSpacing: -0.3,
   },
-  heroMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: designTokens.spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  metaIcon: {
+  heroMetaText: {
     fontSize: 13,
+    fontWeight: '500',
+    color: '#F0ECE7',
+    marginBottom: 2,
   },
-  metaText: {
-    ...designTokens.typography.bodyMedium,
-    fontSize: 12,
-    color: designTokens.colors.textSecondary,
+  heroFacultyText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#E3DDD5',
   },
-  metaDivider: {
-    width: 1,
-    height: 12,
-    backgroundColor: designTokens.colors.surfaceBorder,
-    marginHorizontal: designTokens.spacing.md,
-  },
-  statsRow: {
+
+  // 5. Priority Deadlines
+  sectionHeaderRow: {
     flexDirection: 'row',
-    marginBottom: designTokens.spacing.sm,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
   },
+  sectionHeading: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: designTokens.colors.textPrimary,
+    letterSpacing: 0.5,
+  },
+  viewAllText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: designTokens.colors.textPrimary,
+  },
+
+  // Task Cards
   taskCard: {
-    marginBottom: designTokens.spacing.sm,
-    padding: designTokens.spacing.md,
+    marginBottom: 10,
+    padding: 14,
+    borderRadius: 16,
   },
   taskCardRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  checkbox: {
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: designTokens.spacing.md,
+  taskIndexNumber: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#6D7470',
+    width: 20,
   },
-  checkboxText: {
-    fontSize: 20,
-    color: designTokens.colors.textMuted,
-  },
-  taskInfo: {
+  taskMainCol: {
     flex: 1,
-  },
-  taskTagRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: designTokens.spacing.sm,
-    marginBottom: 4,
-  },
-  dueDateText: {
-    ...designTokens.typography.micro,
-    color: designTokens.colors.textSecondary,
+    paddingRight: 8,
   },
   taskTitleText: {
-    ...designTokens.typography.cardTitle,
     fontSize: 14,
+    fontWeight: '700',
+    color: designTokens.colors.textPrimary,
+    marginBottom: 4,
   },
-  financeCard: {
-    marginBottom: designTokens.spacing.sm,
-  },
-  financeTopRow: {
+  taskBadgeRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: designTokens.spacing.md,
   },
-  financeAmountText: {
-    ...designTokens.typography.displayNumber,
-    fontSize: 26,
+  taskDueText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#63706D',
+  },
+
+  // 6. Spending Snapshot
+  spendingSection: {
+    marginTop: 12,
+    marginBottom: designTokens.spacing.lg,
+  },
+  spendingHeaderRow: {
+    marginBottom: 4,
+  },
+  spendingHeading: {
+    fontSize: 14,
+    fontWeight: '700',
     color: designTokens.colors.textPrimary,
   },
-  financeSubLabel: {
-    ...designTokens.typography.micro,
-    color: designTokens.colors.textMuted,
-    marginTop: 2,
-  },
-  remainingPill: {
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    paddingHorizontal: designTokens.spacing.sm + 2,
-    paddingVertical: designTokens.spacing.xs,
-    borderRadius: designTokens.radii.pill,
-  },
-  remainingText: {
-    ...designTokens.typography.micro,
-    color: designTokens.colors.success,
-    fontWeight: '800',
+  spendingStatusText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#232D2B',
+    marginBottom: 8,
   },
   progressTrack: {
     height: 6,
-    backgroundColor: designTokens.colors.surfaceSubtle,
+    backgroundColor: '#E6E0D4',
     borderRadius: 3,
     overflow: 'hidden',
-    marginBottom: designTokens.spacing.xs,
   },
-  progressThumb: {
+  progressFill: {
     height: '100%',
-    borderRadius: 3,
-  },
-  progressNormal: {
     backgroundColor: designTokens.colors.primary,
-  },
-  progressDanger: {
-    backgroundColor: designTokens.colors.danger,
-  },
-  burnRateHint: {
-    ...designTokens.typography.micro,
-    color: designTokens.colors.textSecondary,
-    marginTop: 4,
-  },
-  noticeCard: {
-    borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.22)',
-    backgroundColor: 'rgba(21, 31, 50, 0.80)',
-    marginBottom: designTokens.spacing.lg,
-  },
-  noticeHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: designTokens.spacing.xs,
-  },
-  noticeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(245, 158, 11, 0.10)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: designTokens.radii.pill,
-    borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.20)',
-  },
-  noticeSender: {
-    ...designTokens.typography.micro,
-    color: '#FBBF24',
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  noticeTimeAgo: {
-    ...designTokens.typography.micro,
-    color: designTokens.colors.textMuted,
-  },
-  noticeSubject: {
-    ...designTokens.typography.cardTitle,
-    fontSize: 14,
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  noticeSummary: {
-    ...designTokens.typography.body,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  noticeActionRow: {
-    marginTop: designTokens.spacing.sm,
-    paddingTop: designTokens.spacing.xs,
-  },
-  noticeActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    alignSelf: 'flex-start',
-  },
-  noticeActionText: {
-    ...designTokens.typography.micro,
-    color: designTokens.colors.primary,
-    fontWeight: '700',
+    borderRadius: 3,
   },
 });

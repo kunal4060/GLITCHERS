@@ -36,18 +36,24 @@ function MainTabs({ navigation }: { navigation: any }) {
         screenOptions={{
           sceneStyle: { backgroundColor: 'transparent' },
           headerStyle: { backgroundColor: 'transparent' },
-          headerTintColor: '#FFFFFF',
-          headerTitleStyle: { fontWeight: '800' },
+          headerTintColor: designTokens.colors.textPrimary,
+          headerTitleStyle: { fontWeight: '700' },
           tabBarStyle: {
-            backgroundColor: 'rgba(7, 10, 16, 0.88)',
-            borderTopColor: designTokens.colors.surfaceBorder,
-            height: 64,
-            paddingBottom: 8,
-            paddingTop: 6,
+            backgroundColor: '#F6F3ED',
+            borderTopColor: 'rgba(41, 51, 50, 0.08)',
+            borderTopWidth: 1,
+            height: 72,
+            paddingBottom: 10,
+            paddingTop: 8,
+            elevation: 0,
+            shadowColor: '#3D352E',
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.03,
+            shadowRadius: 6,
           },
-          tabBarActiveTintColor: designTokens.colors.primary,
-          tabBarInactiveTintColor: designTokens.colors.textMuted,
-          tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
+          tabBarActiveTintColor: designTokens.colors.textPrimary,
+          tabBarInactiveTintColor: designTokens.colors.textSecondary,
+          tabBarLabelStyle: { fontSize: 11, fontWeight: '600', marginTop: 2 },
         }}
       >
         <Tab.Screen
@@ -55,21 +61,45 @@ function MainTabs({ navigation }: { navigation: any }) {
           component={DashboardScreen}
           options={{
             headerShown: false,
+            tabBarLabel: ({ focused }) => (
+              <View style={{ alignItems: 'center' }}>
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: focused ? '700' : '500',
+                    color: focused ? designTokens.colors.textPrimary : designTokens.colors.textSecondary,
+                  }}
+                >
+                  Home
+                </Text>
+                {focused && (
+                  <View
+                    style={{
+                      width: 22,
+                      height: 3,
+                      borderRadius: 1.5,
+                      backgroundColor: designTokens.colors.accentPeachDot, // #D4856A
+                      marginTop: 3,
+                    }}
+                  />
+                )}
+              </View>
+            ),
             tabBarIcon: ({ focused }) => (
               <View
                 style={{
-                  width: 40,
-                  height: 28,
-                  borderRadius: 14,
-                  backgroundColor: focused ? designTokens.colors.primarySubtle : 'transparent',
+                  width: 52,
+                  height: 30,
+                  borderRadius: 15,
+                  backgroundColor: focused ? designTokens.colors.primaryPill : 'transparent',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
                 <Ionicons
                   name={focused ? 'home' : 'home-outline'}
-                  size={20}
-                  color={focused ? designTokens.colors.primary : designTokens.colors.textMuted}
+                  size={19}
+                  color={focused ? designTokens.colors.textPrimary : designTokens.colors.textSecondary}
                 />
               </View>
             ),
@@ -81,23 +111,23 @@ function MainTabs({ navigation }: { navigation: any }) {
           component={TimetableScreen}
           options={{
             headerShown: false,
-            tabBarIcon: ({ focused }) => (
-              <View
+            tabBarLabel: ({ focused }) => (
+              <Text
                 style={{
-                  width: 40,
-                  height: 28,
-                  borderRadius: 14,
-                  backgroundColor: focused ? designTokens.colors.primarySubtle : 'transparent',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  fontSize: 11,
+                  fontWeight: focused ? '700' : '500',
+                  color: focused ? designTokens.colors.textPrimary : designTokens.colors.textSecondary,
                 }}
               >
-                <Ionicons
-                  name={focused ? 'calendar' : 'calendar-outline'}
-                  size={20}
-                  color={focused ? designTokens.colors.primary : designTokens.colors.textMuted}
-                />
-              </View>
+                Timetable
+              </Text>
+            ),
+            tabBarIcon: ({ focused }) => (
+              <Ionicons
+                name={focused ? 'calendar' : 'calendar-outline'}
+                size={20}
+                color={focused ? designTokens.colors.primary : designTokens.colors.textSecondary}
+              />
             ),
           }}
         />
@@ -107,23 +137,23 @@ function MainTabs({ navigation }: { navigation: any }) {
           component={TasksScreen}
           options={{
             headerShown: false,
-            tabBarIcon: ({ focused }) => (
-              <View
+            tabBarLabel: ({ focused }) => (
+              <Text
                 style={{
-                  width: 40,
-                  height: 28,
-                  borderRadius: 14,
-                  backgroundColor: focused ? designTokens.colors.primarySubtle : 'transparent',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  fontSize: 11,
+                  fontWeight: focused ? '700' : '500',
+                  color: focused ? designTokens.colors.textPrimary : designTokens.colors.textSecondary,
                 }}
               >
-                <Ionicons
-                  name={focused ? 'checkbox' : 'checkbox-outline'}
-                  size={20}
-                  color={focused ? designTokens.colors.primary : designTokens.colors.textMuted}
-                />
-              </View>
+                Tasks
+              </Text>
+            ),
+            tabBarIcon: ({ focused }) => (
+              <Ionicons
+                name={focused ? 'checkbox' : 'checkbox-outline'}
+                size={20}
+                color={focused ? designTokens.colors.primary : designTokens.colors.textSecondary}
+              />
             ),
           }}
         />
@@ -133,56 +163,56 @@ function MainTabs({ navigation }: { navigation: any }) {
           component={FinanceScreen}
           options={{
             headerShown: false,
-            tabBarIcon: ({ focused }) => (
-              <View
+            tabBarLabel: ({ focused }) => (
+              <Text
                 style={{
-                  width: 40,
-                  height: 28,
-                  borderRadius: 14,
-                  backgroundColor: focused ? designTokens.colors.primarySubtle : 'transparent',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  fontSize: 11,
+                  fontWeight: focused ? '700' : '500',
+                  color: focused ? designTokens.colors.textPrimary : designTokens.colors.textSecondary,
                 }}
               >
-                <Ionicons
-                  name={focused ? 'wallet' : 'wallet-outline'}
-                  size={20}
-                  color={focused ? designTokens.colors.primary : designTokens.colors.textMuted}
-                />
-              </View>
+                Finance
+              </Text>
+            ),
+            tabBarIcon: ({ focused }) => (
+              <Ionicons
+                name={focused ? 'cash' : 'cash-outline'}
+                size={20}
+                color={focused ? designTokens.colors.primary : designTokens.colors.textSecondary}
+              />
             ),
           }}
         />
 
         <Tab.Screen
-          name="AI Assistant"
+          name="AI Companion"
           component={AIChatScreen}
           options={{
             headerShown: false,
-            tabBarIcon: ({ focused }) => (
-              <View
+            tabBarLabel: ({ focused }) => (
+              <Text
                 style={{
-                  width: 40,
-                  height: 28,
-                  borderRadius: 14,
-                  backgroundColor: focused ? designTokens.colors.aiSubtle : 'transparent',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  fontSize: 11,
+                  fontWeight: focused ? '700' : '500',
+                  color: focused ? designTokens.colors.textPrimary : designTokens.colors.textSecondary,
                 }}
               >
-                <Ionicons
-                  name={focused ? 'sparkles' : 'sparkles-outline'}
-                  size={20}
-                  color={focused ? designTokens.colors.aiPrimary : designTokens.colors.textMuted}
-                />
-              </View>
+                AI Companion
+              </Text>
+            ),
+            tabBarIcon: ({ focused }) => (
+              <Ionicons
+                name={focused ? 'school' : 'school-outline'}
+                size={20}
+                color={focused ? designTokens.colors.primary : designTokens.colors.textSecondary}
+              />
             ),
           }}
         />
       </Tab.Navigator>
 
-      {/* Global In-App Floating AI Companion Button */}
-      <FloatingAIButton onPress={() => navigation.navigate('AI Assistant')} />
+      {/* Floating 3D Crystal Gem Assistant */}
+      <FloatingAIButton onPress={() => navigation.navigate('AI Companion')} />
     </View>
   );
 }
@@ -198,9 +228,10 @@ export const RootNavigator: React.FC = () => {
     <Stack.Navigator
       id="root-stack"
       screenOptions={{
-        headerStyle: { backgroundColor: 'rgba(7, 10, 16, 0.90)' },
-        headerTintColor: '#FFFFFF',
-        headerTitleStyle: { fontWeight: '800' },
+        headerStyle: { backgroundColor: designTokens.colors.background },
+        headerTintColor: designTokens.colors.textPrimary,
+        headerTitleStyle: { fontWeight: '700', color: designTokens.colors.textPrimary },
+        headerShadowVisible: false,
         contentStyle: { backgroundColor: 'transparent' },
       }}
     >

@@ -1,45 +1,63 @@
 export const designTokens = {
   colors: {
-    // Deep obsidian & calm dark navy background surfaces
-    background: '#070A10',
-    backgroundElevated: '#0D131F',
-    surface: '#111827',
-    surfaceCard: '#151F32',
-    surfaceElevated: '#1A263D',
-    surfaceSubtle: '#1F2E49',
-    surfaceBorder: '#1E2D44',
-    surfaceBorderActive: '#3B82F6',
+    // Warm Ivory / Off-White Canvas (Reference Source of Truth)
+    background: '#F7F4EE',
+    backgroundElevated: '#FFFFFF',
+    surface: '#FFFFFF',
+    surfaceSecondary: '#F2EFE8',
+    surfaceCard: '#FFFFFF',
+    surfaceElevated: '#FFFFFF',
+    surfaceSubtle: '#EDE8DF',
+    surfaceBorder: 'rgba(41, 51, 50, 0.07)',
+    surfaceBorderActive: '#75A7A5',
 
-    // Primary Accents (restrained, deliberate electric blue)
-    primary: '#3B82F6',
-    primaryHover: '#2563EB',
-    primaryGlow: 'rgba(59, 130, 246, 0.15)',
-    primarySubtle: 'rgba(59, 130, 246, 0.10)',
+    // Primary Palette (Muted Teal / Blue-Green)
+    primary: '#75A7A5',
+    primaryDark: '#5D8D8B',
+    primaryMuted: '#6F9F9D',
+    primaryLight: '#86B4B1',
+    primarySoft: '#D2E5E3', // Soft mint/teal for cards
+    primaryPill: '#BFD9D8', // Active tab pill
+    primaryDeep: '#4A6B70', // Hero card gradient end
+    primaryGlow: 'rgba(117, 167, 165, 0.15)',
+    primarySubtle: 'rgba(117, 167, 165, 0.12)',
 
-    // AI Visual Identity (Violet / Purple Glow)
-    aiPrimary: '#8B5CF6',
-    aiSecondary: '#A78BFA',
-    aiGlow: 'rgba(139, 92, 246, 0.20)',
-    aiSubtle: 'rgba(139, 92, 246, 0.08)',
-    aiBorder: 'rgba(139, 92, 246, 0.35)',
+    // Secondary Pastel Accents
+    accentPeach: '#E8AD8E', // Warm peach / terracotta
+    accentPeachDeep: '#C88E72', // Hero card gradient start
+    accentPeachDot: '#D4856A', // Notification dot & status dot
+    accentPeachCard: '#EEDFD3', // Stat card 2 tint
+    accentCream: '#F1E5D5',
+    accentSand: '#E3EAE7', // Stat card 3 tint
+    accentSage: '#B8C9B9',
+    accentWine: '#8A2E3B', // EXTREMELY_IMPORTANT crimson/wine badge
 
-    // Semantic Accents
-    success: '#10B981',
-    successGlow: 'rgba(16, 185, 129, 0.15)',
-    warning: '#F59E0B',
-    warningGlow: 'rgba(245, 158, 11, 0.15)',
-    danger: '#EF4444',
-    dangerGlow: 'rgba(239, 68, 68, 0.15)',
+    // AI Visual Identity
+    aiPrimary: '#75A7A5',
+    aiSecondary: '#D4856A',
+    aiGlow: 'rgba(212, 133, 106, 0.20)',
+    aiSubtle: 'rgba(117, 167, 165, 0.08)',
+    aiBorder: 'rgba(117, 167, 165, 0.25)',
 
-    // Typography
-    textPrimary: '#FFFFFF',
-    textSecondary: '#94A3B8',
-    textMuted: '#64748B',
-    textSubtle: '#475569',
+    // Semantic Accents (Muted, Academic, Non-Neon)
+    success: '#6B9E82',
+    successSoft: '#D6E8DE',
+    warning: '#D4856A',
+    warningSoft: '#F7E4DC',
+    danger: '#8A2E3B',
+    dangerSoft: '#F5D7DC',
+
+    // Typography Hierarchy
+    textPrimary: '#232D2B', // Dark warm charcoal
+    textSecondary: '#6D7470', // Muted gray-green / warm slate
+    textMuted: '#8C9692', // Subtle metadata
+    textSubtle: '#A2ACA8',
+    textLight: '#FFFFFF', // High-contrast text on dark/gradient surfaces
+    textPeach: '#F3D7C8', // Hero card "NEXT CLASS" label
 
     // Specific Badges
-    cgpaBadge: '#F59E0B',
-    creditsBadge: '#2563EB',
+    cgpaBadge: '#D4856A',
+    creditsBadge: '#75A7A5',
   },
 
   // Spacing Scale: 4, 8, 12, 16, 20, 24, 32
@@ -53,43 +71,44 @@ export const designTokens = {
     hero: 32,
   },
 
-  // Radii Tokens
+  // Radii Tokens (Rounded, Organic, 16-24px mobile standard)
   radii: {
     xs: 6,
     sm: 10,
     md: 14,
     lg: 18,
-    xl: 24,
+    xl: 22,
+    card: 20,
     pill: 999,
   },
 
   // Typography Hierarchy
   typography: {
-    hero: { fontSize: 26, fontWeight: '800' as const, color: '#FFFFFF', letterSpacing: -0.5 },
-    displayNumber: { fontSize: 32, fontWeight: '900' as const, color: '#FFFFFF', letterSpacing: -0.5 },
-    sectionTitle: { fontSize: 18, fontWeight: '700' as const, color: '#FFFFFF', letterSpacing: -0.2 },
-    cardTitle: { fontSize: 15, fontWeight: '600' as const, color: '#FFFFFF' },
-    body: { fontSize: 13, fontWeight: '400' as const, color: '#94A3B8', lineHeight: 18 },
-    bodyMedium: { fontSize: 13, fontWeight: '500' as const, color: '#E2E8F0' },
-    label: { fontSize: 11, fontWeight: '600' as const, color: '#64748B', textTransform: 'uppercase' as const, letterSpacing: 0.5 },
-    micro: { fontSize: 10, fontWeight: '500' as const, color: '#64748B' },
+    hero: { fontSize: 24, fontWeight: '800' as const, color: '#232D2B', letterSpacing: -0.4 },
+    displayNumber: { fontSize: 28, fontWeight: '800' as const, color: '#232D2B', letterSpacing: -0.5 },
+    sectionTitle: { fontSize: 16, fontWeight: '700' as const, color: '#232D2B', letterSpacing: -0.2 },
+    cardTitle: { fontSize: 15, fontWeight: '700' as const, color: '#232D2B' },
+    body: { fontSize: 13, fontWeight: '400' as const, color: '#6D7470', lineHeight: 18 },
+    bodyMedium: { fontSize: 13, fontWeight: '500' as const, color: '#232D2B' },
+    label: { fontSize: 11, fontWeight: '700' as const, color: '#8C9692', textTransform: 'uppercase' as const, letterSpacing: 0.6 },
+    micro: { fontSize: 11, fontWeight: '500' as const, color: '#8C9692' },
   },
 
-  // Shadows
+  // Soft Warm Shadows
   shadows: {
     card: {
-      shadowColor: '#000',
+      shadowColor: '#3D352E',
       shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
-      elevation: 3,
+      shadowOpacity: 0.05,
+      shadowRadius: 10,
+      elevation: 2,
     },
     floating: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.45,
+      shadowColor: '#3D352E',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.12,
       shadowRadius: 16,
-      elevation: 8,
+      elevation: 6,
     },
   },
 };

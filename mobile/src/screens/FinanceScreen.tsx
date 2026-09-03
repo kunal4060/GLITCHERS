@@ -184,19 +184,21 @@ export const FinanceScreen: React.FC = () => {
 
       <View style={styles.debtsRow}>
         <StatCard
-          label="TO RECEIVE"
+          variant="teal"
+          title="TO RECEIVE"
           value={`₹${toReceive.toLocaleString()}`}
           subtext="Friends owe you"
-          icon={<Ionicons name="arrow-down-circle-outline" size={15} color="#34D399" />}
-          accentColor={designTokens.colors.success}
+          icon={<Ionicons name="arrow-down-circle-outline" size={18} color={designTokens.colors.primaryDark} />}
+          accentColor={designTokens.colors.primaryDark}
         />
         <View style={{ width: designTokens.spacing.md }} />
         <StatCard
-          label="TO PAY"
+          variant="peach"
+          title="TO PAY"
           value={`₹${toPay.toLocaleString()}`}
           subtext="You owe friends"
-          icon={<Ionicons name="arrow-up-circle-outline" size={15} color="#FB7185" />}
-          accentColor={designTokens.colors.danger}
+          icon={<Ionicons name="arrow-up-circle-outline" size={18} color={designTokens.colors.accentPeachDot} />}
+          accentColor={designTokens.colors.accentPeachDot}
         />
       </View>
 
@@ -393,11 +395,11 @@ const styles = StyleSheet.create({
   quickAddText: { ...designTokens.typography.cardTitle, fontSize: 13, color: '#FFFFFF' },
   previewBox: {
     marginTop: designTokens.spacing.md,
-    backgroundColor: designTokens.colors.surfaceElevated,
+    backgroundColor: '#FAF7F2',
     borderRadius: designTokens.radii.md,
     padding: designTokens.spacing.md,
     borderWidth: 1,
-    borderColor: designTokens.colors.surfaceBorderActive,
+    borderColor: 'rgba(117, 167, 165, 0.25)',
   },
   previewHeader: {
     flexDirection: 'row',
@@ -449,23 +451,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: designTokens.spacing.xs + 2,
+    paddingVertical: designTokens.spacing.xs + 3,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.04)',
+    borderBottomColor: 'rgba(41, 51, 50, 0.06)',
   },
   debtPerson: { ...designTokens.typography.cardTitle, fontSize: 13 },
   debtNotes: { ...designTokens.typography.micro, color: designTokens.colors.textMuted },
   debtRight: { alignItems: 'flex-end', gap: 4 },
   debtAmount: { ...designTokens.typography.cardTitle, fontSize: 14 },
-  textSuccess: { color: designTokens.colors.success },
-  textDanger: { color: designTokens.colors.danger },
+  textSuccess: { color: designTokens.colors.primaryDark },
+  textDanger: { color: designTokens.colors.accentPeachDot },
   settleBtn: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: designTokens.radii.xs,
+    backgroundColor: designTokens.colors.primarySoft,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: designTokens.radii.pill,
   },
-  settleText: { ...designTokens.typography.micro, color: designTokens.colors.success, fontWeight: '700' },
+  settleText: { ...designTokens.typography.micro, color: designTokens.colors.primaryDeep, fontWeight: '700' },
   breakdownCard: {
     marginTop: designTokens.spacing.sm,
     gap: designTokens.spacing.md,
@@ -476,13 +478,13 @@ const styles = StyleSheet.create({
   catAmount: { ...designTokens.typography.micro, color: designTokens.colors.textSecondary },
   catBarTrack: {
     height: 5,
-    backgroundColor: designTokens.colors.surfaceSubtle,
+    backgroundColor: '#E6E0D4',
     borderRadius: 2.5,
     overflow: 'hidden',
   },
   catBarFill: {
     height: '100%',
-    backgroundColor: '#60A5FA',
+    backgroundColor: designTokens.colors.primary,
     borderRadius: 2.5,
   },
   txList: {
@@ -501,15 +503,15 @@ const styles = StyleSheet.create({
   txDesc: { ...designTokens.typography.cardTitle, fontSize: 13 },
   txCat: { ...designTokens.typography.micro, color: designTokens.colors.textMuted, marginTop: 2 },
   txRight: { flexDirection: 'row', alignItems: 'center', gap: designTokens.spacing.md },
-  txAmount: { ...designTokens.typography.cardTitle, fontSize: 14, color: '#FFFFFF' },
+  txAmount: { ...designTokens.typography.cardTitle, fontSize: 14, color: designTokens.colors.textPrimary },
   txDelete: { color: designTokens.colors.textMuted, fontSize: 14, padding: 4 },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backgroundColor: 'rgba(35, 45, 43, 0.45)',
     justifyContent: 'flex-end',
   },
   modalSheet: {
-    backgroundColor: designTokens.colors.surfaceCard,
+    backgroundColor: '#FAF7F2',
     borderTopLeftRadius: designTokens.radii.xl,
     borderTopRightRadius: designTokens.radii.xl,
     padding: designTokens.spacing.xl,
@@ -518,14 +520,14 @@ const styles = StyleSheet.create({
   },
   modalTitle: { ...designTokens.typography.sectionTitle, fontSize: 18, marginBottom: designTokens.spacing.xs },
   modalInput: {
-    backgroundColor: designTokens.colors.surfaceElevated,
+    backgroundColor: '#FFFFFF',
     borderRadius: designTokens.radii.md,
     paddingHorizontal: designTokens.spacing.md,
     paddingVertical: designTokens.spacing.md,
     color: designTokens.colors.textPrimary,
     fontSize: 13,
     borderWidth: 1,
-    borderColor: designTokens.colors.surfaceBorder,
+    borderColor: 'rgba(41, 51, 50, 0.10)',
   },
   modalActionRow: {
     flexDirection: 'row',

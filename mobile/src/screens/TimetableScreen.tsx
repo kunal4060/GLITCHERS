@@ -274,12 +274,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: designTokens.spacing.md,
     paddingVertical: designTokens.spacing.xs + 3,
     borderRadius: designTokens.radii.pill,
-    backgroundColor: 'rgba(21, 31, 50, 0.70)',
+    backgroundColor: '#FAF7F2',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(41, 51, 50, 0.08)',
   },
   dayTabActive: {
-    backgroundColor: designTokens.colors.primary,
+    backgroundColor: designTokens.colors.primaryPill,
     borderColor: designTokens.colors.primary,
   },
   dayTabText: {
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
     color: designTokens.colors.textSecondary,
   },
   dayTabTextActive: {
-    color: '#FFFFFF',
+    color: designTokens.colors.textPrimary,
     fontWeight: '700',
   },
   scheduleList: {
@@ -330,14 +330,14 @@ const styles = StyleSheet.create({
     gap: designTokens.spacing.xs,
   },
   typeBadge: {
-    backgroundColor: designTokens.colors.surfaceSubtle,
+    backgroundColor: designTokens.colors.primarySoft,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: designTokens.radii.xs,
   },
   typeBadgeText: {
     ...designTokens.typography.micro,
-    color: designTokens.colors.textMuted,
+    color: designTokens.colors.primaryDeep,
     fontSize: 9,
     fontWeight: '800',
   },
@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: designTokens.spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+    borderTopColor: 'rgba(41, 51, 50, 0.06)',
   },
   metaItem: {
     flexDirection: 'row',
@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
   metaDivider: {
     width: 1,
     height: 12,
-    backgroundColor: designTokens.colors.surfaceBorder,
+    backgroundColor: 'rgba(41, 51, 50, 0.1)',
     marginHorizontal: designTokens.spacing.md,
   },
   deleteIconBtn: {
@@ -383,20 +383,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: designTokens.spacing.hero,
-    backgroundColor: designTokens.colors.surfaceCard,
-    borderRadius: designTokens.radii.lg,
+    backgroundColor: '#FFFFFF',
+    borderRadius: designTokens.radii.card,
     paddingHorizontal: designTokens.spacing.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(41, 51, 50, 0.06)',
+    ...designTokens.shadows.card,
   },
   emptyIcon: { fontSize: 32, marginBottom: designTokens.spacing.sm },
   emptyTitle: { ...designTokens.typography.sectionTitle, fontSize: 15, textAlign: 'center' },
   emptySub: { ...designTokens.typography.body, textAlign: 'center', marginTop: 4 },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backgroundColor: 'rgba(35, 45, 43, 0.45)',
     justifyContent: 'flex-end',
   },
   modalSheet: {
-    backgroundColor: designTokens.colors.surfaceCard,
+    backgroundColor: '#FAF7F2',
     borderTopLeftRadius: designTokens.radii.xl,
     borderTopRightRadius: designTokens.radii.xl,
     padding: designTokens.spacing.xl,
@@ -405,14 +408,14 @@ const styles = StyleSheet.create({
   },
   modalTitle: { ...designTokens.typography.sectionTitle, fontSize: 18, marginBottom: designTokens.spacing.xs },
   modalInput: {
-    backgroundColor: designTokens.colors.surfaceElevated,
+    backgroundColor: '#FFFFFF',
     borderRadius: designTokens.radii.md,
     paddingHorizontal: designTokens.spacing.md,
     paddingVertical: designTokens.spacing.md,
     color: designTokens.colors.textPrimary,
     fontSize: 13,
     borderWidth: 1,
-    borderColor: designTokens.colors.surfaceBorder,
+    borderColor: 'rgba(41, 51, 50, 0.10)',
   },
   modalActionRow: {
     flexDirection: 'row',
@@ -421,7 +424,7 @@ const styles = StyleSheet.create({
   },
   modalCancelBtn: {
     flex: 1,
-    backgroundColor: designTokens.colors.surfaceSubtle,
+    backgroundColor: '#EAE5DB',
     paddingVertical: designTokens.spacing.md,
     borderRadius: designTokens.radii.md,
     alignItems: 'center',

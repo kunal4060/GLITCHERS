@@ -355,7 +355,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
                 style={[styles.messageWrapper, isUser ? styles.msgRight : styles.msgLeft]}
               >
                 <View style={[styles.bubble, isUser ? styles.userBubble : styles.assistantBubble]}>
-                  <Text style={styles.bubbleText}>{m.text}</Text>
+                  <Text style={[styles.bubbleText, isUser ? styles.userBubbleText : styles.assistantBubbleText]}>{m.text}</Text>
 
                   {/* Visual Action Card */}
                   {m.actionCard && (
@@ -509,14 +509,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: designTokens.colors.surfaceCard,
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: designTokens.spacing.md,
     paddingVertical: designTokens.spacing.md,
     borderRadius: designTokens.radii.md,
     borderWidth: 1,
-    borderColor: designTokens.colors.surfaceBorder,
+    borderColor: 'rgba(41, 51, 50, 0.06)',
+    ...designTokens.shadows.card,
   },
-  exampleText: { ...designTokens.typography.bodyMedium, fontSize: 13, color: '#E2E8F0' },
+  exampleText: { ...designTokens.typography.bodyMedium, fontSize: 13, color: designTokens.colors.textPrimary },
   exampleArrow: { color: designTokens.colors.primary, fontWeight: '800' },
   chatScroll: { flex: 1 },
   chatContent: { padding: designTokens.spacing.lg, paddingBottom: 20 },
@@ -534,22 +535,25 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 4,
   },
   assistantBubble: {
-    backgroundColor: designTokens.colors.surfaceCard,
+    backgroundColor: '#FFFFFF',
     borderBottomLeftRadius: 4,
     borderWidth: 1,
-    borderColor: designTokens.colors.surfaceBorder,
+    borderColor: 'rgba(41, 51, 50, 0.08)',
+    ...designTokens.shadows.card,
   },
-  bubbleText: { ...designTokens.typography.bodyMedium, color: '#FFFFFF', lineHeight: 20 },
+  bubbleText: { ...designTokens.typography.bodyMedium, lineHeight: 20 },
+  userBubbleText: { color: '#FFFFFF' },
+  assistantBubbleText: { color: designTokens.colors.textPrimary },
   msgTime: {
     ...designTokens.typography.micro,
-    color: 'rgba(255, 255, 255, 0.45)',
+    color: designTokens.colors.textMuted,
     alignSelf: 'flex-end',
     marginTop: 4,
   },
   actionCard: {
     marginTop: designTokens.spacing.md,
-    backgroundColor: designTokens.colors.surfaceElevated,
-    borderColor: designTokens.colors.surfaceBorderActive,
+    backgroundColor: '#FAF7F2',
+    borderColor: 'rgba(117, 167, 165, 0.25)',
     padding: designTokens.spacing.md,
   },
   cardHeaderRow: {
@@ -558,14 +562,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
   },
-  cardActionTitle: { ...designTokens.typography.cardTitle, fontSize: 13, color: '#FFFFFF' },
+  cardActionTitle: { ...designTokens.typography.cardTitle, fontSize: 13, color: designTokens.colors.textPrimary },
   cardBadge: {
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    backgroundColor: designTokens.colors.primarySoft,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: designTokens.radii.xs,
   },
-  cardBadgeText: { ...designTokens.typography.micro, color: '#93C5FD', fontWeight: '800', fontSize: 9 },
+  cardBadgeText: { ...designTokens.typography.micro, color: designTokens.colors.primaryDeep, fontWeight: '800', fontSize: 9 },
   cardSub: { ...designTokens.typography.body, fontSize: 12, marginBottom: designTokens.spacing.sm },
   cardValuesRow: {
     flexDirection: 'row',
@@ -573,7 +577,7 @@ const styles = StyleSheet.create({
     gap: designTokens.spacing.sm,
     marginBottom: designTokens.spacing.sm,
   },
-  cardPrimaryVal: { ...designTokens.typography.cardTitle, fontSize: 16, color: '#60A5FA' },
+  cardPrimaryVal: { ...designTokens.typography.cardTitle, fontSize: 16, color: designTokens.colors.primaryDark },
   cardSecondaryVal: { ...designTokens.typography.micro, color: designTokens.colors.textMuted },
   cardNavBtn: {
     backgroundColor: designTokens.colors.primary,
@@ -590,7 +594,7 @@ const styles = StyleSheet.create({
   loadingText: { ...designTokens.typography.body, fontSize: 12, color: designTokens.colors.textSecondary },
   chipsBar: {
     borderTopWidth: 1,
-    borderTopColor: designTokens.colors.surfaceBorder,
+    borderTopColor: 'rgba(41, 51, 50, 0.06)',
     paddingVertical: designTokens.spacing.xs + 2,
   },
   chipsContent: {
@@ -598,35 +602,35 @@ const styles = StyleSheet.create({
     gap: designTokens.spacing.sm,
   },
   chipPill: {
-    backgroundColor: designTokens.colors.surfaceElevated,
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: designTokens.spacing.md,
     paddingVertical: 6,
     borderRadius: designTokens.radii.pill,
     borderWidth: 1,
-    borderColor: designTokens.colors.surfaceBorder,
+    borderColor: 'rgba(41, 51, 50, 0.08)',
   },
-  chipText: { ...designTokens.typography.micro, color: '#93C5FD', fontWeight: '600' },
+  chipText: { ...designTokens.typography.micro, color: designTokens.colors.textSecondary, fontWeight: '600' },
   inputBar: {
     flexDirection: 'row',
     paddingHorizontal: designTokens.spacing.lg,
     paddingVertical: designTokens.spacing.sm,
-    backgroundColor: 'rgba(21, 31, 50, 0.85)',
+    backgroundColor: '#FAF7F2',
     borderTopWidth: 1,
-    borderTopColor: designTokens.colors.surfaceBorder,
+    borderTopColor: 'rgba(41, 51, 50, 0.08)',
     alignItems: 'center',
     gap: designTokens.spacing.sm,
     marginBottom: 8,
   },
   input: {
     flex: 1,
-    backgroundColor: 'rgba(7, 10, 16, 0.75)',
+    backgroundColor: '#FFFFFF',
     borderRadius: designTokens.radii.pill,
     paddingHorizontal: designTokens.spacing.lg,
     paddingVertical: 10,
     color: designTokens.colors.textPrimary,
     fontSize: 13,
     borderWidth: 1,
-    borderColor: designTokens.colors.surfaceBorder,
+    borderColor: 'rgba(41, 51, 50, 0.10)',
   },
   sendBtn: {
     width: 38,

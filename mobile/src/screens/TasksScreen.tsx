@@ -95,15 +95,15 @@ export const TasksScreen: React.FC = () => {
         ) : (
           filteredTasks.map((t) => {
             const isDone = t.status === 'COMPLETED';
-            let priorityBadge = <StatusBadge label="Normal" variant="countdown" />;
+            let priorityBadge = <StatusBadge label="NORMAL" variant="safe" />;
             if (t.priority === 'EXTREMELY_IMPORTANT') {
-              priorityBadge = <StatusBadge label="Extremely Important" variant="urgent" />;
+              priorityBadge = <StatusBadge label="EXTREMELY_IMPORTANT" variant="extremely_important" />;
             } else if (t.priority === 'HIGH') {
-              priorityBadge = <StatusBadge label="High Priority" variant="warning" />;
+              priorityBadge = <StatusBadge label="HIGH" variant="high" />;
             }
 
             return (
-              <GlassCard key={t.id} style={styles.taskCard}>
+              <GlassCard key={t.id} variant="teal" style={styles.taskCard}>
                 <View style={styles.taskCardRow}>
                   <TouchableOpacity
                     style={styles.checkbox}
@@ -112,7 +112,7 @@ export const TasksScreen: React.FC = () => {
                     <Ionicons
                       name={isDone ? 'checkmark-circle' : 'ellipse-outline'}
                       size={22}
-                      color={isDone ? '#10B981' : '#64748B'}
+                      color={isDone ? designTokens.colors.primaryDark : designTokens.colors.textSecondary}
                     />
                   </TouchableOpacity>
 
@@ -135,7 +135,7 @@ export const TasksScreen: React.FC = () => {
 
                     <View style={styles.taskFooter}>
                       <View style={styles.aiTag}>
-                        <Ionicons name="sparkles" size={10} color="#A78BFA" />
+                        <Ionicons name="sparkles" size={10} color={designTokens.colors.accentPeachDeep} />
                         <Text style={styles.aiTagText}>AI Suggested</Text>
                       </View>
 
@@ -149,11 +149,11 @@ export const TasksScreen: React.FC = () => {
                           }
                         >
                           <Text style={styles.priorityToggle}>
-                            {t.priority === 'EXTREMELY_IMPORTANT' ? 'Lower Priority' : '⭐ Prioritize'}
+                            {t.priority === 'EXTREMELY_IMPORTANT' ? 'Lower Priority' : 'Prioritize'}
                           </Text>
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => deleteTask(t.id)}>
-                          <Text style={styles.deleteText}>✕</Text>
+                        <TouchableOpacity onPress={() => deleteTask(t.id)} style={{ padding: 2 }}>
+                          <Ionicons name="trash-outline" size={15} color={designTokens.colors.textSecondary} />
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -251,12 +251,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: designTokens.spacing.md,
     paddingVertical: designTokens.spacing.xs + 3,
     borderRadius: designTokens.radii.pill,
-    backgroundColor: 'rgba(21, 31, 50, 0.70)',
+    backgroundColor: '#FAF7F2',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(41, 51, 50, 0.08)',
   },
   filterChipActive: {
-    backgroundColor: designTokens.colors.primary,
+    backgroundColor: designTokens.colors.primaryPill,
     borderColor: designTokens.colors.primary,
   },
   filterText: {
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
     color: designTokens.colors.textSecondary,
   },
   filterTextActive: {
-    color: '#FFFFFF',
+    color: designTokens.colors.textPrimary,
     fontWeight: '700',
   },
   taskList: {
@@ -333,11 +333,11 @@ const styles = StyleSheet.create({
   emptySub: { ...designTokens.typography.body, marginTop: 4 },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backgroundColor: 'rgba(35, 45, 43, 0.45)',
     justifyContent: 'flex-end',
   },
   modalSheet: {
-    backgroundColor: designTokens.colors.surfaceCard,
+    backgroundColor: '#FAF7F2',
     borderTopLeftRadius: designTokens.radii.xl,
     borderTopRightRadius: designTokens.radii.xl,
     padding: designTokens.spacing.xl,
@@ -346,14 +346,14 @@ const styles = StyleSheet.create({
   },
   modalHeading: { ...designTokens.typography.sectionTitle, fontSize: 18 },
   modalInput: {
-    backgroundColor: designTokens.colors.surfaceElevated,
+    backgroundColor: '#FFFFFF',
     borderRadius: designTokens.radii.md,
     paddingHorizontal: designTokens.spacing.md,
     paddingVertical: designTokens.spacing.md,
     color: designTokens.colors.textPrimary,
     fontSize: 13,
     borderWidth: 1,
-    borderColor: designTokens.colors.surfaceBorder,
+    borderColor: 'rgba(41, 51, 50, 0.10)',
   },
   inputLabel: { ...designTokens.typography.label, marginTop: 4 },
   prioritySelector: {
@@ -362,19 +362,19 @@ const styles = StyleSheet.create({
   },
   priorityPill: {
     flex: 1,
-    backgroundColor: designTokens.colors.surfaceElevated,
+    backgroundColor: '#FFFFFF',
     paddingVertical: designTokens.spacing.sm,
-    borderRadius: designTokens.radii.sm,
+    borderRadius: designTokens.radii.pill,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: designTokens.colors.surfaceBorder,
+    borderColor: 'rgba(41, 51, 50, 0.08)',
   },
   priorityPillActive: {
-    backgroundColor: designTokens.colors.primary,
+    backgroundColor: designTokens.colors.primaryPill,
     borderColor: designTokens.colors.primary,
   },
   priorityPillText: { ...designTokens.typography.micro, color: designTokens.colors.textSecondary, fontWeight: '700' },
-  priorityPillTextActive: { color: '#FFFFFF' },
+  priorityPillTextActive: { color: designTokens.colors.textPrimary },
   modalActionRow: {
     flexDirection: 'row',
     gap: designTokens.spacing.md,
@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
   },
   modalCancelBtn: {
     flex: 1,
-    backgroundColor: designTokens.colors.surfaceSubtle,
+    backgroundColor: '#EAE5DB',
     paddingVertical: designTokens.spacing.md,
     borderRadius: designTokens.radii.md,
     alignItems: 'center',

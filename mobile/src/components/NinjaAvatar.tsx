@@ -69,17 +69,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    borderWidth: 2.5,
+    borderColor: '#E5C4B0',
+    borderRadius: 999,
+    padding: 2,
+    backgroundColor: '#F7F4EE',
   },
   circleBase: {
-    backgroundColor: '#FBBF24', // Vibrant golden yellow
+    backgroundColor: '#F59E0B',
     alignItems: 'center',
     justifyContent: 'flex-end',
     overflow: 'hidden',
     position: 'relative',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
   },
   sword: {
     position: 'absolute',

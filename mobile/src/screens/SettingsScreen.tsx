@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
-import { theme } from '../theme/theme';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { designTokens } from '../theme/designTokens';
+import { GradientBackground } from '../components/common/GradientBackground';
 import { NinjaAvatar } from '../components/NinjaAvatar';
 import { useAuthStore } from '../store/authStore';
 import { apiClient } from '../api/client';
@@ -44,210 +46,203 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Title */}
-      <Text style={styles.screenTitle}>Account</Text>
+    <GradientBackground>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        {/* Title */}
+        <Text style={styles.screenTitle}>Account</Text>
 
-      {/* Ninja Hero Profile Section */}
-      <View style={styles.heroSection}>
-        <NinjaAvatar size="large" cgpa={cgpa} credits={credits} showBadges={true} />
+        {/* Ninja Hero Profile Section */}
+        <View style={styles.heroSection}>
+          <NinjaAvatar size="large" cgpa={cgpa} credits={credits} showBadges={true} />
 
-        <Text style={styles.studentName}>{studentName}</Text>
+          <Text style={styles.studentName}>{studentName}</Text>
 
-        {/* Semester Pill */}
-        <View style={styles.semesterPill}>
-          <Text style={styles.semesterText}>{semester}</Text>
+          {/* Semester Pill */}
+          <View style={styles.semesterPill}>
+            <Text style={styles.semesterText}>{semester}</Text>
+          </View>
+
+          {/* Change Semester Link */}
+          <TouchableOpacity onPress={handleChangeSemester}>
+            <Text style={styles.changeSemesterText}>Change semester</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Change Semester Link */}
-        <TouchableOpacity onPress={handleChangeSemester}>
-          <Text style={styles.changeSemesterText}>Change semster</Text>
-        </TouchableOpacity>
-      </View>
+        {/* Account Navigation Group */}
+        <Text style={styles.sectionHeader}>Account</Text>
+        <View style={styles.menuCard}>
+          <TouchableOpacity
+            style={styles.menuRow}
+            onPress={() => Alert.alert('Profile Details', `Name: ${studentName}\nDegree: B.Tech Computer Science\nUniversity: VIT AP`)}
+          >
+            <View style={styles.menuLeft}>
+              <Ionicons name="person-outline" size={18} color={designTokens.colors.primaryDark} style={styles.menuIcon} />
+              <Text style={styles.menuLabel}>Profile</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
 
-      {/* Account Navigation Group */}
-      <Text style={styles.sectionHeader}>Account</Text>
-      <View style={styles.menuCard}>
-        <TouchableOpacity
-          style={styles.menuRow}
-          onPress={() => Alert.alert('Profile Details', `Name: ${studentName}\nDegree: B.Tech Computer Science\nUniversity: VIT AP`)}
-        >
-          <View style={styles.menuLeft}>
-            <Text style={styles.menuIcon}>👤</Text>
-            <Text style={styles.menuLabel}>Profile</Text>
-          </View>
-          <Text style={styles.chevron}>›</Text>
-        </TouchableOpacity>
+          <View style={styles.divider} />
 
-        <View style={styles.divider} />
+          <TouchableOpacity
+            style={styles.menuRow}
+            onPress={() => navigation?.navigate ? navigation.navigate('Privacy') : Alert.alert('Manage Credentials', 'Google OAuth & Supabase authentication keys active.')}
+          >
+            <View style={styles.menuLeft}>
+              <Ionicons name="shield-checkmark-outline" size={18} color={designTokens.colors.primaryDark} style={styles.menuIcon} />
+              <Text style={styles.menuLabel}>Manage Credentials</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.menuRow}
-          onPress={() => navigation?.navigate ? navigation.navigate('Privacy') : Alert.alert('Manage Credentials', 'Google OAuth & Supabase authentication keys active.')}
-        >
-          <View style={styles.menuLeft}>
-            <Text style={styles.menuIcon}>🔏</Text>
-            <Text style={styles.menuLabel}>Manage Credentials</Text>
-          </View>
-          <Text style={styles.chevron}>›</Text>
-        </TouchableOpacity>
+          <View style={styles.divider} />
 
-        <View style={styles.divider} />
-
-        <TouchableOpacity style={styles.menuRow} onPress={handleSyncNow}>
-          <View style={styles.menuLeft}>
-            <Text style={styles.menuIcon}>🔄</Text>
-            <Text style={styles.menuLabel}>Sync ⓘ</Text>
-          </View>
-          <Text style={styles.chevron}>{syncing ? '...' : '›'}</Text>
-        </TouchableOpacity>
-
-        <View style={styles.divider} />
-
-        <TouchableOpacity
-          style={styles.menuRow}
-          onPress={() => Alert.alert('Preferences', 'Quiet hours: 23:00 - 07:00\nDomain: @vitap.ac.in')}
-        >
-          <View style={styles.menuLeft}>
-            <Text style={styles.menuIcon}>⚙️</Text>
-            <Text style={styles.menuLabel}>Settings</Text>
-          </View>
-          <Text style={styles.chevron}>›</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Smart Toggles */}
-      <Text style={styles.sectionHeader}>Preferences & Controls</Text>
-      <View style={styles.menuCard}>
-        <View style={styles.toggleRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.toggleTitle}>🌙 Quiet Hours Suppression</Text>
-            <Text style={styles.toggleSub}>Mute non-critical alerts (23:00 - 07:00)</Text>
-          </View>
-          <Switch
-            value={quietHoursEnabled}
-            onValueChange={setQuietHoursEnabled}
-            trackColor={{ false: '#334155', true: '#2563EB' }}
-            thumbColor="#FFFFFF"
-          />
+          <TouchableOpacity style={styles.menuRow} onPress={handleSyncNow}>
+            <View style={styles.menuLeft}>
+              <Ionicons name="sync-outline" size={18} color={designTokens.colors.primaryDark} style={styles.menuIcon} />
+              <Text style={styles.menuLabel}>Sync with Cloud</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.divider} />
-
-        <View style={styles.toggleRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.toggleTitle}>🎓 Floating Student Assistant</Text>
-            <Text style={styles.toggleSub}>Show floating bubble over other apps</Text>
+        {/* Device & Life Controls Group */}
+        <Text style={styles.sectionHeader}>Preferences & Device</Text>
+        <View style={styles.menuCard}>
+          <View style={styles.toggleRow}>
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <Text style={styles.toggleTitle}>Quiet Hours Mode</Text>
+              <Text style={styles.toggleSub}>Mute non-critical notices from 11 PM to 7 AM</Text>
+            </View>
+            <Switch
+              value={quietHoursEnabled}
+              onValueChange={setQuietHoursEnabled}
+              trackColor={{ false: '#E6E0D4', true: designTokens.colors.primary }}
+              thumbColor="#FFFFFF"
+            />
           </View>
-          <Switch
-            value={floatingAssistantEnabled}
-            onValueChange={setFloatingAssistantEnabled}
-            trackColor={{ false: '#334155', true: '#2563EB' }}
-            thumbColor="#FFFFFF"
-          />
-        </View>
-      </View>
 
-      {/* Onboarding Restart */}
-      {onRestartOnboarding && (
-        <TouchableOpacity style={styles.restartBtn} onPress={onRestartOnboarding}>
-          <Text style={styles.restartBtnText}>↻ Re-run Setup / Onboarding</Text>
-        </TouchableOpacity>
-      )}
-    </ScrollView>
+          <View style={styles.divider} />
+
+          <View style={styles.toggleRow}>
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <Text style={styles.toggleTitle}>Floating AI Assistant</Text>
+              <Text style={styles.toggleSub}>Quick-access floating gem over other apps</Text>
+            </View>
+            <Switch
+              value={floatingAssistantEnabled}
+              onValueChange={setFloatingAssistantEnabled}
+              trackColor={{ false: '#E6E0D4', true: designTokens.colors.primary }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+        </View>
+
+        {/* Replay Onboarding */}
+        {onRestartOnboarding && (
+          <TouchableOpacity style={styles.restartBtn} onPress={onRestartOnboarding} activeOpacity={0.82}>
+            <Text style={styles.restartBtnText}>Re-open Onboarding Walkthrough</Text>
+          </TouchableOpacity>
+        )}
+      </ScrollView>
+    </GradientBackground>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background },
-  content: { padding: 20, paddingBottom: 100 },
+  container: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  content: {
+    padding: designTokens.spacing.lg,
+    paddingBottom: 110,
+  },
   screenTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '800',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 20,
+    color: designTokens.colors.textPrimary,
+    marginBottom: 10,
   },
   heroSection: {
     alignItems: 'center',
-    marginBottom: 30,
+    paddingVertical: 16,
+    marginBottom: 12,
   },
   studentName: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    marginTop: 20,
+    fontSize: 16,
+    fontWeight: '800',
+    color: designTokens.colors.textPrimary,
+    marginTop: 14,
     textAlign: 'center',
-    letterSpacing: 0.8,
+    letterSpacing: 0.5,
   },
   semesterPill: {
-    backgroundColor: '#1E293B',
-    paddingHorizontal: 20,
-    paddingVertical: 9,
-    borderRadius: 20,
-    marginTop: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: designTokens.colors.primarySoft,
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderRadius: designTokens.radii.pill,
+    marginTop: 10,
   },
   semesterText: {
-    color: '#93C5FD',
-    fontSize: 12,
+    color: designTokens.colors.primaryDeep,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.5,
   },
   changeSemesterText: {
-    color: '#3B82F6',
+    color: designTokens.colors.primaryDark,
     fontSize: 13,
     fontWeight: '600',
-    marginTop: 12,
-  },
-  sectionHeader: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#93C5FD',
-    marginBottom: 10,
     marginTop: 10,
   },
+  sectionHeader: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: designTokens.colors.textPrimary,
+    letterSpacing: 0.5,
+    marginBottom: 8,
+    marginTop: 8,
+  },
   menuCard: {
-    backgroundColor: '#151D2A',
-    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: designTokens.radii.card,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#233247',
-    marginBottom: 20,
+    borderColor: 'rgba(41, 51, 50, 0.06)',
+    marginBottom: 16,
+    ...designTokens.shadows.card,
   },
   menuRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 14,
   },
   menuLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 12,
   },
   menuIcon: {
-    fontSize: 18,
-    width: 24,
+    width: 22,
     textAlign: 'center',
   },
   menuLabel: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#F8FAFC',
+    color: designTokens.colors.textPrimary,
   },
   chevron: {
-    fontSize: 20,
-    color: '#64748B',
+    fontSize: 18,
+    color: designTokens.colors.textMuted,
     fontWeight: '400',
   },
   divider: {
     height: 1,
-    backgroundColor: '#233247',
-    marginLeft: 54,
+    backgroundColor: 'rgba(41, 51, 50, 0.06)',
+    marginLeft: 50,
   },
   toggleRow: {
     flexDirection: 'row',
@@ -259,24 +254,24 @@ const styles = StyleSheet.create({
   toggleTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: designTokens.colors.textPrimary,
   },
   toggleSub: {
     fontSize: 11,
-    color: '#94A3B8',
+    color: designTokens.colors.textSecondary,
     marginTop: 2,
   },
   restartBtn: {
-    backgroundColor: '#1E293B',
+    backgroundColor: '#FAF7F2',
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: designTokens.radii.pill,
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 8,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: 'rgba(41, 51, 50, 0.08)',
   },
   restartBtnText: {
-    color: '#94A3B8',
+    color: designTokens.colors.textSecondary,
     fontSize: 13,
     fontWeight: '700',
   },
