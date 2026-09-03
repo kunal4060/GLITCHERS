@@ -23,28 +23,13 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  isAuthenticated: true,
-  isOnboardingComplete: true, // Initially true so existing tests/views pass, toggled if user restarts onboarding or logs out
-  currentOnboardingStep: 'COMPLETE',
+  isAuthenticated: false, // Default to false so student sees the Login Screen on fresh open
+  isOnboardingComplete: false,
+  currentOnboardingStep: 'GOOGLE_AUTH',
   onboardingData: {},
-  user: {
-    id: '00000000-0000-0000-0000-000000000001',
-    email: 'kunal@university.edu',
-    fullName: 'Kunal Ugale',
-    university: 'State Technological University',
-    course: 'Computer Science & Engineering',
-    year: 3,
-    semester: 6,
-    section: 'A',
-    cgpa: '8.71',
-    creditsCompleted: 42,
-    creditsCurrent: 18,
-    universityDomain: 'university.edu',
-    isOnboardingComplete: true,
-    avatarUrl: null,
-  },
-  gmailConnected: true,
-  calendarConnected: true,
+  user: null,
+  gmailConnected: false,
+  calendarConnected: false,
   isLoading: false,
 
   setUser: (user) => set({ user, isAuthenticated: !!user }),
