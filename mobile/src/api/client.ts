@@ -66,12 +66,20 @@ class ApiClient {
     return this.get<{ tasks: any[] }>('/tasks');
   }
 
+  public async createTask(task: { title: string; priority?: string; dueDate?: string | null; description?: string | null }) {
+    return this.post<{ task: any }>('/tasks', task);
+  }
+
   public async createTaskFromText(text: string) {
     return this.post<{ task: any }>('/tasks', { text });
   }
 
   public async fetchExpenses() {
     return this.get<{ expenses: any[]; totalSpent: number }>('/expenses');
+  }
+
+  public async createExpense(expense: { amount: number; category?: string; description?: string }) {
+    return this.post<{ expense: any }>('/expenses', expense);
   }
 
   public async createExpenseFromText(text: string) {

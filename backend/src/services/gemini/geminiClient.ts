@@ -24,7 +24,7 @@ export class GeminiAssistant {
     let requiresConfirmation = false;
     let confirmationPayload: any = null;
 
-    // 1. Timetable & Classes
+    // 1. Timetable & Schedule Queries
     if (text.includes('today') && (text.includes('class') || text.includes('schedule') || text.includes('timetable'))) {
       intent = 'GET_SCHEDULE';
       toolResult = await toolRegistry.get_today_schedule(userId);
@@ -35,7 +35,7 @@ export class GeminiAssistant {
         const list = classes.map((c: any) => `• **${c.subjectName}** (${c.startTime} - ${c.endTime}) in room ${c.room || 'TBD'}`).join('\n');
         reply = `Here is your schedule for today (${toolResult.result.day}):\n\n${list}`;
       }
-    } else if (text.includes('tomorrow') && (text.includes('class') || text.includes('schedule') || text.includes('timetable'))) {
+    } else if (text.includes('tomorrow') && (text.includes('class') || text.includes('schedule') || text.includes('timetable')) && !text.includes('submit') && !text.includes('assignment') && !text.includes('task')) {
       intent = 'GET_SCHEDULE';
       toolResult = await toolRegistry.get_tomorrow_schedule(userId);
       const classes = toolResult.result.classes;
@@ -47,28 +47,21 @@ export class GeminiAssistant {
       }
     }
     // 2. Cross-Module Split Expense (e.g. "Spent 500 on dinner with Rahul. Split it equally")
-    else if (text.includes('split') && (text.includes('dinner') || text.includes('lunch') || text.includes('spent') || text.includes('with'))) {
+    else if (text.includes('split') && (/\d+/.test(text) || text.includes('with') || text.includes('half') || text.includes('equally'))) {
       intent = 'ADD_EXPENSE';
       const parsed = this.parseSplitExpense(userMessage);
       toolResult = await toolRegistry.split_expense(userId, parsed);
       reply = toolResult.message || `Split ₹${parsed.totalAmount} for ${parsed.description} with ${parsed.person}.`;
     }
-    // 3. Add Expense (Single)
-    else if (text.startsWith('spent ') || text.includes('expense') || text.startsWith('paid ') || text.match(/\b\d+\s*(?:rs|rupees|on)\b/i)) {
-      intent = 'ADD_EXPENSE';
-      const parsed = this.parseNaturalExpense(userMessage);
-      toolResult = await toolRegistry.add_expense(userId, parsed);
-      reply = toolResult.message || `Expense recorded: ₹${parsed.amount} for ${parsed.description}.`;
-    }
-    // 4. Delete Expense
-    else if (text.includes('delete') && text.includes('expense')) {
+    // 3. Delete Expense
+    else if (text.includes('delete') && (text.includes('expense') || text.includes('spending'))) {
       intent = 'DELETE_EXPENSE';
-      const descMatch = text.replace(/delete|this|the|expense|record/gi, '').trim();
+      const descMatch = text.replace(/delete|this|the|expense|record|spending/gi, '').trim();
       toolResult = await toolRegistry.delete_expense(userId, descMatch || 'food');
       reply = toolResult.message || 'Expense record removed.';
     }
-    // 5. Category / Monthly Expense Inquiry (e.g. "How much did I spend on food this month?")
-    else if (text.includes('how much') && (text.includes('spend') || text.includes('spent'))) {
+    // 4. Category / Monthly Expense Inquiry
+    else if ((text.includes('how much') || text.includes('total')) && (text.includes('spend') || text.includes('spent') || text.includes('expense'))) {
       intent = 'GET_EXPENSES';
       const res = await toolRegistry.get_expenses(userId);
       const expenses = res.result || [];
@@ -83,17 +76,17 @@ export class GeminiAssistant {
       }
       toolResult = res;
     }
-    // 6. Budget Status
-    else if (text.includes('budget') || text.includes('spending')) {
+    // 5. Budget Status
+    else if (text.includes('budget') || (text.includes('spending') && (text.includes('status') || text.includes('overview') || text.includes('snapshot')))) {
       intent = 'GET_BUDGET';
       toolResult = await toolRegistry.get_budget(userId);
       const b = toolResult.result;
       reply = `**Monthly Budget Overview**:\n• Monthly Limit: ₹${b.monthlyLimit}\n• Spent so far: ₹${b.totalSpent} (${b.percentageUsed}%)\n• Remaining: ₹${b.remaining}\n• Status: ${b.alertLevel}`;
     }
-    // 7. Borrow / Lend & Debts
-    else if (text.includes('borrow') || text.includes('lend') || text.includes('owe')) {
+    // 6. Borrow / Lend & Debts
+    else if (text.includes('borrow') || text.includes('lend') || text.includes('lent') || text.includes('owe') || text.includes('debts')) {
       intent = 'GET_DEBTS';
-      if (text.includes('borrowed') || text.includes('lent') || text.includes('owes me')) {
+      if (text.includes('borrowed') || text.includes('lent') || text.includes('owes me') || text.includes('i owe')) {
         const debtParsed = this.parseNaturalDebt(userMessage);
         toolResult = await toolRegistry.add_debt(userId, debtParsed);
         reply = toolResult.message || 'Debt record added successfully.';
@@ -107,48 +100,86 @@ export class GeminiAssistant {
         reply = `**Borrow / Lend Summary**:\n• To Receive: ₹${totals.toReceive}\n• To Pay: ₹${totals.toPay}`;
       }
     }
-    // 8. Update Task Priority (e.g. "Make it extremely important")
-    else if (text.includes('extremely important') || text.includes('urgent') || text.includes('high priority')) {
+    // 7. Add Expense (Single) - Broad & Robust Matching
+    else if (
+      text.startsWith('spent') ||
+      text.startsWith('paid') ||
+      text.startsWith('bought') ||
+      text.includes('expense') ||
+      text.match(/(?:spent|paid|bought|cost|ordered)\s+(?:rs\.?|₹|inr)?\s*\d+/i) ||
+      text.match(/(?:rs\.?|₹|inr)\s*\d+/i) ||
+      text.match(/\d+\s*(?:rs|rupees|bucks|inr)\b/i) ||
+      (
+        /\d+/.test(text) &&
+        text.match(/\b(food|dinner|lunch|canteen|coffee|chai|tea|breakfast|biryani|pizza|burger|snack|auto|cab|uber|ola|bus|metro|petrol|fuel|stationery|book|books|print|printout|xerox|groceries|swiggy|zomato)\b/i)
+      )
+    ) {
+      intent = 'ADD_EXPENSE';
+      const parsed = this.parseNaturalExpense(userMessage);
+      toolResult = await toolRegistry.add_expense(userId, parsed);
+      reply = toolResult.message || `Expense recorded: ₹${parsed.amount} for ${parsed.description}. Added to your expense tracker.`;
+    }
+    // 8. Update Task Priority
+    else if (text.includes('extremely important') || text.includes('urgent') || text.includes('high priority') || text.includes('prioritize')) {
       intent = 'UPDATE_TASK';
-      const priority = text.includes('extremely') ? 'EXTREMELY_IMPORTANT' : 'HIGH';
+      const priority = text.includes('extremely') || text.includes('urgent') ? 'EXTREMELY_IMPORTANT' : 'HIGH';
       toolResult = await toolRegistry.update_task_priority(userId, { priority });
       reply = toolResult.message || `Task priority updated to ${priority}.`;
     }
-    // 9. Complete Task (e.g. "Mark that task complete", "Mark AI assignment complete")
-    else if (text.includes('complete') && (text.includes('task') || text.includes('assignment'))) {
+    // 9. Complete Task
+    else if (
+      (text.includes('complete') || text.includes('finish') || text.includes('mark done') || text.includes('done with')) &&
+      (text.includes('task') || text.includes('assignment') || text.includes('lab') || text.includes('report') || text.includes('homework') || text.includes('project'))
+    ) {
       intent = 'UPDATE_TASK';
-      const taskTitle = text.replace(/mark|that|the|task|assignment|as|complete|done/gi, '').trim();
+      const taskTitle = text.replace(/mark|that|the|task|assignment|lab|report|as|complete|done|finished|with/gi, '').trim();
       toolResult = await toolRegistry.complete_task(userId, taskTitle || 'AI Assignment');
       reply = toolResult.message || 'Task marked as completed.';
     }
     // 10. Delete Task
-    else if (text.includes('delete') && (text.includes('task') || text.includes('assignment'))) {
+    else if (text.includes('delete') && (text.includes('task') || text.includes('assignment') || text.includes('todo'))) {
       intent = 'DELETE_TASK';
-      const taskTitle = text.replace(/delete|that|the|task|assignment/gi, '').trim();
+      const taskTitle = text.replace(/delete|that|the|task|assignment|todo/gi, '').trim();
       toolResult = await toolRegistry.delete_task(userId, taskTitle || 'AI Assignment');
       reply = toolResult.message || 'Task deleted.';
     }
-    // 11. Create Task / Assignment
-    else if (text.includes('task') || text.includes('assignment') || text.includes('todo')) {
-      if (text.startsWith('add') || text.startsWith('create') || text.startsWith('remind') || text.includes('by ') || text.includes('due ')) {
-        intent = 'CREATE_TASK';
-        const taskParsed = this.parseNaturalTask(userMessage);
-        toolResult = await toolRegistry.create_task(userId, taskParsed);
-        reply = toolResult.message || `Task "${taskParsed.title}" created.`;
+    // 11. Query Tasks (e.g. "what tasks do I have", "show all tasks", "list tasks")
+    else if (
+      (text.includes('what') || text.includes('show') || text.includes('list') || text.includes('check') || text.includes('any')) &&
+      (text.includes('task') || text.includes('tasks') || text.includes('assignment') || text.includes('assignments') || text.includes('pending'))
+    ) {
+      intent = 'GET_TASKS';
+      toolResult = await toolRegistry.get_tasks(userId);
+      const tasks = toolResult.result;
+      if (tasks.length === 0) {
+        reply = 'You currently have no pending tasks.';
       } else {
-        intent = 'GET_TASKS';
-        toolResult = await toolRegistry.get_tasks(userId);
-        const tasks = toolResult.result;
-        if (tasks.length === 0) {
-          reply = 'You currently have no pending tasks.';
-        } else {
-          const list = tasks.map((t: any) => `• [${t.priority}] **${t.title}** (${t.status})`).join('\n');
-          reply = `Here are your current tasks:\n\n${list}`;
-        }
+        const list = tasks.map((t: any) => `• [${t.priority}] **${t.title}** (${t.status})`).join('\n');
+        reply = `Here are your current tasks:\n\n${list}`;
       }
     }
-    // 12. Calendar Integration (e.g. "Add tomorrow's DBMS class to my calendar")
-    else if (text.includes('calendar') && (text.includes('add') || text.includes('event'))) {
+    // 12. Create Task / Assignment / Homework - Broad & Robust Matching
+    else if (
+      text.includes('task') ||
+      text.includes('assignment') ||
+      text.includes('homework') ||
+      text.includes('lab report') ||
+      text.includes('project') ||
+      text.includes('todo') ||
+      text.startsWith('remind me') ||
+      text.startsWith('remember to') ||
+      text.startsWith('i need to') ||
+      text.startsWith('i have to') ||
+      text.match(/\b(submit|complete|finish|prepare|study for|review|write|upload)\b/i) ||
+      text.match(/\b(due tomorrow|due in|by tomorrow|by friday|by monday)\b/i)
+    ) {
+      intent = 'CREATE_TASK';
+      const taskParsed = this.parseNaturalTask(userMessage);
+      toolResult = await toolRegistry.create_task(userId, taskParsed);
+      reply = toolResult.message || `Task "${taskParsed.title}" scheduled successfully. Added to your task manager.`;
+    }
+    // 13. Calendar Integration
+    else if (text.includes('calendar') && (text.includes('add') || text.includes('event') || text.includes('schedule'))) {
       intent = 'CREATE_CALENDAR_EVENT';
       requiresConfirmation = true;
       confirmationPayload = {
@@ -160,8 +191,8 @@ export class GeminiAssistant {
       toolResult = await toolRegistry.create_calendar_event(userId, confirmationPayload);
       reply = `Added **${confirmationPayload.title}** (${confirmationPayload.startTime} - ${confirmationPayload.endTime}) in Room ${confirmationPayload.location} to your academic calendar.`;
     }
-    // 13. University Notices & Emails
-    else if (text.includes('email') || text.includes('notice') || text.includes('announcement')) {
+    // 14. University Notices & Emails
+    else if (text.includes('email') || text.includes('notice') || text.includes('announcement') || text.includes('circular')) {
       intent = 'GET_EMAILS';
       toolResult = await toolRegistry.get_important_emails(userId);
       const emails = toolResult.result;
@@ -173,7 +204,7 @@ export class GeminiAssistant {
       }
     } else {
       intent = 'GENERAL_QUERY';
-      reply = `I am your AI Student Life Companion. You can ask me to:\n• Add expenses or split bills (e.g. "Spent 500 with Rahul, split equally")\n• Schedule tasks (e.g. "Remind me to submit AI assignment tomorrow")\n• Adjust priorities ("Make it extremely important")\n• Check your timetable or calendar\n• Query spending totals ("What did I spend on food this month?")`;
+      reply = `I am your AI Student Life Companion. You can ask me to:\n• Add expenses or split bills (e.g. "Spent 180 on dinner", "Bought coffee for 60", "Split 500 with Rahul")\n• Schedule tasks or assignments (e.g. "Submit DBMS lab report tomorrow", "Remind me to study for quiz")\n• Adjust priorities ("Make it extremely important")\n• Check your timetable, attendance, or calendar\n• Query spending totals ("How much did I spend on food?")`;
     }
 
     return {
@@ -187,41 +218,63 @@ export class GeminiAssistant {
   }
 
   public parseNaturalExpense(text: string): { amount: number; category: any; description: string; merchant?: string } {
-    const amountMatch = text.match(/(?:spent|paid|rs\.?|₹)?\s*(\d+(?:\.\d{1,2})?)/i);
+    // Extract numerical amount, tolerating currency symbols
+    const amountMatch = text.match(/(?:(?:rs\.?|₹|inr)\s*)?(\d+(?:\.\d{1,2})?)(?:\s*(?:rs|rupees|bucks|inr))?/i);
     const amount = amountMatch ? parseFloat(amountMatch[1]) : 100;
 
     let category: any = 'OTHER';
     const lower = text.toLowerCase();
-    if (lower.includes('food') || lower.includes('dinner') || lower.includes('lunch') || lower.includes('canteen') || lower.includes('coffee') || lower.includes('biryani')) {
+    if (lower.match(/\b(food|dinner|lunch|canteen|coffee|tea|chai|breakfast|biryani|pizza|burger|snack|snacks|swiggy|zomato|cafe|juice|maggi|meal|restaurant)\b/i)) {
       category = 'FOOD';
-    } else if (lower.includes('auto') || lower.includes('cab') || lower.includes('uber') || lower.includes('ola') || lower.includes('bus') || lower.includes('metro') || lower.includes('transport')) {
+    } else if (lower.match(/\b(auto|cab|uber|ola|bus|metro|petrol|fuel|ticket|train|fare|rapido|transport)\b/i)) {
       category = 'TRANSPORT';
-    } else if (lower.includes('book') || lower.includes('course') || lower.includes('exam') || lower.includes('tuition') || lower.includes('stationery')) {
+    } else if (lower.match(/\b(book|books|pen|notebook|stationery|print|printout|xerox|exam|fee|tuition|course|notes|lab manual|education)\b/i)) {
       category = 'EDUCATION';
-    } else if (lower.includes('movie') || lower.includes('game') || lower.includes('party')) {
+    } else if (lower.match(/\b(movie|game|party|netflix|ott|cinema|bowling|gaming|entertainment)\b/i)) {
       category = 'ENTERTAINMENT';
     }
 
-    let description = text.replace(/(?:spent|paid|rs\.?|₹|\b\d+\b)/gi, '').trim();
-    if (!description) description = `${category.toLowerCase()} expense`;
+    let description = text
+      .replace(/^(?:please\s+)?(?:i\s+)?(?:spent|spend|paid|pay|bought|buy|cost|ordered|add expense:?|expense:?)\s*/i, '')
+      .replace(/(?:for|on|of)\s+(?:rs\.?|₹|inr)?\s*\d+(?:\.\d{1,2})?(?:\s*(?:rs|rupees|bucks|inr))?/i, '')
+      .replace(/(?:rs\.?|₹|inr)?\s*\d+(?:\.\d{1,2})?(?:\s*(?:rs|rupees|bucks|inr))?/i, '')
+      .replace(/\b(?:today|yesterday|just now)\b/gi, '')
+      .replace(/^(?:for|on)\s+/i, '')
+      .trim();
+
+    if (!description || description.length < 2) {
+      description =
+        category === 'FOOD'
+          ? 'Food & Dining'
+          : category === 'TRANSPORT'
+          ? 'Travel / Commute'
+          : category === 'EDUCATION'
+          ? 'Academic Expense'
+          : 'Expense';
+    } else {
+      description = description.charAt(0).toUpperCase() + description.slice(1);
+    }
 
     return { amount, category, description };
   }
 
   public parseSplitExpense(text: string): { totalAmount: number; description: string; person: string; category?: any } {
-    const amountMatch = text.match(/(\d+(?:\.\d{1,2})?)/);
+    const amountMatch = text.match(/(?:(?:rs\.?|₹|inr)\s*)?(\d+(?:\.\d{1,2})?)/i);
     const totalAmount = amountMatch ? parseFloat(amountMatch[1]) : 500;
 
-    // Detect friend name
     let person = 'Rahul';
     const withMatch = text.match(/with\s+([A-Za-z]+)/i);
-    if (withMatch && withMatch[1]) {
-      person = withMatch[1];
+    if (withMatch && withMatch[1] && !['the', 'my', 'a', 'an'].includes(withMatch[1].toLowerCase())) {
+      person = withMatch[1].charAt(0).toUpperCase() + withMatch[1].slice(1);
     }
 
-    let description = 'Dinner / Lunch split';
-    if (text.toLowerCase().includes('dinner')) description = 'Dinner';
-    if (text.toLowerCase().includes('lunch')) description = 'Lunch';
+    let description = 'Dinner';
+    const lower = text.toLowerCase();
+    if (lower.includes('dinner')) description = 'Dinner';
+    else if (lower.includes('lunch')) description = 'Lunch';
+    else if (lower.includes('canteen')) description = 'Canteen';
+    else if (lower.includes('food')) description = 'Food';
+    else if (lower.includes('auto') || lower.includes('cab')) description = 'Cab fare';
 
     return { totalAmount, description, person, category: 'FOOD' };
   }
@@ -229,22 +282,47 @@ export class GeminiAssistant {
   public parseNaturalTask(text: string): { title: string; priority: any; dueDate?: string } {
     let priority: any = 'NORMAL';
     const lower = text.toLowerCase();
-    if (lower.includes('urgent') || lower.includes('critical') || lower.includes('extremely important')) {
+    if (lower.includes('urgent') || lower.includes('critical') || lower.includes('extremely important') || lower.includes('highest priority')) {
       priority = 'EXTREMELY_IMPORTANT';
     } else if (lower.includes('important') || lower.includes('high priority')) {
       priority = 'HIGH';
     }
 
-    let title = text.replace(/^(?:add|create|remind me to)\s+/i, '').replace(/make it (?:extremely )?important/i, '').trim();
+    // Determine due date
+    let dueDate = new Date(Date.now() + 86400000).toISOString();
+    if (lower.includes('today') || lower.includes('tonight')) {
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+      dueDate = today.toISOString();
+    } else if (lower.includes('in 2 days')) {
+      dueDate = new Date(Date.now() + 86400000 * 2).toISOString();
+    } else if (lower.includes('in 3 days')) {
+      dueDate = new Date(Date.now() + 86400000 * 3).toISOString();
+    } else if (lower.includes('next week')) {
+      dueDate = new Date(Date.now() + 86400000 * 7).toISOString();
+    }
+
+    let title = text
+      .replace(/^(?:please\s+)?(?:remind me to|remember to|i need to|i have to|schedule a task to|schedule task to|schedule task|create task to|create a task to|create task|add task to|add a task to|add task|add todo|task:|todo:)\s+/i, '')
+      .replace(/(?:,\s*)?(?:make it|set priority to|priority:?)\s+(?:extremely )?(?:important|urgent|high|normal)/i, '')
+      .replace(/(?:,\s*)?(?:due|by)\s+(?:tomorrow|today|tonight|next week|monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i, '')
+      .trim();
+
+    if (title.length > 0) {
+      title = title.charAt(0).toUpperCase() + title.slice(1);
+    } else {
+      title = 'Academic Task';
+    }
+
     return {
       title,
       priority,
-      dueDate: new Date(Date.now() + 86400000).toISOString(),
+      dueDate,
     };
   }
 
   public parseNaturalDebt(text: string): { person: string; type: 'OWES_ME' | 'I_OWE'; amount: number; notes?: string } {
-    const amountMatch = text.match(/(\d+(?:\.\d{1,2})?)/);
+    const amountMatch = text.match(/(?:(?:rs\.?|₹|inr)\s*)?(\d+(?:\.\d{1,2})?)/i);
     const amount = amountMatch ? parseFloat(amountMatch[1]) : 100;
 
     const lower = text.toLowerCase();

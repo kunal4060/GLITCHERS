@@ -214,9 +214,16 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   setEmails: (emails) => set({ emails }),
 
   addTask: async (task) => {
-    set((s) => ({ tasks: [task, ...s.tasks] }));
+    set((s) => ({
+      tasks: [task, ...s.tasks.filter((t) => t.id !== task.id)],
+    }));
     try {
-      await apiClient.createTaskFromText(`${task.title}, priority: ${task.priority}`);
+      await apiClient.createTask({
+        title: task.title,
+        priority: task.priority,
+        dueDate: task.dueDate,
+        description: task.description,
+      });
     } catch {
       // Retained in optimistic store
     }
@@ -243,9 +250,15 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   },
 
   addExpense: async (expense) => {
-    set((s) => ({ expenses: [expense, ...s.expenses] }));
+    set((s) => ({
+      expenses: [expense, ...s.expenses.filter((e) => e.id !== expense.id)],
+    }));
     try {
-      await apiClient.createExpenseFromText(`Spent ${expense.amount} on ${expense.description}`);
+      await apiClient.createExpense({
+        amount: Number(expense.amount),
+        category: expense.category,
+        description: expense.description,
+      });
     } catch {
       // Retained in optimistic store
     }
@@ -311,10 +324,28 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         set({ classes: classRes.value.classes, isBackendConnected: true });
       }
       if (taskRes.status === 'fulfilled' && taskRes.value.tasks) {
-        set({ tasks: taskRes.value.tasks });
+        const backendTasks = taskRes.value.tasks;
+        set((s) => {
+          const merged = [...backendTasks];
+          for (const localT of s.tasks) {
+            if (!merged.some((m) => m.id === localT.id || (m.title.toLowerCase() === localT.title.toLowerCase() && m.status === localT.status))) {
+              merged.push(localT);
+            }
+          }
+          return { tasks: merged };
+        });
       }
       if (expRes.status === 'fulfilled' && expRes.value.expenses) {
-        set({ expenses: expRes.value.expenses });
+        const backendExps = expRes.value.expenses;
+        set((s) => {
+          const merged = [...backendExps];
+          for (const localE of s.expenses) {
+            if (!merged.some((m) => m.id === localE.id)) {
+              merged.push(localE);
+            }
+          }
+          return { expenses: merged };
+        });
       }
       if (budgetRes.status === 'fulfilled' && budgetRes.value.budget) {
         set({ budget: budgetRes.value.budget });

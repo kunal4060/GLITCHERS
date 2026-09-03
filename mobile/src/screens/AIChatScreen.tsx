@@ -210,6 +210,81 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
         };
       }
 
+      // Safety Guard: If no action card was created but the user clearly asked for a task or expense
+      if (!actionCard) {
+        const lower = textToSend.toLowerCase();
+        if (
+          lower.startsWith('spent') ||
+          lower.startsWith('paid') ||
+          lower.startsWith('bought') ||
+          (/\b(dinner|lunch|canteen|coffee|chai|tea|food|auto|cab|uber|ola|swiggy|zomato|stationery|book|books)\b/i.test(lower) && /\d+/.test(lower))
+        ) {
+          const amtMatch = textToSend.match(/\d+(?:\.\d+)?/);
+          const amt = amtMatch ? parseFloat(amtMatch[0]) : 100;
+          let cat: any = 'OTHER';
+          if (/\b(dinner|lunch|canteen|coffee|chai|tea|food|swiggy|zomato|pizza|burger|snack)\b/i.test(lower)) cat = 'FOOD';
+          else if (/\b(auto|cab|uber|ola|bus|metro|petrol|fuel)\b/i.test(lower)) cat = 'TRANSPORT';
+          else if (/\b(book|books|stationery|print|xerox|notes)\b/i.test(lower)) cat = 'EDUCATION';
+
+          let desc = textToSend.replace(/^(?:spent|paid|bought)\s+/i, '').trim();
+          if (!desc) desc = cat === 'FOOD' ? 'Dining' : 'Expense';
+
+          const newExp: Expense = {
+            id: String(Date.now()),
+            userId: 'u1',
+            amount: amt,
+            category: cat,
+            description: desc,
+            date: new Date().toISOString(),
+            type: 'EXPENSE',
+          };
+          addExpense(newExp);
+          actionCard = {
+            type: 'EXPENSE',
+            title: '✓ Expense Added',
+            subtitle: newExp.description,
+            primaryValue: `₹${newExp.amount}`,
+            secondaryValue: `${newExp.category} • Today`,
+            badge: 'Added to Finance',
+            navigationScreen: 'Finance',
+          };
+        } else if (
+          /\b(submit|complete|finish|prepare|study|read|write|homework|assignment|task|lab report|project|quiz|todo)\b/i.test(lower) ||
+          lower.startsWith('remind me') ||
+          lower.startsWith('i need to') ||
+          lower.startsWith('i have to')
+        ) {
+          const cleanTitle = textToSend
+            .replace(/^(?:remind me to|remember to|i need to|i have to|add task|create task)\s+/i, '')
+            .replace(/(?:,\s*)?(?:make it|set priority to|priority:?)\s+(?:extremely )?(?:important|urgent|high|normal)/i, '')
+            .trim();
+
+          const newTask: Task = {
+            id: String(Date.now()),
+            userId: 'u1',
+            title: cleanTitle ? cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1) : 'Academic Task',
+            priority:
+              lower.includes('urgent') || lower.includes('extremely')
+                ? 'EXTREMELY_IMPORTANT'
+                : lower.includes('important') || lower.includes('high')
+                ? 'HIGH'
+                : 'NORMAL',
+            status: 'TODO',
+            dueDate: new Date(Date.now() + 86400000).toISOString(),
+          };
+          addTask(newTask);
+          actionCard = {
+            type: 'TASK',
+            title: '✓ Task Created',
+            subtitle: newTask.title,
+            primaryValue: newTask.priority,
+            secondaryValue: 'Due tomorrow',
+            badge: 'Reminders Active',
+            navigationScreen: 'Tasks',
+          };
+        }
+      }
+
       const assistantMsg: ChatMessage = {
         id: String(Date.now() + 1),
         sender: 'assistant',
@@ -225,51 +300,83 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
       let replyText = '';
       let actionCard: ActionCardPayload | undefined;
 
-      if (lower.includes('split') && lower.includes('500') && lower.includes('rahul')) {
-        splitExpense(500, 'Dinner', 'Rahul');
-        replyText = 'Split ₹500 for Dinner: Your share is ₹250, and Rahul owes you ₹250.';
+      if (lower.includes('split') && /\d+/.test(lower)) {
+        const amt = parseFloat(textToSend.match(/\d+(?:\.\d+)?/)?.[0] || '500');
+        let person = 'Rahul';
+        const withM = textToSend.match(/with\s+([A-Za-z]+)/i);
+        if (withM && withM[1]) person = withM[1];
+        splitExpense(amt, 'Split bill', person);
+        replyText = `Split ₹${amt}: Your share is ₹${Math.round(amt / 2)}, and ${person} owes you ₹${Math.round(amt / 2)}.`;
         actionCard = {
           type: 'EXPENSE',
           title: '⚡ Bill Split Recorded',
-          subtitle: 'Dinner with Rahul',
-          primaryValue: '₹500 Total',
-          secondaryValue: 'Rahul owes ₹250',
+          subtitle: `Split with ${person}`,
+          primaryValue: `₹${amt} Total`,
+          secondaryValue: `${person} owes ₹${Math.round(amt / 2)}`,
           badge: 'Finance + Debt',
           navigationScreen: 'Finance',
         };
-      } else if (lower.startsWith('spent ') || lower.startsWith('paid ')) {
-        const amt = parseFloat(textToSend.match(/\d+/)?.[0] || '180');
+      } else if (
+        lower.startsWith('spent') ||
+        lower.startsWith('paid') ||
+        lower.startsWith('bought') ||
+        (/\b(dinner|lunch|canteen|coffee|chai|tea|food|auto|cab|uber|ola|swiggy|zomato|stationery|book|books)\b/i.test(lower) && /\d+/.test(lower))
+      ) {
+        const amtMatch = textToSend.match(/\d+(?:\.\d+)?/);
+        const amt = amtMatch ? parseFloat(amtMatch[0]) : 100;
+        let cat: any = 'FOOD';
+        if (/\b(auto|cab|uber|ola|bus|metro|petrol)\b/i.test(lower)) cat = 'TRANSPORT';
+        else if (/\b(book|books|stationery|print|xerox|notes)\b/i.test(lower)) cat = 'EDUCATION';
+
+        let desc = textToSend.replace(/(?:spent|paid|bought|rs\.?|₹|\b\d+\b)/gi, '').trim();
+        if (!desc) desc = cat === 'FOOD' ? 'Food & Dining' : 'Expense';
+
         const newExp: Expense = {
           id: String(Date.now()),
           userId: 'u1',
           amount: amt,
-          category: 'FOOD',
-          description: 'Dinner',
+          category: cat,
+          description: desc.charAt(0).toUpperCase() + desc.slice(1),
           date: new Date().toISOString(),
           type: 'EXPENSE',
         };
         addExpense(newExp);
-        replyText = `Recorded ₹${amt} for Dinner under FOOD. Added to your finance tracker.`;
+        replyText = `Recorded ₹${amt} for ${newExp.description} under ${cat}. Added to your finance tracker.`;
         actionCard = {
           type: 'EXPENSE',
           title: '✓ Expense Added',
-          subtitle: 'Dinner',
+          subtitle: newExp.description,
           primaryValue: `₹${amt}`,
-          secondaryValue: 'FOOD • Today',
+          secondaryValue: `${cat} • Today`,
           badge: 'Finance Updated',
           navigationScreen: 'Finance',
         };
-      } else if (lower.includes('task') || lower.includes('assignment')) {
+      } else if (
+        /\b(submit|complete|finish|prepare|study|read|write|homework|assignment|task|lab report|project|quiz|todo)\b/i.test(lower) ||
+        lower.startsWith('remind me') ||
+        lower.startsWith('i need to') ||
+        lower.startsWith('i have to')
+      ) {
+        const cleanTitle = textToSend
+          .replace(/^(?:remind me to|remember to|i need to|i have to|add task|create task)\s+/i, '')
+          .replace(/(?:,\s*)?(?:make it|set priority to|priority:?)\s+(?:extremely )?(?:important|urgent|high|normal)/i, '')
+          .trim();
+
         const newTask: Task = {
           id: String(Date.now()),
           userId: 'u1',
-          title: 'Submit AI Assignment',
-          priority: lower.includes('extremely') ? 'EXTREMELY_IMPORTANT' : 'HIGH',
+          title: cleanTitle ? cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1) : 'Academic Task',
+          priority:
+            lower.includes('urgent') || lower.includes('extremely')
+              ? 'EXTREMELY_IMPORTANT'
+              : lower.includes('important') || lower.includes('high')
+              ? 'HIGH'
+              : 'NORMAL',
           status: 'TODO',
           dueDate: new Date(Date.now() + 86400000).toISOString(),
         };
         addTask(newTask);
-        replyText = `Task "${newTask.title}" scheduled for tomorrow with ${newTask.priority} priority.`;
+        replyText = `Task "${newTask.title}" scheduled for tomorrow with ${newTask.priority} priority. Added to task manager.`;
         actionCard = {
           type: 'TASK',
           title: '✓ Task Created',
