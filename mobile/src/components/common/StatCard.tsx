@@ -6,7 +6,7 @@ interface StatCardProps {
   label: string;
   value: string | number;
   subtext?: string;
-  icon?: string;
+  icon?: React.ReactNode;
   accentColor?: string;
   onPress?: () => void;
 }
@@ -23,7 +23,9 @@ export const StatCard: React.FC<StatCardProps> = ({
     <View style={styles.card}>
       <View style={styles.topRow}>
         <Text style={styles.label}>{label}</Text>
-        {icon && <Text style={styles.icon}>{icon}</Text>}
+        {icon && (
+          typeof icon === 'string' ? <Text style={styles.icon}>{icon}</Text> : icon
+        )}
       </View>
       <Text style={[styles.value, { color: accentColor }]}>{value}</Text>
       {subtext && <Text style={styles.subtext}>{subtext}</Text>}
@@ -43,11 +45,11 @@ export const StatCard: React.FC<StatCardProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: designTokens.colors.surfaceCard,
+    backgroundColor: 'rgba(21, 31, 50, 0.75)',
     borderRadius: designTokens.radii.md,
     padding: designTokens.spacing.md,
     borderWidth: 1,
-    borderColor: designTokens.colors.surfaceBorder,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   topRow: {
     flexDirection: 'row',

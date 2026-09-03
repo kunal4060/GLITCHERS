@@ -16,6 +16,7 @@
     "mobile:start": "npm run start --workspace=mobile"
   },
   "devDependencies": {
+    "jpeg-js": "^0.4.4",
     "typescript": "^5.7.3"
   },
   "dependencies": {

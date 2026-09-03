@@ -20,40 +20,46 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ label, variant = 'coun
         };
       case 'urgent':
         return {
-          bg: 'rgba(239, 68, 68, 0.18)',
-          text: '#EF4444',
-          border: 'rgba(239, 68, 68, 0.4)',
+          bg: 'rgba(244, 63, 94, 0.10)',
+          text: '#FB7185',
+          border: 'rgba(244, 63, 94, 0.25)',
+          dot: '#FB7185',
         };
       case 'warning':
         return {
-          bg: 'rgba(245, 158, 11, 0.18)',
-          text: '#F59E0B',
-          border: 'rgba(245, 158, 11, 0.4)',
+          bg: 'rgba(245, 158, 11, 0.10)',
+          text: '#FBBF24',
+          border: 'rgba(245, 158, 11, 0.25)',
+          dot: '#FBBF24',
         };
       case 'completed':
         return {
-          bg: 'rgba(100, 116, 139, 0.18)',
+          bg: 'rgba(100, 116, 139, 0.12)',
           text: '#94A3B8',
-          border: 'rgba(100, 116, 139, 0.3)',
+          border: 'rgba(100, 116, 139, 0.20)',
+          dot: null,
         };
       case 'ai':
         return {
-          bg: 'rgba(139, 92, 246, 0.18)',
-          text: '#A78BFA',
-          border: 'rgba(139, 92, 246, 0.4)',
+          bg: 'rgba(139, 92, 246, 0.12)',
+          text: '#C4B5FD',
+          border: 'rgba(139, 92, 246, 0.25)',
+          dot: '#A78BFA',
         };
       case 'safe':
         return {
-          bg: 'rgba(16, 185, 129, 0.14)',
+          bg: 'rgba(16, 185, 129, 0.10)',
           text: '#34D399',
-          border: 'rgba(16, 185, 129, 0.3)',
+          border: 'rgba(16, 185, 129, 0.22)',
+          dot: '#34D399',
         };
       case 'countdown':
       default:
         return {
-          bg: 'rgba(59, 130, 246, 0.18)',
+          bg: 'rgba(59, 130, 246, 0.10)',
           text: '#60A5FA',
-          border: 'rgba(59, 130, 246, 0.4)',
+          border: 'rgba(59, 130, 246, 0.25)',
+          dot: '#60A5FA',
         };
     }
   };
@@ -62,7 +68,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ label, variant = 'coun
 
   return (
     <View style={[styles.badge, { backgroundColor: v.bg, borderColor: v.border }]}>
-      {variant === 'live' && <View style={styles.pulsingDot} />}
+      {v.dot && <View style={[styles.pulsingDot, { backgroundColor: v.dot }]} />}
       <Text style={[styles.label, { color: v.text }]}>{label}</Text>
     </View>
   );

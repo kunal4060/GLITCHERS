@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Activi
 import { designTokens } from '../theme/designTokens';
 import { GlassCard } from '../components/common/GlassCard';
 import { GradientBackground } from '../components/common/GradientBackground';
+import { AIGemSymbol } from '../components/common/AIGemSymbol';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useDashboardStore } from '../store/dashboardStore';
 import { apiClient } from '../api/client';
 import type { Task, Expense, Debt } from '@glitchers/shared';
@@ -39,31 +41,31 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
   const getContextChips = () => {
     if (lastUserText.includes('spent') || lastUserText.includes('budget') || lastUserText.includes('food')) {
       return [
-        { label: '💰 Food spending this month', prompt: 'What did I spend on food this month?' },
-        { label: '⚡ Split dinner with Rahul', prompt: 'Spent ₹500 on dinner with Rahul. Split it equally' },
-        { label: '📊 View monthly budget', prompt: 'What is my budget status?' },
+        { label: 'Food spending this month', prompt: 'What did I spend on food this month?' },
+        { label: 'Split dinner with Rahul', prompt: 'Spent ₹500 on dinner with Rahul. Split it equally' },
+        { label: 'View monthly budget', prompt: 'What is my budget status?' },
       ];
     }
     if (lastUserText.includes('class') || lastUserText.includes('schedule') || lastUserText.includes('tomorrow')) {
       return [
-        { label: '🗓 Classes tomorrow', prompt: 'What classes do I have tomorrow?' },
-        { label: '📅 Add class to calendar', prompt: 'Add tomorrow DBMS class to my calendar' },
-        { label: '📍 Next class room', prompt: 'Where is my next class?' },
+        { label: 'Classes tomorrow', prompt: 'What classes do I have tomorrow?' },
+        { label: 'Add class to calendar', prompt: 'Add tomorrow DBMS class to my calendar' },
+        { label: 'Next class room', prompt: 'Where is my next class?' },
       ];
     }
     if (lastUserText.includes('task') || lastUserText.includes('assignment')) {
       return [
-        { label: '⭐ Make urgent', prompt: 'Make that task extremely important' },
-        { label: '✅ Mark complete', prompt: 'Mark AI assignment complete' },
-        { label: '📋 Show all tasks', prompt: 'What tasks are pending?' },
+        { label: 'Make urgent', prompt: 'Make that task extremely important' },
+        { label: 'Mark complete', prompt: 'Mark AI assignment complete' },
+        { label: 'Show all tasks', prompt: 'What tasks are pending?' },
       ];
     }
     // Default starter chips
     return [
-      { label: '🍱 Spent ₹180 on dinner', prompt: 'Spent ₹180 on dinner' },
-      { label: '⭐ Submit AI assignment (Urgent)', prompt: 'Remind me to submit AI assignment tomorrow. Make it extremely important' },
-      { label: '⚡ Split ₹600 with Rahul', prompt: 'Spent ₹600 on lunch with Rahul. Split it equally' },
-      { label: '🗓 Classes tomorrow', prompt: 'What classes do I have tomorrow?' },
+      { label: 'Spent ₹180 on dinner', prompt: 'Spent ₹180 on dinner' },
+      { label: 'Submit AI assignment (Urgent)', prompt: 'Remind me to submit AI assignment tomorrow. Make it extremely important' },
+      { label: 'Split ₹600 with Rahul', prompt: 'Spent ₹600 on lunch with Rahul. Split it equally' },
+      { label: 'Classes tomorrow', prompt: 'What classes do I have tomorrow?' },
     ];
   };
 
@@ -303,9 +305,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <View style={styles.aiAvatar}>
-            <Text style={styles.aiAvatarText}>✨</Text>
-          </View>
+          <AIGemSymbol size={34} />
           <View>
             <Text style={styles.headerTitle}>AI Student Companion</Text>
             <View style={styles.statusRow}>
@@ -319,8 +319,8 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
       {/* Chat Messages Feed or Empty State */}
       {messages.length === 0 ? (
         <ScrollView contentContainerStyle={styles.emptyContainer}>
-          <View style={styles.emptyGlowCircle}>
-            <Text style={styles.emptyIcon}>🎓</Text>
+          <View style={{ marginBottom: 16 }}>
+            <AIGemSymbol size={64} />
           </View>
           <Text style={styles.emptyTitle}>Universal Student Command Center</Text>
           <Text style={styles.emptyDescription}>
@@ -438,7 +438,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
           onPress={() => handleSend()}
           disabled={!input.trim() || loading}
         >
-          <Text style={styles.sendIcon}>↑</Text>
+          <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
     </View>

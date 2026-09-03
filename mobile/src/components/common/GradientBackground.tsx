@@ -10,10 +10,10 @@ interface GradientBackgroundProps {
 export const GradientBackground: React.FC<GradientBackgroundProps> = ({ children, style }) => {
   return (
     <LinearGradient
-      colors={['#102038', '#0A1322', '#04070D']}
-      locations={[0, 0.45, 1]}
-      start={{ x: 0.5, y: 0 }}
-      end={{ x: 0.5, y: 1 }}
+      colors={['#0F203C', '#0A1527', '#060B15', '#020408']}
+      locations={[0, 0.32, 0.68, 1]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
       style={[styles.gradient, style]}
     >
       {children}

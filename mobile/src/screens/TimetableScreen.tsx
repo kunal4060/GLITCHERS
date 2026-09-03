@@ -4,6 +4,7 @@ import { designTokens } from '../theme/designTokens';
 import { GlassCard } from '../components/common/GlassCard';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { GradientBackground } from '../components/common/GradientBackground';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useDashboardStore } from '../store/dashboardStore';
 import type { ClassSession } from '@glitchers/shared';
 
@@ -75,7 +76,8 @@ export const TimetableScreen: React.FC = () => {
             style={styles.addBtn}
             onPress={() => setIsAddModalVisible(true)}
           >
-            <Text style={styles.addBtnText}>+ Add</Text>
+            <Ionicons name="add" size={16} color="#FFFFFF" />
+            <Text style={styles.addBtnText}>Add Class</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -108,7 +110,7 @@ export const TimetableScreen: React.FC = () => {
       <ScrollView contentContainerStyle={styles.scheduleList}>
         {dayClasses.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyIcon}>☕</Text>
+            <Ionicons name="cafe-outline" size={32} color="#64748B" style={{ marginBottom: 8 }} />
             <Text style={styles.emptyTitle}>No classes scheduled for {selectedDay}</Text>
             <Text style={styles.emptySub}>Enjoy your free academic hours or catch up on project work.</Text>
           </View>
@@ -126,7 +128,9 @@ export const TimetableScreen: React.FC = () => {
               <GlassCard key={item.id} style={styles.classCard}>
                 <View style={styles.cardHeader}>
                   <View style={styles.timeBlock}>
+                    <Ionicons name="time-outline" size={13} color="#60A5FA" />
                     <Text style={styles.timeStart}>{item.startTime}</Text>
+                    <Text style={styles.timeDivider}>–</Text>
                     <Text style={styles.timeEnd}>{item.endTime}</Text>
                   </View>
 
@@ -142,12 +146,12 @@ export const TimetableScreen: React.FC = () => {
 
                 <View style={styles.metaRow}>
                   <View style={styles.metaItem}>
-                    <Text style={styles.metaIcon}>📍</Text>
+                    <Ionicons name="location-outline" size={13} color="#38BDF8" />
                     <Text style={styles.metaText}>{item.room || 'Room TBD'}</Text>
                   </View>
                   <View style={styles.metaDivider} />
                   <View style={styles.metaItem}>
-                    <Text style={styles.metaIcon}>👤</Text>
+                    <Ionicons name="person-outline" size={13} color="#94A3B8" />
                     <Text style={styles.metaText}>{item.faculty || 'Faculty'}</Text>
                   </View>
 
@@ -155,7 +159,7 @@ export const TimetableScreen: React.FC = () => {
                     style={styles.deleteIconBtn}
                     onPress={() => handleDeleteClass(item.id, item.subjectName)}
                   >
-                    <Text style={styles.deleteIconText}>✕</Text>
+                    <Ionicons name="trash-outline" size={14} color="#64748B" />
                   </TouchableOpacity>
                 </View>
               </GlassCard>
@@ -246,9 +250,12 @@ const styles = StyleSheet.create({
   },
   addBtn: {
     backgroundColor: designTokens.colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: designTokens.spacing.md,
     paddingVertical: designTokens.spacing.xs + 2,
-    borderRadius: designTokens.radii.sm,
+    borderRadius: designTokens.radii.pill,
   },
   addBtnText: {
     ...designTokens.typography.cardTitle,
@@ -257,26 +264,27 @@ const styles = StyleSheet.create({
   },
   dayTabsWrapper: {
     marginBottom: designTokens.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: designTokens.colors.surfaceBorder,
   },
   dayTabsContent: {
     paddingHorizontal: designTokens.spacing.lg,
     gap: designTokens.spacing.sm,
-    paddingBottom: designTokens.spacing.sm,
+    paddingBottom: designTokens.spacing.xs,
   },
   dayTab: {
     paddingHorizontal: designTokens.spacing.md,
-    paddingVertical: designTokens.spacing.xs + 2,
+    paddingVertical: designTokens.spacing.xs + 3,
     borderRadius: designTokens.radii.pill,
-    backgroundColor: designTokens.colors.surfaceCard,
+    backgroundColor: 'rgba(21, 31, 50, 0.70)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   dayTabActive: {
     backgroundColor: designTokens.colors.primary,
+    borderColor: designTokens.colors.primary,
   },
   dayTabText: {
     ...designTokens.typography.bodyMedium,
-    fontSize: 13,
+    fontSize: 12,
     color: designTokens.colors.textSecondary,
   },
   dayTabTextActive: {
@@ -300,16 +308,21 @@ const styles = StyleSheet.create({
   timeBlock: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
   },
   timeStart: {
     ...designTokens.typography.cardTitle,
-    fontSize: 14,
+    fontSize: 13,
     color: designTokens.colors.textPrimary,
   },
-  timeEnd: {
-    ...designTokens.typography.micro,
+  timeDivider: {
     color: designTokens.colors.textMuted,
+    fontSize: 12,
+  },
+  timeEnd: {
+    ...designTokens.typography.bodyMedium,
+    fontSize: 12,
+    color: designTokens.colors.textSecondary,
   },
   cardHeaderRight: {
     flexDirection: 'row',

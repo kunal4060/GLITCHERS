@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Text, TouchableOpacity, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { DashboardScreen } from '../screens/DashboardScreen';
 import { TimetableScreen } from '../screens/TimetableScreen';
@@ -57,7 +58,7 @@ function MainTabs({ navigation }: { navigation: any }) {
             tabBarIcon: ({ focused }) => (
               <View
                 style={{
-                  width: 44,
+                  width: 40,
                   height: 28,
                   borderRadius: 14,
                   backgroundColor: focused ? designTokens.colors.primarySubtle : 'transparent',
@@ -65,7 +66,11 @@ function MainTabs({ navigation }: { navigation: any }) {
                   justifyContent: 'center',
                 }}
               >
-                <Text style={{ fontSize: 17 }}>🏠</Text>
+                <Ionicons
+                  name={focused ? 'home' : 'home-outline'}
+                  size={20}
+                  color={focused ? designTokens.colors.primary : designTokens.colors.textMuted}
+                />
               </View>
             ),
           }}
@@ -79,7 +84,7 @@ function MainTabs({ navigation }: { navigation: any }) {
             tabBarIcon: ({ focused }) => (
               <View
                 style={{
-                  width: 44,
+                  width: 40,
                   height: 28,
                   borderRadius: 14,
                   backgroundColor: focused ? designTokens.colors.primarySubtle : 'transparent',
@@ -87,7 +92,11 @@ function MainTabs({ navigation }: { navigation: any }) {
                   justifyContent: 'center',
                 }}
               >
-                <Text style={{ fontSize: 17 }}>🗓</Text>
+                <Ionicons
+                  name={focused ? 'calendar' : 'calendar-outline'}
+                  size={20}
+                  color={focused ? designTokens.colors.primary : designTokens.colors.textMuted}
+                />
               </View>
             ),
           }}
@@ -101,7 +110,7 @@ function MainTabs({ navigation }: { navigation: any }) {
             tabBarIcon: ({ focused }) => (
               <View
                 style={{
-                  width: 44,
+                  width: 40,
                   height: 28,
                   borderRadius: 14,
                   backgroundColor: focused ? designTokens.colors.primarySubtle : 'transparent',
@@ -109,7 +118,11 @@ function MainTabs({ navigation }: { navigation: any }) {
                   justifyContent: 'center',
                 }}
               >
-                <Text style={{ fontSize: 17 }}>✅</Text>
+                <Ionicons
+                  name={focused ? 'checkbox' : 'checkbox-outline'}
+                  size={20}
+                  color={focused ? designTokens.colors.primary : designTokens.colors.textMuted}
+                />
               </View>
             ),
           }}
@@ -123,7 +136,7 @@ function MainTabs({ navigation }: { navigation: any }) {
             tabBarIcon: ({ focused }) => (
               <View
                 style={{
-                  width: 44,
+                  width: 40,
                   height: 28,
                   borderRadius: 14,
                   backgroundColor: focused ? designTokens.colors.primarySubtle : 'transparent',
@@ -131,7 +144,11 @@ function MainTabs({ navigation }: { navigation: any }) {
                   justifyContent: 'center',
                 }}
               >
-                <Text style={{ fontSize: 17 }}>💰</Text>
+                <Ionicons
+                  name={focused ? 'wallet' : 'wallet-outline'}
+                  size={20}
+                  color={focused ? designTokens.colors.primary : designTokens.colors.textMuted}
+                />
               </View>
             ),
           }}
@@ -145,7 +162,7 @@ function MainTabs({ navigation }: { navigation: any }) {
             tabBarIcon: ({ focused }) => (
               <View
                 style={{
-                  width: 44,
+                  width: 40,
                   height: 28,
                   borderRadius: 14,
                   backgroundColor: focused ? designTokens.colors.aiSubtle : 'transparent',
@@ -153,7 +170,11 @@ function MainTabs({ navigation }: { navigation: any }) {
                   justifyContent: 'center',
                 }}
               >
-                <Text style={{ fontSize: 17 }}>✨</Text>
+                <Ionicons
+                  name={focused ? 'sparkles' : 'sparkles-outline'}
+                  size={20}
+                  color={focused ? designTokens.colors.aiPrimary : designTokens.colors.textMuted}
+                />
               </View>
             ),
           }}

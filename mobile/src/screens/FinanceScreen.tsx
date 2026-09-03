@@ -4,6 +4,7 @@ import { designTokens } from '../theme/designTokens';
 import { GlassCard } from '../components/common/GlassCard';
 import { StatCard } from '../components/common/StatCard';
 import { GradientBackground } from '../components/common/GradientBackground';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useDashboardStore } from '../store/dashboardStore';
 import type { Expense, Debt } from '@glitchers/shared';
 
@@ -124,7 +125,10 @@ export const FinanceScreen: React.FC = () => {
 
       {/* 3. AI Quick Entry Bar */}
       <GlassCard style={styles.quickEntryCard}>
-        <Text style={styles.quickEntryTitle}>AI Quick Expense Entry</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: designTokens.spacing.sm }}>
+          <Ionicons name="sparkles" size={13} color={designTokens.colors.primary} />
+          <Text style={styles.quickEntryTitle}>AI Quick Expense Entry</Text>
+        </View>
         <View style={styles.quickEntryRow}>
           <TextInput
             style={styles.quickInput}
@@ -139,7 +143,7 @@ export const FinanceScreen: React.FC = () => {
             onPress={handleQuickAddPress}
             disabled={!quickInput.trim()}
           >
-            <Text style={styles.quickAddText}>Add</Text>
+            <Ionicons name="arrow-up" size={16} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
 
@@ -173,7 +177,8 @@ export const FinanceScreen: React.FC = () => {
       <View style={styles.sectionHeaderRow}>
         <Text style={styles.sectionTitle}>Peer Debts & Splits</Text>
         <TouchableOpacity style={styles.splitBillBtn} onPress={() => setSplitModalVisible(true)}>
-          <Text style={styles.splitBillText}>⚡ Split Bill</Text>
+          <Ionicons name="git-branch-outline" size={13} color="#FFFFFF" />
+          <Text style={styles.splitBillText}>Split Bill</Text>
         </TouchableOpacity>
       </View>
 
@@ -182,6 +187,7 @@ export const FinanceScreen: React.FC = () => {
           label="TO RECEIVE"
           value={`₹${toReceive.toLocaleString()}`}
           subtext="Friends owe you"
+          icon={<Ionicons name="arrow-down-circle-outline" size={15} color="#34D399" />}
           accentColor={designTokens.colors.success}
         />
         <View style={{ width: designTokens.spacing.md }} />
@@ -189,6 +195,7 @@ export const FinanceScreen: React.FC = () => {
           label="TO PAY"
           value={`₹${toPay.toLocaleString()}`}
           subtext="You owe friends"
+          icon={<Ionicons name="arrow-up-circle-outline" size={15} color="#FB7185" />}
           accentColor={designTokens.colors.danger}
         />
       </View>
@@ -427,14 +434,15 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { ...designTokens.typography.sectionTitle, fontSize: 15 },
   splitBillBtn: {
-    backgroundColor: designTokens.colors.surfaceElevated,
-    paddingHorizontal: designTokens.spacing.sm + 2,
-    paddingVertical: 4,
+    backgroundColor: designTokens.colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: designTokens.spacing.md,
+    paddingVertical: designTokens.spacing.xs + 2,
     borderRadius: designTokens.radii.pill,
-    borderWidth: 1,
-    borderColor: designTokens.colors.surfaceBorder,
   },
-  splitBillText: { ...designTokens.typography.micro, color: '#60A5FA', fontWeight: '700' },
+  splitBillText: { ...designTokens.typography.micro, color: '#FFFFFF', fontWeight: '700' },
   debtsRow: { flexDirection: 'row', marginBottom: designTokens.spacing.sm },
   debtListCard: { marginBottom: designTokens.spacing.md, padding: designTokens.spacing.md },
   debtItemRow: {

@@ -6,6 +6,7 @@ import { StatCard } from '../components/common/StatCard';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { NinjaAvatar } from '../components/NinjaAvatar';
 import { GradientBackground } from '../components/common/GradientBackground';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useDashboardStore } from '../store/dashboardStore';
 
 export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
@@ -77,13 +78,13 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
             style={styles.actionCircle}
             onPress={() => navigation?.navigate('Search')}
           >
-            <Text style={styles.actionIcon}>🔍</Text>
+            <Ionicons name="search-outline" size={17} color="#94A3B8" />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionCircle}
             onPress={() => navigation?.navigate('Alerts')}
           >
-            <Text style={styles.actionIcon}>🔔</Text>
+            <Ionicons name="notifications-outline" size={17} color="#94A3B8" />
             {urgentEmail && <View style={styles.notifDot} />}
           </TouchableOpacity>
         </View>
@@ -91,7 +92,10 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
 
       {/* 2. Priority Engine Hero: Next Class with Live Countdown */}
       <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionHeading}>Today's Schedule</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Ionicons name="school-outline" size={15} color="#94A3B8" />
+          <Text style={styles.sectionHeading}>Today's Schedule</Text>
+        </View>
         <StatusBadge label="Starts in 18 min" variant="countdown" />
       </View>
 
@@ -105,19 +109,22 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
           <View style={styles.typePill}>
             <Text style={styles.typePillText}>{nextClass.classType || 'LECTURE'}</Text>
           </View>
-          <Text style={styles.heroTimeRange}>{nextClass.startTime} – {nextClass.endTime}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Ionicons name="time-outline" size={13} color="#93C5FD" />
+            <Text style={styles.heroTimeRange}>{nextClass.startTime} – {nextClass.endTime}</Text>
+          </View>
         </View>
 
         <Text style={styles.heroSubjectTitle}>{nextClass.subjectName}</Text>
 
         <View style={styles.heroMetaRow}>
           <View style={styles.metaItem}>
-            <Text style={styles.metaIcon}>📍</Text>
+            <Ionicons name="location-outline" size={13} color="#38BDF8" />
             <Text style={styles.metaText}>{nextClass.room || '120-CB'}</Text>
           </View>
           <View style={styles.metaDivider} />
           <View style={styles.metaItem}>
-            <Text style={styles.metaIcon}>👤</Text>
+            <Ionicons name="person-outline" size={13} color="#94A3B8" />
             <Text style={styles.metaText}>{nextClass.faculty || 'Faculty'}</Text>
           </View>
         </View>
@@ -129,7 +136,7 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
           label="CLASSES TODAY"
           value={classes.length}
           subtext="4 scheduled"
-          icon="📅"
+          icon={<Ionicons name="calendar-outline" size={15} color={designTokens.colors.primary} />}
           accentColor={designTokens.colors.primary}
           onPress={() => navigation?.navigate('Timetable')}
         />
@@ -138,8 +145,8 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
           label="PENDING TASKS"
           value={pendingTasks.length}
           subtext={criticalTasks.length > 0 ? `${criticalTasks.length} urgent` : 'On track'}
-          icon="✅"
-          accentColor={criticalTasks.length > 0 ? designTokens.colors.danger : designTokens.colors.success}
+          icon={<Ionicons name="checkbox-outline" size={15} color={criticalTasks.length > 0 ? '#FB7185' : '#34D399'} />}
+          accentColor={criticalTasks.length > 0 ? '#FB7185' : designTokens.colors.success}
           onPress={() => navigation?.navigate('Tasks')}
         />
         <View style={{ width: designTokens.spacing.md }} />
@@ -147,7 +154,7 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
           label="NOTICES"
           value={emails.length}
           subtext="1 important"
-          icon="📬"
+          icon={<Ionicons name="mail-outline" size={15} color="#A78BFA" />}
           accentColor={designTokens.colors.aiSecondary}
           onPress={() => navigation?.navigate('Email')}
         />
@@ -168,7 +175,7 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
               style={styles.checkbox}
               onPress={() => completeTask(task.id)}
             >
-              <Text style={styles.checkboxText}>○</Text>
+              <Ionicons name="ellipse-outline" size={20} color="#64748B" />
             </TouchableOpacity>
 
             <View style={styles.taskInfo}>
@@ -178,7 +185,10 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
                 ) : (
                   <StatusBadge label="High Priority" variant="warning" />
                 )}
-                <Text style={styles.dueDateText}>Due tomorrow</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                  <Ionicons name="time-outline" size={11} color="#64748B" />
+                  <Text style={styles.dueDateText}>Due tomorrow</Text>
+                </View>
               </View>
               <Text style={styles.taskTitleText}>{task.title}</Text>
             </View>
@@ -218,19 +228,28 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
         <Text style={styles.burnRateHint}>On track: ₹{Math.round(remainingBudget / 27)} daily safe allowance</Text>
       </GlassCard>
 
-      {/* 6. Urgent University Notice Banner */}
+      {/* 6. University Notice Dispatch (Refined Executive Briefing) */}
       {urgentEmail && (
         <>
           <View style={[styles.sectionHeaderRow, { marginTop: designTokens.spacing.lg }]}>
-            <Text style={styles.sectionHeading}>University Circular</Text>
-            <StatusBadge label="Urgent" variant="urgent" />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="newspaper-outline" size={15} color="#94A3B8" />
+              <Text style={styles.sectionHeading}>University Circular</Text>
+            </View>
+            <StatusBadge label="Official Notice" variant="warning" />
           </View>
 
           <GlassCard
             style={styles.noticeCard}
             onPress={() => navigation?.navigate('Email')}
           >
-            <Text style={styles.noticeSender}>{urgentEmail.sender}</Text>
+            <View style={styles.noticeHeaderRow}>
+              <View style={styles.noticeBadge}>
+                <Ionicons name="shield-checkmark-outline" size={12} color="#FBBF24" />
+                <Text style={styles.noticeSender}>{urgentEmail.sender}</Text>
+              </View>
+              <Text style={styles.noticeTimeAgo}>Today</Text>
+            </View>
             <Text style={styles.noticeSubject}>{urgentEmail.subject}</Text>
             <Text style={styles.noticeSummary} numberOfLines={2}>{urgentEmail.summary}</Text>
             <View style={styles.noticeActionRow}>
@@ -238,7 +257,8 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
                 style={styles.noticeActionBtn}
                 onPress={() => navigation?.navigate('Email')}
               >
-                <Text style={styles.noticeActionText}>View Full Announcement →</Text>
+                <Text style={styles.noticeActionText}>Read Official Notice</Text>
+                <Ionicons name="arrow-forward" size={12} color={designTokens.colors.primary} />
               </TouchableOpacity>
             </View>
           </GlassCard>
@@ -474,30 +494,57 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   noticeCard: {
-    borderLeftWidth: 3,
-    borderLeftColor: designTokens.colors.danger,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.22)',
+    backgroundColor: 'rgba(21, 31, 50, 0.80)',
+    marginBottom: designTokens.spacing.lg,
+  },
+  noticeHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: designTokens.spacing.xs,
+  },
+  noticeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(245, 158, 11, 0.10)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: designTokens.radii.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.20)',
   },
   noticeSender: {
     ...designTokens.typography.micro,
-    color: designTokens.colors.danger,
+    color: '#FBBF24',
+    fontWeight: '700',
     letterSpacing: 0.5,
-    marginBottom: 2,
+  },
+  noticeTimeAgo: {
+    ...designTokens.typography.micro,
+    color: designTokens.colors.textMuted,
   },
   noticeSubject: {
     ...designTokens.typography.cardTitle,
     fontSize: 14,
+    color: '#FFFFFF',
     marginBottom: 4,
   },
   noticeSummary: {
     ...designTokens.typography.body,
     fontSize: 12,
-    lineHeight: 17,
+    lineHeight: 18,
   },
   noticeActionRow: {
     marginTop: designTokens.spacing.sm,
     paddingTop: designTokens.spacing.xs,
   },
   noticeActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     alignSelf: 'flex-start',
   },
   noticeActionText: {

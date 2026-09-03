@@ -4,6 +4,7 @@ import { designTokens } from '../theme/designTokens';
 import { GlassCard } from '../components/common/GlassCard';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { GradientBackground } from '../components/common/GradientBackground';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useDashboardStore } from '../store/dashboardStore';
 import type { Task } from '@glitchers/shared';
 
@@ -60,7 +61,8 @@ export const TasksScreen: React.FC = () => {
         </View>
 
         <TouchableOpacity style={styles.addBtn} onPress={() => setModalVisible(true)}>
-          <Text style={styles.addBtnText}>+ New Task</Text>
+          <Ionicons name="add" size={16} color="#FFFFFF" />
+          <Text style={styles.addBtnText}>New Task</Text>
         </TouchableOpacity>
       </View>
 
@@ -86,7 +88,7 @@ export const TasksScreen: React.FC = () => {
       <ScrollView contentContainerStyle={styles.taskList}>
         {filteredTasks.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>🎉</Text>
+            <Ionicons name="checkmark-done-circle-outline" size={36} color="#34D399" style={{ marginBottom: 8 }} />
             <Text style={styles.emptyTitle}>You're all clear</Text>
             <Text style={styles.emptySub}>No pending tasks found under {selectedFilter}.</Text>
           </View>
@@ -104,16 +106,23 @@ export const TasksScreen: React.FC = () => {
               <GlassCard key={t.id} style={styles.taskCard}>
                 <View style={styles.taskCardRow}>
                   <TouchableOpacity
-                    style={[styles.checkbox, isDone && styles.checkboxDone]}
+                    style={styles.checkbox}
                     onPress={() => completeTask(t.id)}
                   >
-                    <Text style={styles.checkIcon}>{isDone ? '✓' : '○'}</Text>
+                    <Ionicons
+                      name={isDone ? 'checkmark-circle' : 'ellipse-outline'}
+                      size={22}
+                      color={isDone ? '#10B981' : '#64748B'}
+                    />
                   </TouchableOpacity>
 
                   <View style={styles.taskContent}>
                     <View style={styles.badgeRow}>
                       {priorityBadge}
-                      <Text style={styles.deadlineTag}>Due tomorrow</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                        <Ionicons name="time-outline" size={11} color="#64748B" />
+                        <Text style={styles.deadlineTag}>Due tomorrow</Text>
+                      </View>
                     </View>
 
                     <Text style={[styles.taskTitle, isDone && styles.taskTitleDone]}>
@@ -126,7 +135,8 @@ export const TasksScreen: React.FC = () => {
 
                     <View style={styles.taskFooter}>
                       <View style={styles.aiTag}>
-                        <Text style={styles.aiTagText}>✨ Created by AI Companion</Text>
+                        <Ionicons name="sparkles" size={10} color="#A78BFA" />
+                        <Text style={styles.aiTagText}>AI Suggested</Text>
                       </View>
 
                       <View style={styles.taskActions}>
@@ -217,30 +227,47 @@ const styles = StyleSheet.create({
   headerSubtitle: { ...designTokens.typography.micro, color: designTokens.colors.textSecondary, marginTop: 2 },
   addBtn: {
     backgroundColor: designTokens.colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: designTokens.spacing.md,
     paddingVertical: designTokens.spacing.xs + 2,
-    borderRadius: designTokens.radii.sm,
+    borderRadius: designTokens.radii.pill,
   },
-  addBtnText: { ...designTokens.typography.cardTitle, fontSize: 12, color: '#FFFFFF' },
+  addBtnText: {
+    ...designTokens.typography.cardTitle,
+    fontSize: 12,
+    color: '#FFFFFF',
+  },
   filterBar: {
-    borderBottomWidth: 1,
-    borderBottomColor: designTokens.colors.surfaceBorder,
     marginBottom: designTokens.spacing.md,
   },
   filterContent: {
     paddingHorizontal: designTokens.spacing.lg,
     gap: designTokens.spacing.sm,
-    paddingBottom: designTokens.spacing.sm,
+    paddingBottom: designTokens.spacing.xs,
   },
   filterChip: {
     paddingHorizontal: designTokens.spacing.md,
-    paddingVertical: designTokens.spacing.xs + 2,
+    paddingVertical: designTokens.spacing.xs + 3,
     borderRadius: designTokens.radii.pill,
-    backgroundColor: designTokens.colors.surfaceCard,
+    backgroundColor: 'rgba(21, 31, 50, 0.70)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  filterChipActive: { backgroundColor: designTokens.colors.primary },
-  filterText: { ...designTokens.typography.bodyMedium, fontSize: 12, color: designTokens.colors.textSecondary },
-  filterTextActive: { color: '#FFFFFF', fontWeight: '700' },
+  filterChipActive: {
+    backgroundColor: designTokens.colors.primary,
+    borderColor: designTokens.colors.primary,
+  },
+  filterText: {
+    ...designTokens.typography.bodyMedium,
+    fontSize: 12,
+    color: designTokens.colors.textSecondary,
+  },
+  filterTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
   taskList: {
     paddingHorizontal: designTokens.spacing.lg,
     paddingBottom: 110,

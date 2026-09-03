@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 import { useFloatingStore } from '../store/floatingStore';
 import { useDashboardStore } from '../store/dashboardStore';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { AIGemSymbol } from './common/AIGemSymbol';
 
 export const FloatingAssistantOverlay: React.FC = () => {
   const {
@@ -183,30 +185,35 @@ export const FloatingAssistantOverlay: React.FC = () => {
       {isMenuExpanded && (
         <View style={styles.menuDock}>
           <TouchableOpacity style={styles.menuItem} onPress={() => openMiniWindow('EMAIL')}>
-            <Text style={styles.menuItemText}>📧 Email</Text>
+            <Ionicons name="mail-outline" size={16} color="#38BDF8" />
+            <Text style={styles.menuItemText}>Notices</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.menuItem} onPress={() => openMiniWindow('FINANCE')}>
-            <Text style={styles.menuItemText}>💰 Finance</Text>
+            <Ionicons name="wallet-outline" size={16} color="#34D399" />
+            <Text style={styles.menuItemText}>Expense</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.menuItem} onPress={() => openMiniWindow('TASKS')}>
-            <Text style={styles.menuItemText}>✅ Tasks</Text>
+            <Ionicons name="checkbox-outline" size={16} color="#FBBF24" />
+            <Text style={styles.menuItemText}>Tasks</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.menuItem} onPress={() => openMiniWindow('CALENDAR')}>
-            <Text style={styles.menuItemText}>🗓 Calendar</Text>
+            <Ionicons name="calendar-outline" size={16} color="#60A5FA" />
+            <Text style={styles.menuItemText}>Schedule</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.menuItem} onPress={() => openMiniWindow('AI')}>
-            <Text style={styles.menuItemText}>🤖 AI Chat</Text>
+            <Ionicons name="sparkles" size={16} color="#C4B5FD" />
+            <Text style={styles.menuItemText}>AI Chat</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {/* 3. Draggable Floating Bubble */}
+      {/* 3. Draggable Floating Bubble with 3D Gem Symbol */}
       <TouchableOpacity
         style={styles.floatingBubble}
-        activeOpacity={0.8}
+        activeOpacity={0.82}
         onPress={() => setMenuExpanded(!isMenuExpanded)}
       >
-        <Text style={styles.bubbleIcon}>🎓</Text>
+        <AIGemSymbol size={56} />
       </TouchableOpacity>
     </View>
   );
@@ -225,20 +232,8 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   floatingBubble: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#3B82F6',
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-  },
-  bubbleIcon: {
-    fontSize: 28,
   },
   menuDock: {
     position: 'absolute',
