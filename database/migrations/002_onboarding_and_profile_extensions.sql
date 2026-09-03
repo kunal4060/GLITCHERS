@@ -58,10 +58,12 @@ ALTER TABLE public.onboarding_state ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.initialization_jobs ENABLE ROW LEVEL SECURITY;
 
 -- 5. RLS Policies: User isolation based on auth.uid()
+DROP POLICY IF EXISTS "Users access own onboarding_state" ON public.onboarding_state;
 CREATE POLICY "Users access own onboarding_state"
     ON public.onboarding_state FOR ALL
     USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users access own initialization_jobs" ON public.initialization_jobs;
 CREATE POLICY "Users access own initialization_jobs"
     ON public.initialization_jobs FOR ALL
     USING (auth.uid() = user_id);

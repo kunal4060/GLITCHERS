@@ -334,23 +334,63 @@ ALTER TABLE public.ai_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sync_records ENABLE ROW LEVEL SECURITY;
 
 -- Standard tenant isolation policies using auth.uid()
+DROP POLICY IF EXISTS "Users access own profile" ON public.profiles;
 CREATE POLICY "Users access own profile" ON public.profiles FOR ALL USING (auth.uid() = id);
+
+DROP POLICY IF EXISTS "Users access own google_accounts" ON public.google_accounts;
 CREATE POLICY "Users access own google_accounts" ON public.google_accounts FOR ALL USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users access own semesters" ON public.semesters;
 CREATE POLICY "Users access own semesters" ON public.semesters FOR ALL USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users access own subjects" ON public.subjects;
 CREATE POLICY "Users access own subjects" ON public.subjects FOR ALL USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users access own timetables" ON public.timetables;
 CREATE POLICY "Users access own timetables" ON public.timetables FOR ALL USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users access own classes" ON public.classes;
 CREATE POLICY "Users access own classes" ON public.classes FOR ALL USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users access own calendar_events" ON public.calendar_events;
 CREATE POLICY "Users access own calendar_events" ON public.calendar_events FOR ALL USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users access own tasks" ON public.tasks;
 CREATE POLICY "Users access own tasks" ON public.tasks FOR ALL USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users access own exams" ON public.exams;
 CREATE POLICY "Users access own exams" ON public.exams FOR ALL USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users access own assignments" ON public.assignments;
 CREATE POLICY "Users access own assignments" ON public.assignments FOR ALL USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users access own expenses" ON public.expenses;
 CREATE POLICY "Users access own expenses" ON public.expenses FOR ALL USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users access own budgets" ON public.budgets;
 CREATE POLICY "Users access own budgets" ON public.budgets FOR ALL USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users access own debts" ON public.debts;
 CREATE POLICY "Users access own debts" ON public.debts FOR ALL USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users access own shared_expenses" ON public.shared_expenses;
 CREATE POLICY "Users access own shared_expenses" ON public.shared_expenses FOR ALL USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users access own emails" ON public.emails;
 CREATE POLICY "Users access own emails" ON public.emails FOR ALL USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users access own notifications" ON public.notifications;
 CREATE POLICY "Users access own notifications" ON public.notifications FOR ALL USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users access own device_tokens" ON public.device_tokens;
 CREATE POLICY "Users access own device_tokens" ON public.device_tokens FOR ALL USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users access own user_preferences" ON public.user_preferences;
 CREATE POLICY "Users access own user_preferences" ON public.user_preferences FOR ALL USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users access own ai_conversations" ON public.ai_conversations;
 CREATE POLICY "Users access own ai_conversations" ON public.ai_conversations FOR ALL USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users access own sync_records" ON public.sync_records;
 CREATE POLICY "Users access own sync_records" ON public.sync_records FOR ALL USING (auth.uid() = user_id);
+
