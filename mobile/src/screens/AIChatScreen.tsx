@@ -62,10 +62,12 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
     }
     // Default starter chips
     return [
+      { label: 'Yesterday expenses', prompt: 'What amount did I expense yesterday?' },
+      { label: 'Which classes do I have', prompt: 'Which classes do I have?' },
+      { label: 'Daily expense budget', prompt: 'Calculate my daily expense allowance and remaining budget' },
       { label: 'Spent ₹180 on dinner', prompt: 'Spent ₹180 on dinner' },
-      { label: 'Submit AI assignment (Urgent)', prompt: 'Remind me to submit AI assignment tomorrow. Make it extremely important' },
+      { label: 'Submit AI assignment', prompt: 'Remind me to submit AI assignment tomorrow. Make it extremely important' },
       { label: 'Split ₹600 with Rahul', prompt: 'Spent ₹600 on lunch with Rahul. Split it equally' },
-      { label: 'Classes tomorrow', prompt: 'What classes do I have tomorrow?' },
     ];
   };
 
