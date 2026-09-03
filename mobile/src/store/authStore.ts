@@ -87,15 +87,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isOnboardingComplete: false,
       };
 
-      // Check onboarding state for this user
+      // Check onboarding state for this user - always enter setup after Google login
       const statusRes = await apiClient.getOnboardingStatus().catch(() => null);
-      const isComplete = statusRes?.isComplete || user.isOnboardingComplete || false;
-      const step = (statusRes?.state?.currentStep as OnboardingStep) || (isComplete ? 'COMPLETE' : 'GOOGLE_SERVICES');
+      const isComplete = false;
+      const step: OnboardingStep = (statusRes?.state?.currentStep && statusRes.state.currentStep !== 'COMPLETE')
+        ? (statusRes.state.currentStep as OnboardingStep)
+        : 'GOOGLE_SERVICES';
 
       set({
         isAuthenticated: true,
-        user,
-        isOnboardingComplete: isComplete,
+        user: { ...user, isOnboardingComplete: false },
+        isOnboardingComplete: false,
         currentOnboardingStep: step,
         onboardingData: statusRes?.state?.data || {},
         isLoading: false,

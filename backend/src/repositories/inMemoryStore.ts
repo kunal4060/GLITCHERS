@@ -54,30 +54,17 @@ class InMemoryStore {
       creditsCompleted: 42,
       creditsCurrent: 18,
       universityDomain: 'university.edu',
-      isOnboardingComplete: true,
+      isOnboardingComplete: false,
       createdAt: new Date().toISOString(),
     });
 
     this.onboardingStates.set(userId, {
       userId,
-      currentStep: 'COMPLETE',
-      completedSteps: [
-        'GOOGLE_AUTH',
-        'GOOGLE_SERVICES',
-        'PROFILE',
-        'ACADEMICS',
-        'TIMETABLE',
-        'TIMETABLE_REVIEW',
-        'NOTIFICATION_SETUP',
-        'FINANCE_SETUP',
-        'FLOATING_ASSISTANT',
-        'INITIAL_PROCESSING',
-        'COMPLETE',
-      ],
-      isComplete: true,
+      currentStep: 'GOOGLE_SERVICES',
+      completedSteps: ['GOOGLE_AUTH'],
+      isComplete: false,
       data: {},
       startedAt: new Date().toISOString(),
-      completedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
 
