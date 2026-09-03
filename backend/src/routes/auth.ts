@@ -12,7 +12,14 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.get<{ Querystring: { code?: string; error?: string; state?: string } }>('/google/callback', async (req, reply) => {
     const { code, error, state } = req.query || {};
-    const frontendUrl = state || 'http://localhost:8082';
+    let frontendUrl = 'http://localhost:8082';
+    if (state) {
+      try {
+        frontendUrl = Buffer.from(state, 'base64url').toString('utf8');
+      } catch {
+        frontendUrl = state;
+      }
+    }
     const cleanBase = frontendUrl.split('?')[0].replace(/\/$/, '');
 
     if (error || !code) {

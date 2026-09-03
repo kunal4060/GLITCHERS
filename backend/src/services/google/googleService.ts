@@ -30,7 +30,7 @@ export class GoogleService {
       access_type: 'offline',
       prompt: 'consent',
       scope: scopes,
-      state: stateUrl || 'http://localhost:8082',
+      state: Buffer.from(stateUrl || 'http://localhost:8082').toString('base64url'),
     });
   }
 
