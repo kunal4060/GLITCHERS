@@ -9,6 +9,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY shared/package.json ./shared/
 COPY backend/package.json ./backend/
+COPY mobile/package.json ./mobile/
 
 RUN npm ci
 
@@ -41,6 +42,7 @@ RUN apk add --no-cache curl
 COPY package.json package-lock.json ./
 COPY shared/package.json ./shared/
 COPY backend/package.json ./backend/
+COPY mobile/package.json ./mobile/
 
 # Install production dependencies only
 RUN npm ci --omit=dev
