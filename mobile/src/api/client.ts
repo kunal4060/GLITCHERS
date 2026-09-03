@@ -1,7 +1,9 @@
 import { Platform } from 'react-native';
 import type { AIChatResponse } from '@glitchers/shared';
 
-const DEFAULT_HOST = Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://localhost:5000/api';
+const PROD_HOST = 'https://glitchers-backend.onrender.com/api';
+const LOCAL_DEV_HOST = Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://localhost:5000/api';
+const DEFAULT_HOST = process.env.EXPO_PUBLIC_API_URL || PROD_HOST;
 
 class ApiClient {
   private baseUrl: string = DEFAULT_HOST;

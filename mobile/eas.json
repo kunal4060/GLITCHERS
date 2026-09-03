@@ -13,7 +13,7 @@
         "buildType": "apk"
       },
       "env": {
-        "API_BASE_URL": "https://glitchers-backend.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://glitchers-backend.onrender.com/api"
       }
     },
     "production": {
@@ -21,7 +21,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "API_BASE_URL": "https://glitchers-backend.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://glitchers-backend.onrender.com/api"
       }
     }
   },
