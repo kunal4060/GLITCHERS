@@ -37,6 +37,9 @@ interface DashboardState {
   setCredits: (credits: number) => void;
   updateAcademics: (cgpa: string, credits: number) => void;
 
+  avatarUrl: string | null;
+  setAvatarUrl: (avatarUrl: string | null) => void;
+
   syncWithBackend: () => Promise<void>;
 }
 
@@ -46,6 +49,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   setCgpa: (cgpa) => set({ cgpa }),
   setCredits: (credits) => set({ credits }),
   updateAcademics: (cgpa, credits) => set({ cgpa, credits }),
+  avatarUrl: null,
+  setAvatarUrl: (avatarUrl) => set({ avatarUrl }),
   classes: [
     {
       id: 'c1',

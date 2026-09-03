@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Modal, TextInput } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as ImagePicker from 'expo-image-picker';
 import { designTokens } from '../theme/designTokens';
 import { GradientBackground } from '../components/common/GradientBackground';
 import { NinjaAvatar } from '../components/NinjaAvatar';
@@ -15,7 +16,7 @@ interface SettingsScreenProps {
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboarding, navigation }) => {
   const { user } = useAuthStore();
-  const { cgpa, credits, setCgpa, setCredits } = useDashboardStore();
+  const { cgpa, credits, setCgpa, setCredits, avatarUrl, setAvatarUrl } = useDashboardStore();
 
   const [semester, setSemester] = useState('FALL SEMESTER 2026-27');
   const [quietHoursEnabled, setQuietHoursEnabled] = useState(true);
@@ -28,6 +29,35 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
   const [editValue, setEditValue] = useState('');
 
   const studentName = user?.fullName || 'KUNAL BALKRUSHN UGALE';
+
+  const handlePickImageFromGallery = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permission Required', 'Please grant access to your photo library to pick a profile picture.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.85,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        setAvatarUrl(result.assets[0].uri);
+        Alert.alert('Profile Updated', 'Your profile picture has been updated from your gallery!');
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Could not open photo gallery.');
+    }
+  };
+
+  const handleResetAvatar = () => {
+    setAvatarUrl(null);
+    Alert.alert('Avatar Reset', 'Restored to default avatar character.');
+  };
 
   const handleOpenEditCgpa = () => {
     setEditType('CGPA');
@@ -96,11 +126,30 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
             cgpa={cgpa}
             credits={credits}
             showBadges={true}
+            customImageUri={avatarUrl}
+            onPressAvatar={handlePickImageFromGallery}
             onPressCgpa={handleOpenEditCgpa}
             onPressCredits={handleOpenEditCredits}
           />
 
           <Text style={styles.studentName}>{studentName}</Text>
+
+          {/* Change Photo / Gallery Action Button */}
+          <View style={styles.photoActionRow}>
+            <TouchableOpacity style={styles.changePhotoBtn} onPress={handlePickImageFromGallery} activeOpacity={0.8}>
+              <Ionicons name="images-outline" size={15} color={designTokens.colors.primaryDark} />
+              <Text style={styles.changePhotoBtnText}>
+                {avatarUrl ? 'Change from Gallery' : 'Upload Photo from Gallery'}
+              </Text>
+            </TouchableOpacity>
+
+            {avatarUrl ? (
+              <TouchableOpacity style={styles.resetPhotoBtn} onPress={handleResetAvatar} activeOpacity={0.7}>
+                <Ionicons name="refresh-outline" size={14} color="#B91C1C" />
+                <Text style={styles.resetPhotoBtnText}>Reset</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
 
           {/* Academic Edit Bar */}
           <View style={styles.academicChipsRow}>
@@ -281,6 +330,45 @@ const styles = StyleSheet.create({
     marginTop: 14,
     textAlign: 'center',
     letterSpacing: 0.5,
+  },
+  photoActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+    marginBottom: 2,
+  },
+  changePhotoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FAF7F2',
+    borderWidth: 1,
+    borderColor: 'rgba(117, 167, 165, 0.4)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: designTokens.radii.pill,
+  },
+  changePhotoBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: designTokens.colors.primaryDark,
+  },
+  resetPhotoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: designTokens.radii.pill,
+  },
+  resetPhotoBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#B91C1C',
   },
   academicChipsRow: {
     flexDirection: 'row',

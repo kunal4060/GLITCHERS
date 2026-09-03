@@ -19,6 +19,7 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
     budget,
     emails,
     isLoading,
+    avatarUrl,
     syncWithBackend,
     completeTask,
   } = useDashboardStore();
@@ -121,7 +122,7 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
           activeOpacity={0.85}
           onPress={() => navigation?.navigate('Account')}
         >
-          <NinjaAvatar size="small" showBadges={false} />
+          <NinjaAvatar size="small" showBadges={false} customImageUri={avatarUrl} />
           <View style={styles.profileTextCol}>
             <Text style={styles.greetingTitle}>Good morning, Kunal</Text>
             <Text style={styles.semesterSubtitle}>VIT AP • Fall Semester 2026-27</Text>

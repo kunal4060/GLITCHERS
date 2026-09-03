@@ -1,13 +1,16 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 interface NinjaAvatarProps {
   size?: 'small' | 'large';
   cgpa?: string;
   credits?: number;
   showBadges?: boolean;
+  customImageUri?: string | null;
   onPressCgpa?: () => void;
   onPressCredits?: () => void;
+  onPressAvatar?: () => void;
 }
 
 export const NinjaAvatar: React.FC<NinjaAvatarProps> = ({
@@ -15,11 +18,50 @@ export const NinjaAvatar: React.FC<NinjaAvatarProps> = ({
   cgpa = '8.71',
   credits = 42,
   showBadges = true,
+  customImageUri,
   onPressCgpa,
   onPressCredits,
+  onPressAvatar,
 }) => {
   const isLarge = size === 'large';
   const containerSize = isLarge ? 160 : 46;
+
+  const AvatarContent = (
+    <View
+      style={[
+        styles.circleBase,
+        {
+          width: containerSize,
+          height: containerSize,
+          borderRadius: containerSize / 2,
+        },
+      ]}
+    >
+      {customImageUri ? (
+        <Image
+          source={{ uri: customImageUri }}
+          style={{ width: containerSize, height: containerSize, borderRadius: containerSize / 2 }}
+          resizeMode="cover"
+        />
+      ) : (
+        <>
+          {/* Sword on back */}
+          <View style={[styles.sword, isLarge ? styles.swordLarge : styles.swordSmall]} />
+
+          {/* Ninja Head */}
+          <View style={[styles.ninjaHead, isLarge ? styles.headLarge : styles.headSmall]}>
+            {/* Red Headband */}
+            <View style={[styles.headband, isLarge ? styles.bandLarge : styles.bandSmall]} />
+            {/* Skin Face Mask Opening */}
+            <View style={[styles.faceOpening, isLarge ? styles.faceLarge : styles.faceSmall]} />
+          </View>
+
+          {/* Ninja Shoulders */}
+          <View style={[styles.ninjaShoulders, isLarge ? styles.shoulderLarge : styles.shoulderSmall]} />
+        </>
+      )}
+    </View>
+  );
 
   return (
     <View style={[styles.wrapper, { width: containerSize, height: containerSize }]}>
@@ -37,30 +79,13 @@ export const NinjaAvatar: React.FC<NinjaAvatarProps> = ({
       )}
 
       {/* Main Circular Avatar Body */}
-      <View
-        style={[
-          styles.circleBase,
-          {
-            width: containerSize,
-            height: containerSize,
-            borderRadius: containerSize / 2,
-          },
-        ]}
-      >
-        {/* Sword on back */}
-        <View style={[styles.sword, isLarge ? styles.swordLarge : styles.swordSmall]} />
-
-        {/* Ninja Head */}
-        <View style={[styles.ninjaHead, isLarge ? styles.headLarge : styles.headSmall]}>
-          {/* Red Headband */}
-          <View style={[styles.headband, isLarge ? styles.bandLarge : styles.bandSmall]} />
-          {/* Skin Face Mask Opening */}
-          <View style={[styles.faceOpening, isLarge ? styles.faceLarge : styles.faceSmall]} />
-        </View>
-
-        {/* Ninja Shoulders */}
-        <View style={[styles.ninjaShoulders, isLarge ? styles.shoulderLarge : styles.shoulderSmall]} />
-      </View>
+      {onPressAvatar ? (
+        <TouchableOpacity activeOpacity={0.85} onPress={onPressAvatar}>
+          {AvatarContent}
+        </TouchableOpacity>
+      ) : (
+        AvatarContent
+      )}
 
       {/* Bottom Right Credits Badge */}
       {isLarge && showBadges && (
@@ -72,6 +97,17 @@ export const NinjaAvatar: React.FC<NinjaAvatarProps> = ({
         >
           <Text style={styles.badgeNumber}>{credits}</Text>
           <Text style={styles.badgeLabel}>credits{onPressCredits ? ' ✎' : ''}</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Camera / Gallery Picker Icon Badge */}
+      {isLarge && onPressAvatar && (
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={onPressAvatar}
+          style={styles.cameraBadge}
+        >
+          <Ionicons name="camera" size={16} color="#FFFFFF" />
         </TouchableOpacity>
       )}
     </View>
@@ -88,6 +124,25 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     padding: 2,
     backgroundColor: '#F7F4EE',
+  },
+  cameraBadge: {
+    position: 'absolute',
+    bottom: 2,
+    right: 32,
+    backgroundColor: '#324846',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    zIndex: 10,
   },
   circleBase: {
     backgroundColor: '#F59E0B',
