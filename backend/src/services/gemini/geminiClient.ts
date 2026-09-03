@@ -8,10 +8,9 @@ import { randomUUID } from 'crypto';
 export class GeminiAssistant {
   private genAI: GoogleGenerativeAI | null = null;
   private candidateModels = [
-    'gemini-3.5-flash-lite',
-    'gemini-3.6-flash',
-    'gemini-3.7-flash',
-    'gemini-3.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+    'gemini-1.5-pro',
   ];
 
   constructor() {
@@ -602,14 +601,17 @@ RULES:
 - Times MUST be in HH:MM format (24-hour).
 - Return raw JSON only with NO markdown code fences.`;
 
-      for (const modelName of ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-3.5-flash']) {
+      const cleanBase64 = base64Data.replace(/^data:[^;]+;base64,/, '').trim();
+      const cleanMime = mimeType?.startsWith('image/') ? mimeType : 'image/jpeg';
+
+      for (const modelName of ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro']) {
         try {
           const model = this.genAI.getGenerativeModel({ model: modelName });
           const result = await model.generateContent([
             {
               inlineData: {
-                data: base64Data,
-                mimeType,
+                data: cleanBase64,
+                mimeType: cleanMime,
               },
             },
             visionPrompt,
@@ -628,8 +630,8 @@ RULES:
       }
     }
 
-    // Deterministic fallback if vision did not return classes
-    if (classes.length === 0) {
+    // Only use sample fallback if no image was provided at all (e.g. testing)
+    if (!base64Data && classes.length === 0) {
       classes = [
         {
           subjectName: 'Database Management Systems',

@@ -15,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuthStore } from '../store/authStore';
+import { useDashboardStore } from '../store/dashboardStore';
 import { apiClient } from '../api/client';
 import type { ClassSession, DayOfWeekType } from '@glitchers/shared';
 
@@ -59,44 +60,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
   // 4 & 5. Timetable & Review
   const [timetableMode, setTimetableMode] = useState<'CHOICE' | 'MANUAL' | 'REVIEW'>('CHOICE');
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
-  const [classes, setClasses] = useState<Partial<ClassSession>[]>([
-    {
-      subjectName: 'Database Management Systems',
-      day: 'MONDAY',
-      startTime: '10:00',
-      endTime: '11:00',
-      room: 'AB1-204',
-      faculty: 'Dr. Sharma',
-      classType: 'LECTURE',
-    },
-    {
-      subjectName: 'Operating Systems Lab',
-      day: 'MONDAY',
-      startTime: '14:00',
-      endTime: '16:00',
-      room: 'AB2-301',
-      faculty: 'Prof. Verma',
-      classType: 'LAB',
-    },
-    {
-      subjectName: 'Artificial Intelligence',
-      day: 'TUESDAY',
-      startTime: '11:00',
-      endTime: '12:00',
-      room: 'AB3-105',
-      faculty: 'Dr. Iyer',
-      classType: 'LECTURE',
-    },
-    {
-      subjectName: 'Computer Networks',
-      day: 'WEDNESDAY',
-      startTime: '09:00',
-      endTime: '10:00',
-      room: 'AB1-102',
-      faculty: 'Prof. Kulkarni',
-      classType: 'LECTURE',
-    },
-  ]);
+  const [classes, setClasses] = useState<Partial<ClassSession>[]>([]);
 
   // Manual Class Form State
   const [manualSubject, setManualSubject] = useState('');
@@ -160,14 +124,16 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
         const res = await apiClient.analyzeTimetableImage(result.assets[0].base64, mimeType);
         if (res.classes && res.classes.length > 0) {
           setClasses(res.classes);
-          Alert.alert('Timetable Analyzed', `Extracted ${res.classes.length} classes using Gemini AI.`);
+          Alert.alert('Timetable Analyzed', `Successfully extracted ${res.classes.length} classes from your schedule!`);
+        } else {
+          Alert.alert('Extraction Info', 'No classes could be automatically recognized from this image. Please add your classes manually.');
         }
         setIsAnalyzingImage(false);
         setActiveStep('TIMETABLE_REVIEW');
       }
     } catch (err: any) {
       setIsAnalyzingImage(false);
-      Alert.alert('Extraction Info', 'Extracted standard academic schedule for review.');
+      Alert.alert('Analysis Notice', err.message || 'Could not analyze image.');
       setActiveStep('TIMETABLE_REVIEW');
     }
   };
@@ -256,6 +222,21 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
       setGoogleConnections(gmailEnabled, calendarEnabled);
       completeOnboarding(payload.profile as any);
 
+      // Save user's actual classes and budget into live dashboardStore
+      const { setClasses: setDashboardClasses, setBudget, updateAcademics } = useDashboardStore.getState();
+      if (classes.length > 0) {
+        setDashboardClasses(classes as any);
+      }
+      updateAcademics(cgpa, Number(creditsCompleted) || 0);
+      setBudget({
+        id: 'b1',
+        userId: user?.id || 'u1',
+        monthlyLimit: Number(monthlyBudget) || 10000,
+        currentSpending: 0,
+        month: new Date().toISOString().slice(0, 7),
+        alertThresholds: [75, 90, 100],
+      });
+
       // Transition to final completion screen
       setActiveStep('COMPLETE');
     } catch (err: any) {
@@ -270,6 +251,11 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
         section,
         cgpa,
       });
+      const { setClasses: setDashboardClasses, setBudget, updateAcademics } = useDashboardStore.getState();
+      if (classes.length > 0) {
+        setDashboardClasses(classes as any);
+      }
+      updateAcademics(cgpa, Number(creditsCompleted) || 0);
       setActiveStep('COMPLETE');
     }
   };
@@ -643,7 +629,15 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
               {/* Option C: Use Pre-loaded Schedule */}
               <TouchableOpacity
                 style={styles.optionCard}
-                onPress={() => setActiveStep('TIMETABLE_REVIEW')}
+                onPress={() => {
+                  setClasses([
+                    { subjectName: 'Database Management Systems', day: 'MONDAY', startTime: '10:00', endTime: '11:00', room: 'AB1-204', faculty: 'Dr. Sharma', classType: 'LECTURE' },
+                    { subjectName: 'Operating Systems Lab', day: 'MONDAY', startTime: '14:00', endTime: '16:00', room: 'AB2-301', faculty: 'Prof. Verma', classType: 'LAB' },
+                    { subjectName: 'Artificial Intelligence', day: 'TUESDAY', startTime: '11:00', endTime: '12:00', room: 'AB3-105', faculty: 'Dr. Iyer', classType: 'LECTURE' },
+                    { subjectName: 'Computer Networks', day: 'WEDNESDAY', startTime: '09:00', endTime: '10:00', room: 'AB1-102', faculty: 'Prof. Kulkarni', classType: 'LECTURE' },
+                  ]);
+                  setActiveStep('TIMETABLE_REVIEW');
+                }}
               >
                 <View style={styles.optionIconContainer}>
                   <Ionicons name="checkmark-done-circle-outline" size={28} color="#2E7470" />
