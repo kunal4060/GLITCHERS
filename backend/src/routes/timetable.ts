@@ -65,6 +65,47 @@ export const timetableRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
+  fastify.post<{ Body: { imageBase64: string; mimeType?: string } }>('/analyze-image', async (req) => {
+    const { imageBase64, mimeType } = req.body || {};
+    const { geminiAssistant } = await import('../services/gemini/geminiClient.js');
+    const result = await geminiAssistant.analyzeTimetableImage(imageBase64, mimeType);
+    const conflicts = detectScheduleConflicts(result.classes as any);
+
+    return {
+      success: true,
+      classes: result.classes,
+      conflicts,
+    };
+  });
+
+  fastify.post<{ Body: { classes: ClassSession[] } }>('/classes/bulk', async (req) => {
+    const userId = req.userId!;
+    const incomingClasses = req.body?.classes || [];
+
+    const existing = inMemoryStore.classes.get(userId) || [];
+    const merged = [...existing];
+
+    for (const c of incomingClasses) {
+      if (!merged.some((m) => m.day === c.day && m.startTime === c.startTime && m.subjectName.toLowerCase() === c.subjectName.toLowerCase())) {
+        merged.push({
+          ...c,
+          id: c.id || randomUUID(),
+          userId,
+        });
+      }
+    }
+
+    inMemoryStore.classes.set(userId, merged);
+    const conflicts = detectScheduleConflicts(merged);
+
+    return {
+      success: true,
+      savedCount: merged.length,
+      classes: merged,
+      conflicts,
+    };
+  });
+
   fastify.post('/check-conflicts', async (req) => {
     const userId = req.userId!;
     const classes = inMemoryStore.classes.get(userId) || [];

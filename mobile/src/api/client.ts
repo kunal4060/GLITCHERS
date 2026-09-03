@@ -157,6 +157,50 @@ class ApiClient {
   public async syncBatch(operations: any[]) {
     return this.post<any>('/sync/batch', { operations });
   }
+
+  // Onboarding & Identity methods
+  public async getOnboardingStatus() {
+    return this.get<{ state: any; profile: any; isComplete: boolean }>('/onboarding/status');
+  }
+
+  public async saveOnboardingStep(step: string, data?: Record<string, any>, isComplete?: boolean) {
+    return this.patch<{ success: boolean; state: any }>('/onboarding/step', {
+      step,
+      data,
+      isComplete,
+    });
+  }
+
+  public async initializeWorkspace(payload: any) {
+    return this.post<{
+      success: boolean;
+      jobId: string;
+      status: string;
+      job: any;
+      isComplete: boolean;
+    }>('/onboarding/initialize', payload);
+  }
+
+  public async getJobStatus(jobId: string) {
+    return this.get<{ job: any }>(`/onboarding/jobs/${jobId}`);
+  }
+
+  public async updateGoogleServices(data: { gmailConnected?: boolean; calendarConnected?: boolean; universityDomain?: string }) {
+    return this.post<{ success: boolean; connection: any }>('/auth/google/services', data);
+  }
+
+  public async analyzeTimetableImage(imageBase64: string, mimeType: string = 'image/jpeg') {
+    return this.post<{ success: boolean; classes: any[]; conflicts: any[] }>('/timetable/analyze-image', {
+      imageBase64,
+      mimeType,
+    });
+  }
+
+  public async saveTimetableClasses(classes: any[]) {
+    return this.post<{ success: boolean; savedCount: number; classes: any[]; conflicts: any[] }>('/timetable/classes/bulk', {
+      classes,
+    });
+  }
 }
 
 export const apiClient = new ApiClient();

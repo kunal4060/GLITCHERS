@@ -19,6 +19,7 @@ import { examRoutes } from './routes/exams.js';
 import { assignmentRoutes } from './routes/assignments.js';
 import { documentRoutes } from './routes/documents.js';
 import { settingsRoutes } from './routes/settings.js';
+import { onboardingRoutes } from './routes/onboarding.js';
 
 export function buildApp(): FastifyInstance {
   const app = Fastify({
@@ -46,6 +47,7 @@ export function buildApp(): FastifyInstance {
 
   // Register All Modular Routes
   app.register(authRoutes, { prefix: '/api/auth' });
+  app.register(onboardingRoutes, { prefix: '/api/onboarding' });
   app.register(timetableRoutes, { prefix: '/api/timetable' });
   app.register(taskRoutes, { prefix: '/api/tasks' });
   app.register(expenseRoutes, { prefix: '/api/expenses' });

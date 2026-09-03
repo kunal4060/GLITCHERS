@@ -12,6 +12,9 @@ import type {
   EmailSummary,
   NotificationItem,
   QuietHours,
+  OnboardingState,
+  InitializationJob,
+  GoogleConnection,
 } from '@glitchers/shared';
 
 class InMemoryStore {
@@ -27,6 +30,9 @@ class InMemoryStore {
   public emails = new Map<string, EmailSummary[]>();
   public notifications = new Map<string, NotificationItem[]>();
   public preferences = new Map<string, { quietHours: QuietHours; universityDomain: string }>();
+  public onboardingStates = new Map<string, OnboardingState>();
+  public initializationJobs = new Map<string, InitializationJob>();
+  public googleConnections = new Map<string, GoogleConnection>();
 
   constructor() {
     this.seedDefaultStudent();
@@ -44,7 +50,35 @@ class InMemoryStore {
       year: 3,
       semester: 6,
       section: 'A',
+      cgpa: '8.71',
+      creditsCompleted: 42,
+      creditsCurrent: 18,
+      universityDomain: 'university.edu',
+      isOnboardingComplete: true,
       createdAt: new Date().toISOString(),
+    });
+
+    this.onboardingStates.set(userId, {
+      userId,
+      currentStep: 'COMPLETE',
+      completedSteps: [
+        'GOOGLE_AUTH',
+        'GOOGLE_SERVICES',
+        'PROFILE',
+        'ACADEMICS',
+        'TIMETABLE',
+        'TIMETABLE_REVIEW',
+        'NOTIFICATION_SETUP',
+        'FINANCE_SETUP',
+        'FLOATING_ASSISTANT',
+        'INITIAL_PROCESSING',
+        'COMPLETE',
+      ],
+      isComplete: true,
+      data: {},
+      startedAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
 
     this.classes.set(userId, [

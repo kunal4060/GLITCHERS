@@ -21,6 +21,8 @@ import { SearchScreen } from '../screens/SearchScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { PrivacyScreen } from '../screens/PrivacyScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
+import { LoginScreen } from '../screens/LoginScreen';
+import { useAuthStore } from '../store/authStore';
 
 import { designTokens } from '../theme/designTokens';
 import { FloatingAIButton } from '../components/common/FloatingAIButton';
@@ -218,10 +220,24 @@ function MainTabs({ navigation }: { navigation: any }) {
 }
 
 export const RootNavigator: React.FC = () => {
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  const { isAuthenticated, isOnboardingComplete, completeOnboarding } = useAuthStore();
+  const [showManualOnboarding, setShowManualOnboarding] = useState(false);
 
-  if (showOnboarding) {
-    return <OnboardingScreen onComplete={() => setShowOnboarding(false)} />;
+  // 1. If not authenticated, render Google Login Screen
+  if (!isAuthenticated) {
+    return <LoginScreen />;
+  }
+
+  // 2. If authenticated but onboarding not yet completed, or user re-opened onboarding
+  if (!isOnboardingComplete || showManualOnboarding) {
+    return (
+      <OnboardingScreen
+        onComplete={() => {
+          completeOnboarding();
+          setShowManualOnboarding(false);
+        }}
+      />
+    );
   }
 
   return (
@@ -241,7 +257,7 @@ export const RootNavigator: React.FC = () => {
         children={(props) => (
           <SettingsScreen
             {...props}
-            onRestartOnboarding={() => setShowOnboarding(true)}
+            onRestartOnboarding={() => setShowManualOnboarding(true)}
           />
         )}
         options={{ title: 'Student Profile & Account' }}
@@ -255,7 +271,14 @@ export const RootNavigator: React.FC = () => {
       <Stack.Screen name="Alerts" component={NotificationsScreen} options={{ title: 'Notifications' }} />
       <Stack.Screen name="Privacy" component={PrivacyScreen} options={{ title: 'Privacy & Credentials' }} />
       <Stack.Screen name="Onboarding">
-        {() => <OnboardingScreen onComplete={() => setShowOnboarding(false)} />}
+        {() => (
+          <OnboardingScreen
+            onComplete={() => {
+              completeOnboarding();
+              setShowManualOnboarding(false);
+            }}
+          />
+        )}
       </Stack.Screen>
     </Stack.Navigator>
   );

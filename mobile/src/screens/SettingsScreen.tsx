@@ -15,7 +15,7 @@ interface SettingsScreenProps {
 }
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboarding, navigation }) => {
-  const { user } = useAuthStore();
+  const { user, logout } = useAuthStore();
   const { cgpa, credits, setCgpa, setCredits, avatarUrl, setAvatarUrl } = useDashboardStore();
 
   const [semester, setSemester] = useState('FALL SEMESTER 2026-27');
@@ -248,9 +248,25 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
         {/* Replay Onboarding */}
         {onRestartOnboarding && (
           <TouchableOpacity style={styles.restartBtn} onPress={onRestartOnboarding} activeOpacity={0.82}>
-            <Text style={styles.restartBtnText}>Re-open Onboarding Walkthrough</Text>
+            <Ionicons name="refresh-outline" size={16} color={designTokens.colors.primaryDark} style={{ marginRight: 6 }} />
+            <Text style={styles.restartBtnText}>Re-open Onboarding Setup</Text>
           </TouchableOpacity>
         )}
+
+        {/* Log Out */}
+        <TouchableOpacity
+          style={styles.logoutBtn}
+          onPress={() => {
+            Alert.alert('Log Out', 'Are you sure you want to log out of your student account?', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Log Out', style: 'destructive', onPress: () => logout() },
+            ]);
+          }}
+          activeOpacity={0.82}
+        >
+          <Ionicons name="log-out-outline" size={16} color="#C25E4A" style={{ marginRight: 6 }} />
+          <Text style={styles.logoutBtnText}>Log Out</Text>
+        </TouchableOpacity>
       </ScrollView>
 
       {/* Edit CGPA / Credits Modal */}
@@ -560,5 +576,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FAF7F2',
+    borderWidth: 1,
+    borderColor: '#ECE6DC',
+    borderRadius: 16,
+    paddingVertical: 14,
+    marginTop: 12,
+    marginBottom: 20,
+  },
+  logoutBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#C25E4A',
   },
 });

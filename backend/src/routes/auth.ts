@@ -57,4 +57,54 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     inMemoryStore.profiles.set(userId, updated);
     return { user: updated };
   });
+
+  fastify.post<{
+    Body: {
+      gmailConnected?: boolean;
+      calendarConnected?: boolean;
+      universityDomain?: string;
+    };
+  }>('/google/services', { preHandler: authMiddleware }, async (req) => {
+    const userId = req.userId!;
+    const { gmailConnected, calendarConnected, universityDomain } = req.body || {};
+
+    const profile = inMemoryStore.profiles.get(userId);
+    if (profile && universityDomain) {
+      profile.universityDomain = universityDomain;
+      inMemoryStore.profiles.set(userId, profile);
+    }
+
+    const currentConn = inMemoryStore.googleConnections.get(userId) || {
+      userId,
+      email: profile?.email || 'student@university.edu',
+      gmailConnected: false,
+      calendarConnected: false,
+      scopes: [],
+    };
+
+    const updatedConn = {
+      ...currentConn,
+      gmailConnected: gmailConnected !== undefined ? gmailConnected : currentConn.gmailConnected,
+      calendarConnected: calendarConnected !== undefined ? calendarConnected : currentConn.calendarConnected,
+    };
+    inMemoryStore.googleConnections.set(userId, updatedConn);
+
+    return {
+      success: true,
+      connection: updatedConn,
+    };
+  });
+
+  fastify.get('/google/status', { preHandler: authMiddleware }, async (req) => {
+    const userId = req.userId!;
+    const connection = inMemoryStore.googleConnections.get(userId) || {
+      userId,
+      email: inMemoryStore.profiles.get(userId)?.email || 'student@university.edu',
+      gmailConnected: true,
+      calendarConnected: true,
+      scopes: ['userinfo.email', 'gmail.readonly', 'calendar.events'],
+    };
+    return { connection };
+  });
 };
+
