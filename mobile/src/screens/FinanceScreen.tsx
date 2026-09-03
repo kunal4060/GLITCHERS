@@ -362,24 +362,34 @@ export const FinanceScreen: React.FC = () => {
 
       {/* 6. Recent Transactions */}
       <Text style={[styles.sectionTitle, { marginTop: designTokens.spacing.lg }]}>Recent Transactions</Text>
-      <View style={styles.txList}>
-        {expenses.slice(0, 5).map((e) => (
-          <GlassCard key={e.id} style={styles.txCard}>
-            <View style={styles.txRow}>
-              <View style={styles.txLeft}>
-                <Text style={styles.txDesc}>{e.description}</Text>
-                <Text style={styles.txCat}>{e.category} • Today</Text>
+      {expenses.length === 0 ? (
+        <GlassCard style={styles.emptyCard}>
+          <Ionicons name="receipt-outline" size={32} color="#75A7A5" style={{ marginBottom: 6 }} />
+          <Text style={styles.emptyTitle}>No Expenses Logged Yet</Text>
+          <Text style={styles.emptySub}>
+            Track your daily expenses using the quick log bar above or snap a receipt bill to auto-log items.
+          </Text>
+        </GlassCard>
+      ) : (
+        <View style={styles.txList}>
+          {expenses.slice(0, 5).map((e) => (
+            <GlassCard key={e.id} style={styles.txCard}>
+              <View style={styles.txRow}>
+                <View style={styles.txLeft}>
+                  <Text style={styles.txDesc}>{e.description}</Text>
+                  <Text style={styles.txCat}>{e.category} • Today</Text>
+                </View>
+                <View style={styles.txRight}>
+                  <Text style={styles.txAmount}>₹{Number(e.amount).toLocaleString()}</Text>
+                  <TouchableOpacity onPress={() => deleteExpense(e.id)}>
+                    <Text style={styles.txDelete}>✕</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-              <View style={styles.txRight}>
-                <Text style={styles.txAmount}>₹{Number(e.amount).toLocaleString()}</Text>
-                <TouchableOpacity onPress={() => deleteExpense(e.id)}>
-                  <Text style={styles.txDelete}>✕</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </GlassCard>
-        ))}
-      </View>
+            </GlassCard>
+          ))}
+        </View>
+      )}
 
       {/* Split Bill Modal */}
       <Modal visible={splitModalVisible} transparent animationType="slide">
@@ -796,5 +806,24 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#15803D',
+  },
+  emptyCard: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+    borderRadius: designTokens.radii.card,
+    marginTop: 6,
+  },
+  emptyTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: designTokens.colors.textPrimary,
+    marginBottom: 4,
+  },
+  emptySub: {
+    fontSize: 12,
+    color: designTokens.colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });

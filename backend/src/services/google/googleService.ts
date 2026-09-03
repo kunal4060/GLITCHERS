@@ -36,13 +36,15 @@ export class GoogleService {
   public async exchangeCodeForTokens(code: string): Promise<{
     email: string;
     googleId: string;
+    name?: string;
     accessToken: string;
     refreshToken?: string;
   }> {
     if (!this.oauth2Client || code.startsWith('mock_')) {
       return {
-        email: 'student@university.edu',
+        email: 'kunalugale4060@gmail.com',
         googleId: 'google_sub_1092837465',
+        name: 'Kunal Ugale',
         accessToken: 'mock_google_access_token',
         refreshToken: 'mock_google_refresh_token',
       };
@@ -55,8 +57,9 @@ export class GoogleService {
     const userInfo = await oauth2.userinfo.get();
 
     return {
-      email: userInfo.data.email || 'student@university.edu',
+      email: userInfo.data.email || 'kunalugale4060@gmail.com',
       googleId: userInfo.data.id || 'google_user_id',
+      name: userInfo.data.name || 'Kunal Ugale',
       accessToken: tokens.access_token || '',
       refreshToken: tokens.refresh_token || undefined,
     };

@@ -43,7 +43,7 @@ class InMemoryStore {
 
     this.profiles.set(userId, {
       id: userId,
-      email: 'student@university.edu',
+      email: 'kunalugale4060@gmail.com',
       fullName: 'Kunal Ugale',
       university: 'State Technological University',
       course: 'Computer Science & Engineering',

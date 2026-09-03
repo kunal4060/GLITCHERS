@@ -9,13 +9,61 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     return { url: googleService.getAuthUrl() };
   });
 
+  fastify.get<{ Querystring: { code?: string; error?: string } }>('/google/callback', async (req, reply) => {
+    const { code, error } = req.query || {};
+    if (error || !code) {
+      return reply.redirect(`http://localhost:8082/?auth_error=${encodeURIComponent(error || 'access_denied')}`);
+    }
+
+    try {
+      const { email, googleId, name, accessToken } = await googleService.exchangeCodeForTokens(code);
+
+      let profile = Array.from(inMemoryStore.profiles.values()).find((p) => p.email === email);
+      if (!profile) {
+        const id = randomUUID();
+        profile = {
+          id,
+          email,
+          fullName: name || 'Kunal Ugale',
+          university: 'State Technological University',
+          course: 'Computer Science & Engineering',
+          year: 3,
+          semester: 6,
+          section: 'A',
+          cgpa: '8.71',
+          creditsCompleted: 42,
+          creditsCurrent: 18,
+          universityDomain: email.includes('@') ? email.split('@')[1] : 'university.edu',
+          isOnboardingComplete: false,
+          createdAt: new Date().toISOString(),
+        };
+        inMemoryStore.profiles.set(id, profile);
+      }
+
+      inMemoryStore.googleConnections.set(profile.id, {
+        id: randomUUID(),
+        userId: profile.id,
+        email,
+        gmailConnected: true,
+        calendarConnected: true,
+        scopes: ['userinfo.email', 'userinfo.profile', 'gmail.readonly', 'calendar.events'],
+      });
+
+      return reply.redirect(
+        `http://localhost:8082/?token=jwt_${profile.id}&email=${encodeURIComponent(profile.email)}&name=${encodeURIComponent(profile.fullName)}`
+      );
+    } catch (err: any) {
+      return reply.redirect(`http://localhost:8082/?auth_error=${encodeURIComponent(err.message)}`);
+    }
+  });
+
   fastify.post<{ Body: { code: string } }>('/google/callback', async (req, reply) => {
     const { code } = req.body || {};
     if (!code) {
       return reply.status(400).send({ error: 'Authorization code is required' });
     }
 
-    const { email, googleId, accessToken } = await googleService.exchangeCodeForTokens(code);
+    const { email, googleId, name, accessToken } = await googleService.exchangeCodeForTokens(code);
 
     let profile = Array.from(inMemoryStore.profiles.values()).find((p) => p.email === email);
     if (!profile) {
@@ -23,16 +71,30 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       profile = {
         id,
         email,
-        fullName: 'Student User',
-        university: 'Engineering College',
-        course: 'Computer Science',
-        year: 1,
-        semester: 1,
+        fullName: name || 'Kunal Ugale',
+        university: 'State Technological University',
+        course: 'Computer Science & Engineering',
+        year: 3,
+        semester: 6,
+        section: 'A',
+        cgpa: '8.71',
+        creditsCompleted: 42,
+        creditsCurrent: 18,
+        universityDomain: email.includes('@') ? email.split('@')[1] : 'university.edu',
+        isOnboardingComplete: false,
         createdAt: new Date().toISOString(),
       };
       inMemoryStore.profiles.set(id, profile);
-      inMemoryStore.seedDefaultStudent(id);
     }
+
+    inMemoryStore.googleConnections.set(profile.id, {
+      id: randomUUID(),
+      userId: profile.id,
+      email,
+      gmailConnected: true,
+      calendarConnected: true,
+      scopes: ['userinfo.email', 'userinfo.profile', 'gmail.readonly', 'calendar.events'],
+    });
 
     return {
       accessToken: 'jwt_mock_token_' + profile.id,

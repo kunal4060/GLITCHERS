@@ -9,16 +9,22 @@ import {
   ActivityIndicator,
   Modal,
   ScrollView,
+  TextInput,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/authStore';
+import { apiClient } from '../api/client';
 
 export const LoginScreen: React.FC = () => {
   const { loginWithGoogle, isLoading } = useAuthStore();
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [customEmail, setCustomEmail] = useState('kunalugale4060@gmail.com');
 
   const handleGoogleLogin = async () => {
-    await loginWithGoogle('student@university.edu', 'Kunal Ugale');
+    const emailToUse = customEmail.trim() || 'kunalugale4060@gmail.com';
+    const nameToUse = 'Kunal Ugale';
+    await loginWithGoogle(emailToUse, nameToUse);
   };
 
   return (
@@ -69,6 +75,22 @@ export const LoginScreen: React.FC = () => {
 
         {/* Action Section */}
         <View style={styles.actionSection}>
+          <View style={styles.accountBox}>
+            <Text style={styles.accountBoxLabel}>GOOGLE / UNIVERSITY ACCOUNT</Text>
+            <View style={styles.accountInputRow}>
+              <Ionicons name="mail-outline" size={18} color="#2E7470" style={{ marginRight: 8 }} />
+              <TextInput
+                style={styles.accountTextInput}
+                value={customEmail}
+                onChangeText={setCustomEmail}
+                placeholder="e.g. kunalugale4060@gmail.com"
+                placeholderTextColor="#A09E9B"
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+          </View>
+
           {/* Sole Login Action: Continue with Google */}
           <TouchableOpacity
             style={styles.googleButton}
@@ -245,6 +267,34 @@ const styles = StyleSheet.create({
   actionSection: {
     alignItems: 'center',
     width: '100%',
+  },
+  accountBox: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2DED6',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  accountBoxLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#7A7875',
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+  accountInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  accountTextInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#1A1A1A',
+    fontWeight: '600',
+    paddingVertical: 2,
   },
   googleButton: {
     flexDirection: 'row',
