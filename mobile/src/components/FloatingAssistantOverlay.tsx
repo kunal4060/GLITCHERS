@@ -13,6 +13,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { AIGemSymbol } from './common/AIGemSymbol';
 import { designTokens } from '../theme/designTokens';
 import { apiClient } from '../api/client';
+import { offlineAiEngine } from '../services/offlineAiEngine';
 import type { Task, Expense } from '@glitchers/shared';
 
 export const FloatingAssistantOverlay: React.FC = () => {
@@ -25,7 +26,20 @@ export const FloatingAssistantOverlay: React.FC = () => {
     closeMiniWindow,
   } = useFloatingStore();
 
-  const { classes, tasks, expenses, emails, addExpense, addTask, addDebt } = useDashboardStore();
+  const {
+    classes,
+    tasks,
+    expenses,
+    budget,
+    debts,
+    emails,
+    addExpense,
+    addTask,
+    addDebt,
+    aiMode,
+    activeOfflineModel,
+    queueOfflineAction,
+  } = useDashboardStore();
 
   const [quickInput, setQuickInput] = useState('');
   const [quickAiResponse, setQuickAiResponse] = useState('');
@@ -37,6 +51,31 @@ export const FloatingAssistantOverlay: React.FC = () => {
     setQuickInput('');
     setIsAiLoading(true);
     setQuickAiResponse('Thinking...');
+
+    // OFFLINE MODE: Run 100% on-device via Hugging Face model
+    if (aiMode === 'OFFLINE') {
+      const offlineRes = offlineAiEngine.processMessage(
+        prompt,
+        { classes, tasks, expenses, budget, debts },
+        activeOfflineModel
+      );
+      if (offlineRes.actionType === 'EXPENSE' && offlineRes.actionData) {
+        if (offlineRes.actionData.expense) {
+          addExpense(offlineRes.actionData.expense);
+          if (offlineRes.actionData.debt) addDebt(offlineRes.actionData.debt);
+          queueOfflineAction({ type: 'SPLIT_EXPENSE', payload: offlineRes.actionData });
+        } else {
+          addExpense(offlineRes.actionData);
+          queueOfflineAction({ type: 'CREATE_EXPENSE', payload: offlineRes.actionData });
+        }
+      } else if (offlineRes.actionType === 'TASK' && offlineRes.actionData) {
+        addTask(offlineRes.actionData);
+        queueOfflineAction({ type: 'CREATE_TASK', payload: offlineRes.actionData });
+      }
+      setQuickAiResponse(offlineRes.message);
+      setIsAiLoading(false);
+      return;
+    }
 
     try {
       const res = await apiClient.sendAIChat(prompt);
@@ -69,61 +108,30 @@ export const FloatingAssistantOverlay: React.FC = () => {
             type: 'EXPENSE',
           });
         }
-      } else {
-        // Client-side fallback check
-        const lower = prompt.toLowerCase();
-        if (/\b(submit|complete|finish|assignment|lab report|homework|project|quiz|task)\b/i.test(lower)) {
-          addTask({
-            id: String(Date.now()),
-            userId: 'u1',
-            title: prompt.replace(/^(?:remind me to|i need to|add task)\s+/i, '').trim(),
-            priority: lower.includes('urgent') || lower.includes('extremely') ? 'EXTREMELY_IMPORTANT' : 'NORMAL',
-            status: 'TODO',
-            dueDate: new Date(Date.now() + 86400000).toISOString(),
-          });
-        } else if (/\b(spent|paid|bought|dinner|lunch|coffee|canteen|auto)\b/i.test(lower) && /\d+/.test(lower)) {
-          const amt = parseFloat(prompt.match(/\d+(?:\.\d+)?/)?.[0] || '100');
-          addExpense({
-            id: String(Date.now()),
-            userId: 'u1',
-            amount: amt,
-            category: 'FOOD',
-            description: prompt,
-            date: new Date().toISOString(),
-            type: 'EXPENSE',
-          });
-        }
       }
 
       setQuickAiResponse(res.message);
     } catch {
-      // Offline/local fallback
-      const lower = prompt.toLowerCase();
-      if (/\b(submit|complete|finish|assignment|lab report|homework|project|quiz|task)\b/i.test(lower)) {
-        addTask({
-          id: String(Date.now()),
-          userId: 'u1',
-          title: prompt.replace(/^(?:remind me to|i need to|add task)\s+/i, '').trim(),
-          priority: lower.includes('urgent') || lower.includes('extremely') ? 'EXTREMELY_IMPORTANT' : 'NORMAL',
-          status: 'TODO',
-          dueDate: new Date(Date.now() + 86400000).toISOString(),
-        });
-        setQuickAiResponse(`✓ Task scheduled: "${prompt}". Added to task manager.`);
-      } else if (/\b(spent|paid|bought|dinner|lunch|coffee|canteen|auto)\b/i.test(lower) && /\d+/.test(lower)) {
-        const amt = parseFloat(prompt.match(/\d+(?:\.\d+)?/)?.[0] || '100');
-        addExpense({
-          id: String(Date.now()),
-          userId: 'u1',
-          amount: amt,
-          category: 'FOOD',
-          description: prompt,
-          date: new Date().toISOString(),
-          type: 'EXPENSE',
-        });
-        setQuickAiResponse(`✓ Recorded ₹${amt} expense. Added to finance tracker.`);
-      } else {
-        setQuickAiResponse(`Processed "${prompt}". Synced with student companion.`);
+      // Offline fallback: Use local Hugging Face engine and queue for cloud sync
+      const offlineRes = offlineAiEngine.processMessage(
+        prompt,
+        { classes, tasks, expenses, budget, debts },
+        activeOfflineModel
+      );
+      if (offlineRes.actionType === 'EXPENSE' && offlineRes.actionData) {
+        if (offlineRes.actionData.expense) {
+          addExpense(offlineRes.actionData.expense);
+          if (offlineRes.actionData.debt) addDebt(offlineRes.actionData.debt);
+          queueOfflineAction({ type: 'SPLIT_EXPENSE', payload: offlineRes.actionData });
+        } else {
+          addExpense(offlineRes.actionData);
+          queueOfflineAction({ type: 'CREATE_EXPENSE', payload: offlineRes.actionData });
+        }
+      } else if (offlineRes.actionType === 'TASK' && offlineRes.actionData) {
+        addTask(offlineRes.actionData);
+        queueOfflineAction({ type: 'CREATE_TASK', payload: offlineRes.actionData });
       }
+      setQuickAiResponse(`${offlineRes.message}\n\n*(Offline Mode: Saved locally on device. Will push to cloud dataset when online.)*`);
     } finally {
       setIsAiLoading(false);
     }

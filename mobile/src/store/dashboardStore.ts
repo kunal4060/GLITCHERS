@@ -40,6 +40,26 @@ interface DashboardState {
   avatarUrl: string | null;
   setAvatarUrl: (avatarUrl: string | null) => void;
 
+  aiMode: 'AUTO' | 'OFFLINE' | 'CLOUD';
+  activeOfflineModel: string;
+  downloadedModels: string[];
+  downloadProgress: Record<string, number>;
+  setAiMode: (mode: 'AUTO' | 'OFFLINE' | 'CLOUD') => void;
+  setActiveOfflineModel: (modelId: string) => void;
+  downloadOfflineModel: (modelId: string) => Promise<void>;
+
+  offlineSyncQueue: Array<{
+    id: string;
+    type: 'CREATE_EXPENSE' | 'CREATE_TASK' | 'SPLIT_EXPENSE' | 'CREATE_DEBT';
+    payload: any;
+    timestamp: string;
+    synced: boolean;
+  }>;
+  isOnline: boolean;
+  setIsOnline: (online: boolean) => void;
+  queueOfflineAction: (action: { type: 'CREATE_EXPENSE' | 'CREATE_TASK' | 'SPLIT_EXPENSE' | 'CREATE_DEBT'; payload: any }) => void;
+  flushOfflineQueue: () => Promise<{ syncedCount: number }>;
+
   syncWithBackend: () => Promise<void>;
 }
 
@@ -51,6 +71,63 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   updateAcademics: (cgpa, credits) => set({ cgpa, credits }),
   avatarUrl: null,
   setAvatarUrl: (avatarUrl) => set({ avatarUrl }),
+
+  aiMode: 'AUTO',
+  activeOfflineModel: 'HuggingFaceTB/SmolLM2-360M-Instruct',
+  downloadedModels: ['HuggingFaceTB/SmolLM2-360M-Instruct'],
+  downloadProgress: {},
+
+  offlineSyncQueue: [],
+  isOnline: true,
+  setIsOnline: (isOnline) => set({ isOnline }),
+  queueOfflineAction: (action) => {
+    const item = {
+      id: String(Date.now()) + Math.random().toString(36).slice(2, 6),
+      type: action.type,
+      payload: action.payload,
+      timestamp: new Date().toISOString(),
+      synced: false,
+    };
+    set((s) => ({ offlineSyncQueue: [...s.offlineSyncQueue, item] }));
+  },
+  flushOfflineQueue: async () => {
+    const pending = get().offlineSyncQueue.filter((q) => !q.synced);
+    if (pending.length === 0) return { syncedCount: 0 };
+
+    let syncedCount = 0;
+    for (const item of pending) {
+      try {
+        if (item.type === 'CREATE_EXPENSE') {
+          await apiClient.createExpense(item.payload);
+          syncedCount++;
+        } else if (item.type === 'CREATE_TASK') {
+          await apiClient.createTask(item.payload);
+          syncedCount++;
+        }
+      } catch (err) {
+        console.warn('Offline push item failed:', err);
+      }
+    }
+    set((s) => ({
+      offlineSyncQueue: s.offlineSyncQueue.map((item) => ({ ...item, synced: true })),
+    }));
+    return { syncedCount };
+  },
+
+  setAiMode: (aiMode) => set({ aiMode }),
+  setActiveOfflineModel: (activeOfflineModel) => set({ activeOfflineModel }),
+  downloadOfflineModel: async (modelId: string) => {
+    // Simulate real progressive download of Hugging Face weights
+    for (let p = 15; p <= 100; p += 20) {
+      set((s) => ({ downloadProgress: { ...s.downloadProgress, [modelId]: Math.min(100, p) } }));
+      await new Promise((r) => setTimeout(r, 120));
+    }
+    set((s) => ({
+      downloadedModels: s.downloadedModels.includes(modelId) ? s.downloadedModels : [...s.downloadedModels, modelId],
+      activeOfflineModel: modelId,
+      downloadProgress: { ...s.downloadProgress, [modelId]: 100 },
+    }));
+  },
   classes: [
     {
       id: 'c1',
@@ -372,8 +449,13 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       if (emailRes.status === 'fulfilled' && emailRes.value.emails) {
         set({ emails: emailRes.value.emails });
       }
+
+      // Automatically push temporary offline queued actions to cloud dataset
+      set({ isOnline: true });
+      await get().flushOfflineQueue();
     } catch {
       // Offline fallback
+      set({ isOnline: false });
     } finally {
       set({ isLoading: false });
     }

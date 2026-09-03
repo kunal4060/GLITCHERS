@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Modal } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { designTokens } from '../theme/designTokens';
 import { GlassCard } from '../components/common/GlassCard';
@@ -8,6 +8,7 @@ import { AIGemSymbol } from '../components/common/AIGemSymbol';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useDashboardStore } from '../store/dashboardStore';
 import { apiClient } from '../api/client';
+import { offlineAiEngine, HUGGINGFACE_OFFLINE_MODELS, type HuggingFaceModelInfo } from '../services/offlineAiEngine';
 import type { Task, Expense, Debt } from '@glitchers/shared';
 
 interface ActionCardPayload {
@@ -29,12 +30,34 @@ interface ChatMessage {
 }
 
 export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
-  const { classes, tasks, expenses, budget, debts, addTask, addExpense, addDebt, splitExpense, updateTaskPriority } =
-    useDashboardStore();
+  const {
+    classes,
+    tasks,
+    expenses,
+    budget,
+    debts,
+    addTask,
+    addExpense,
+    addDebt,
+    splitExpense,
+    updateTaskPriority,
+    aiMode,
+    activeOfflineModel,
+    downloadedModels,
+    downloadProgress,
+    setAiMode,
+    setActiveOfflineModel,
+    downloadOfflineModel,
+    offlineSyncQueue,
+    queueOfflineAction,
+    flushOfflineQueue,
+  } = useDashboardStore();
 
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [modelModalVisible, setModelModalVisible] = useState(false);
+  const [customRepoInput, setCustomRepoInput] = useState('');
   const scrollRef = useRef<ScrollView>(null);
 
   // Dynamic contextual prompt chips
@@ -86,6 +109,70 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
     setMessages((prev) => [...prev, userMessage]);
     if (!customPrompt) setInput('');
     setLoading(true);
+
+    // 0. OFFLINE MODE: Run 100% on-device via Hugging Face model
+    if (aiMode === 'OFFLINE') {
+      const offlineRes = offlineAiEngine.processMessage(
+        textToSend,
+        { classes, tasks, expenses, budget, debts },
+        activeOfflineModel
+      );
+
+      let actionCard: ActionCardPayload | undefined;
+      if (offlineRes.actionType === 'EXPENSE' && offlineRes.actionData) {
+        if (offlineRes.actionData.expense) {
+          addExpense(offlineRes.actionData.expense);
+          if (offlineRes.actionData.debt) addDebt(offlineRes.actionData.debt);
+          queueOfflineAction({ type: 'SPLIT_EXPENSE', payload: offlineRes.actionData });
+          actionCard = {
+            type: 'EXPENSE',
+            title: '⚡ Offline Split Recorded',
+            subtitle: offlineRes.actionData.expense.description,
+            primaryValue: `₹${offlineRes.actionData.expense.amount}`,
+            secondaryValue: `${offlineRes.actionData.debt?.person} owes ₹${offlineRes.actionData.debt?.amount}`,
+            badge: `${offlineRes.offlineModelUsed} (Offline)`,
+            navigationScreen: 'Finance',
+          };
+        } else {
+          addExpense(offlineRes.actionData);
+          queueOfflineAction({ type: 'CREATE_EXPENSE', payload: offlineRes.actionData });
+          actionCard = {
+            type: 'EXPENSE',
+            title: '⚡ Offline Expense Added',
+            subtitle: offlineRes.actionData.description,
+            primaryValue: `₹${offlineRes.actionData.amount}`,
+            secondaryValue: `${offlineRes.actionData.category} • Today`,
+            badge: `${offlineRes.offlineModelUsed} (Offline)`,
+            navigationScreen: 'Finance',
+          };
+        }
+      } else if (offlineRes.actionType === 'TASK' && offlineRes.actionData) {
+        addTask(offlineRes.actionData);
+        queueOfflineAction({ type: 'CREATE_TASK', payload: offlineRes.actionData });
+        actionCard = {
+          type: 'TASK',
+          title: '⚡ Offline Task Scheduled',
+          subtitle: offlineRes.actionData.title,
+          primaryValue: offlineRes.actionData.priority,
+          secondaryValue: 'Due tomorrow',
+          badge: `${offlineRes.offlineModelUsed} (Offline)`,
+          navigationScreen: 'Tasks',
+        };
+      }
+
+      const assistantMsg: ChatMessage = {
+        id: String(Date.now() + 1),
+        sender: 'assistant',
+        text: offlineRes.message,
+        actionCard,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+
+      setMessages((prev) => [...prev, assistantMsg]);
+      setLoading(false);
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+      return;
+    }
 
     try {
       // 1. Call real backend Fastify API
@@ -298,99 +385,53 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
 
       setMessages((prev) => [...prev, assistantMsg]);
     } catch {
-      // Local natural language fallback engine
-      const lower = textToSend.toLowerCase();
-      let replyText = '';
+      // Offline fallback: Process via Hugging Face on-device model and queue for later sync
+      const offlineRes = offlineAiEngine.processMessage(
+        textToSend,
+        { classes, tasks, expenses, budget, debts },
+        activeOfflineModel
+      );
+
       let actionCard: ActionCardPayload | undefined;
-
-      if (lower.includes('split') && /\d+/.test(lower)) {
-        const amt = parseFloat(textToSend.match(/\d+(?:\.\d+)?/)?.[0] || '500');
-        let person = 'Rahul';
-        const withM = textToSend.match(/with\s+([A-Za-z]+)/i);
-        if (withM && withM[1]) person = withM[1];
-        splitExpense(amt, 'Split bill', person);
-        replyText = `Split ₹${amt}: Your share is ₹${Math.round(amt / 2)}, and ${person} owes you ₹${Math.round(amt / 2)}.`;
-        actionCard = {
-          type: 'EXPENSE',
-          title: '⚡ Bill Split Recorded',
-          subtitle: `Split with ${person}`,
-          primaryValue: `₹${amt} Total`,
-          secondaryValue: `${person} owes ₹${Math.round(amt / 2)}`,
-          badge: 'Finance + Debt',
-          navigationScreen: 'Finance',
-        };
-      } else if (
-        lower.startsWith('spent') ||
-        lower.startsWith('paid') ||
-        lower.startsWith('bought') ||
-        (/\b(dinner|lunch|canteen|coffee|chai|tea|food|auto|cab|uber|ola|swiggy|zomato|stationery|book|books)\b/i.test(lower) && /\d+/.test(lower))
-      ) {
-        const amtMatch = textToSend.match(/\d+(?:\.\d+)?/);
-        const amt = amtMatch ? parseFloat(amtMatch[0]) : 100;
-        let cat: any = 'FOOD';
-        if (/\b(auto|cab|uber|ola|bus|metro|petrol)\b/i.test(lower)) cat = 'TRANSPORT';
-        else if (/\b(book|books|stationery|print|xerox|notes)\b/i.test(lower)) cat = 'EDUCATION';
-
-        let desc = textToSend.replace(/(?:spent|paid|bought|rs\.?|₹|\b\d+\b)/gi, '').trim();
-        if (!desc) desc = cat === 'FOOD' ? 'Food & Dining' : 'Expense';
-
-        const newExp: Expense = {
-          id: String(Date.now()),
-          userId: 'u1',
-          amount: amt,
-          category: cat,
-          description: desc.charAt(0).toUpperCase() + desc.slice(1),
-          date: new Date().toISOString(),
-          type: 'EXPENSE',
-        };
-        addExpense(newExp);
-        replyText = `Recorded ₹${amt} for ${newExp.description} under ${cat}. Added to your finance tracker.`;
-        actionCard = {
-          type: 'EXPENSE',
-          title: '✓ Expense Added',
-          subtitle: newExp.description,
-          primaryValue: `₹${amt}`,
-          secondaryValue: `${cat} • Today`,
-          badge: 'Finance Updated',
-          navigationScreen: 'Finance',
-        };
-      } else if (
-        /\b(submit|complete|finish|prepare|study|read|write|homework|assignment|task|lab report|project|quiz|todo)\b/i.test(lower) ||
-        lower.startsWith('remind me') ||
-        lower.startsWith('i need to') ||
-        lower.startsWith('i have to')
-      ) {
-        const cleanTitle = textToSend
-          .replace(/^(?:remind me to|remember to|i need to|i have to|add task|create task)\s+/i, '')
-          .replace(/(?:,\s*)?(?:make it|set priority to|priority:?)\s+(?:extremely )?(?:important|urgent|high|normal)/i, '')
-          .trim();
-
-        const newTask: Task = {
-          id: String(Date.now()),
-          userId: 'u1',
-          title: cleanTitle ? cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1) : 'Academic Task',
-          priority:
-            lower.includes('urgent') || lower.includes('extremely')
-              ? 'EXTREMELY_IMPORTANT'
-              : lower.includes('important') || lower.includes('high')
-              ? 'HIGH'
-              : 'NORMAL',
-          status: 'TODO',
-          dueDate: new Date(Date.now() + 86400000).toISOString(),
-        };
-        addTask(newTask);
-        replyText = `Task "${newTask.title}" scheduled for tomorrow with ${newTask.priority} priority. Added to task manager.`;
+      if (offlineRes.actionType === 'EXPENSE' && offlineRes.actionData) {
+        if (offlineRes.actionData.expense) {
+          addExpense(offlineRes.actionData.expense);
+          if (offlineRes.actionData.debt) addDebt(offlineRes.actionData.debt);
+          queueOfflineAction({ type: 'SPLIT_EXPENSE', payload: offlineRes.actionData });
+          actionCard = {
+            type: 'EXPENSE',
+            title: '⚡ Offline Split Recorded',
+            subtitle: offlineRes.actionData.expense.description,
+            primaryValue: `₹${offlineRes.actionData.expense.amount}`,
+            secondaryValue: `${offlineRes.actionData.debt?.person} owes ₹${offlineRes.actionData.debt?.amount}`,
+            badge: 'Queued to Sync',
+            navigationScreen: 'Finance',
+          };
+        } else {
+          addExpense(offlineRes.actionData);
+          queueOfflineAction({ type: 'CREATE_EXPENSE', payload: offlineRes.actionData });
+          actionCard = {
+            type: 'EXPENSE',
+            title: '⚡ Offline Expense Added',
+            subtitle: offlineRes.actionData.description,
+            primaryValue: `₹${offlineRes.actionData.amount}`,
+            secondaryValue: `${offlineRes.actionData.category} • Saved Locally`,
+            badge: 'Queued to Sync',
+            navigationScreen: 'Finance',
+          };
+        }
+      } else if (offlineRes.actionType === 'TASK' && offlineRes.actionData) {
+        addTask(offlineRes.actionData);
+        queueOfflineAction({ type: 'CREATE_TASK', payload: offlineRes.actionData });
         actionCard = {
           type: 'TASK',
-          title: '✓ Task Created',
-          subtitle: newTask.title,
-          primaryValue: newTask.priority,
-          secondaryValue: 'Due tomorrow',
-          badge: 'Reminders Active',
+          title: '⚡ Offline Task Scheduled',
+          subtitle: offlineRes.actionData.title,
+          primaryValue: offlineRes.actionData.priority,
+          secondaryValue: 'Saved Locally',
+          badge: 'Queued to Sync',
           navigationScreen: 'Tasks',
         };
-      } else {
-        replyText = `I processed: "${textToSend}". Your student companion records have been synchronized.`;
       }
 
       setMessages((prev) => [
@@ -398,7 +439,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
         {
           id: String(Date.now() + 1),
           sender: 'assistant',
-          text: replyText,
+          text: `${offlineRes.message}\n\n*(Cloud unavailable • Processed by offline ${offlineRes.offlineModelUsed} model. Data saved on phone and will push to dataset when online.)*`,
           actionCard,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
@@ -490,12 +531,52 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
           <View>
             <Text style={styles.headerTitle}>AI Student Companion</Text>
             <View style={styles.statusRow}>
-              <View style={styles.onlineDot} />
-              <Text style={styles.statusText}>Universal Command Center Active</Text>
+              <View style={[styles.onlineDot, aiMode === 'OFFLINE' && { backgroundColor: '#F59E0B' }]} />
+              <Text style={styles.statusText}>
+                {aiMode === 'OFFLINE' ? '100% Offline (Hugging Face)' : 'Universal Command Center Active'}
+              </Text>
             </View>
           </View>
         </View>
+
+        {/* Offline Hugging Face Model Switcher Pill */}
+        <TouchableOpacity
+          style={[styles.modelPillBtn, aiMode === 'OFFLINE' && styles.modelPillBtnOffline]}
+          onPress={() => setModelModalVisible(true)}
+          activeOpacity={0.8}
+        >
+          <Ionicons
+            name={aiMode === 'OFFLINE' ? 'flash' : aiMode === 'AUTO' ? 'sync' : 'cloud'}
+            size={13}
+            color={aiMode === 'OFFLINE' ? '#B45309' : designTokens.colors.primaryDark}
+          />
+          <Text style={[styles.modelPillText, aiMode === 'OFFLINE' && { color: '#B45309' }]}>
+            {aiMode === 'OFFLINE' ? 'SmolLM2 (Offline)' : aiMode === 'AUTO' ? 'Auto (HF/Cloud)' : 'Gemini Cloud'}
+          </Text>
+          <Ionicons name="chevron-down" size={11} color={designTokens.colors.textSecondary} />
+        </TouchableOpacity>
       </View>
+
+      {/* Offline Pending Sync Banner */}
+      {offlineSyncQueue.filter((q) => !q.synced).length > 0 && (
+        <View style={styles.offlineQueueBanner}>
+          <View style={styles.queueBannerLeft}>
+            <Ionicons name="cloud-offline-outline" size={15} color="#B45309" />
+            <Text style={styles.queueBannerText}>
+              {offlineSyncQueue.filter((q) => !q.synced).length} action(s) stored in phone. Will push to dataset when online.
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.syncQueueBtn}
+            onPress={async () => {
+              const res = await flushOfflineQueue();
+              Alert.alert('Dataset Synced', `Pushed ${res.syncedCount} offline record(s) to cloud database!`);
+            }}
+          >
+            <Text style={styles.syncQueueBtnText}>Sync Now</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Chat Messages Feed or Empty State */}
       {messages.length === 0 ? (
@@ -631,6 +712,171 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
           <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
+
+      {/* Hugging Face Offline Model Manager Modal */}
+      <Modal
+        visible={modelModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setModelModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            {/* Modal Header */}
+            <View style={styles.modalHeaderRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="hardware-chip-outline" size={22} color={designTokens.colors.primaryDark} />
+                <View>
+                  <Text style={styles.modalTitle}>Offline AI Engine</Text>
+                  <Text style={styles.modalSubtitle}>Hugging Face On-Device Models</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setModelModalVisible(false)} style={styles.modalCloseBtn}>
+                <Ionicons name="close" size={20} color={designTokens.colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+              {/* Connectivity Mode Switcher */}
+              <Text style={styles.modalSectionLabel}>AI EXECUTION MODE</Text>
+              <View style={styles.modeToggleRow}>
+                {(['AUTO', 'OFFLINE', 'CLOUD'] as const).map((mode) => (
+                  <TouchableOpacity
+                    key={mode}
+                    style={[styles.modeToggleBtn, aiMode === mode && styles.modeToggleBtnActive]}
+                    onPress={() => setAiMode(mode)}
+                  >
+                    <Text style={[styles.modeToggleText, aiMode === mode && styles.modeToggleTextActive]}>
+                      {mode === 'AUTO' ? '⚡ Auto Fallback' : mode === 'OFFLINE' ? '📴 100% Offline' : '☁️ Cloud Gemini'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Hugging Face Offline Models List */}
+              <Text style={styles.modalSectionLabel}>HUGGING FACE ON-DEVICE MODELS</Text>
+              {HUGGINGFACE_OFFLINE_MODELS.map((m) => {
+                const isDownloaded = downloadedModels.includes(m.id);
+                const isActive = activeOfflineModel === m.id;
+                const progress = downloadProgress[m.id];
+                const isDownloading = progress !== undefined && progress < 100;
+
+                return (
+                  <GlassCard key={m.id} variant="cream" style={styles.modelCard}>
+                    <View style={styles.modelCardTop}>
+                      <View style={{ flex: 1, paddingRight: 8 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={styles.modelCardName}>{m.name}</Text>
+                          {isActive && (
+                            <View style={styles.activeTag}>
+                              <Text style={styles.activeTagText}>ACTIVE</Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={styles.modelCardRepo}>{m.repo}</Text>
+                        <Text style={styles.modelCardDesc}>{m.description}</Text>
+                      </View>
+                      <Text style={styles.modelCardSize}>{m.sizeMB} MB</Text>
+                    </View>
+
+                    {/* Download Progress Bar if downloading */}
+                    {isDownloading && (
+                      <View style={styles.progressRow}>
+                        <View style={styles.progressBarTrack}>
+                          <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
+                        </View>
+                        <Text style={styles.progressText}>{progress}%</Text>
+                      </View>
+                    )}
+
+                    <View style={styles.modelCardBottom}>
+                      <Text style={styles.modelSpecialty}>🎯 {m.specialty}</Text>
+                      <TouchableOpacity
+                        style={[
+                          styles.modelActionBtn,
+                          isActive && styles.modelActionBtnActive,
+                          !isDownloaded && styles.modelActionBtnDownload,
+                        ]}
+                        onPress={async () => {
+                          if (!isDownloaded) {
+                            await downloadOfflineModel(m.id);
+                          } else {
+                            setActiveOfflineModel(m.id);
+                          }
+                        }}
+                        disabled={isDownloading}
+                      >
+                        <Text
+                          style={[
+                            styles.modelActionBtnText,
+                            isActive && styles.modelActionBtnTextActive,
+                          ]}
+                        >
+                          {isDownloading
+                            ? 'Downloading...'
+                            : isActive
+                            ? 'Active Model'
+                            : isDownloaded
+                            ? 'Select Model'
+                            : 'Download from HF'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </GlassCard>
+                );
+              })}
+
+              {/* Custom Hugging Face Repo Input */}
+              <Text style={styles.modalSectionLabel}>LOAD CUSTOM HUGGING FACE REPO</Text>
+              <View style={styles.customRepoCard}>
+                <TextInput
+                  style={styles.customRepoInput}
+                  placeholder="e.g. HuggingFaceTB/SmolLM2-135M"
+                  placeholderTextColor="#94A3B8"
+                  value={customRepoInput}
+                  onChangeText={setCustomRepoInput}
+                />
+                <TouchableOpacity
+                  style={[styles.customRepoBtn, !customRepoInput.trim() && { opacity: 0.5 }]}
+                  disabled={!customRepoInput.trim()}
+                  onPress={async () => {
+                    const repo = customRepoInput.trim();
+                    await downloadOfflineModel(repo);
+                    setCustomRepoInput('');
+                    Alert.alert('Model Loaded', `Downloaded & activated "${repo}" from Hugging Face for offline reasoning!`);
+                  }}
+                >
+                  <Ionicons name="download-outline" size={16} color="#FFFFFF" />
+                  <Text style={styles.customRepoBtnText}>Download</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Dataset Sync Status Card */}
+              <Text style={styles.modalSectionLabel}>OFFLINE DATASET SYNC</Text>
+              <View style={styles.syncStatusCard}>
+                <View style={{ flex: 1, paddingRight: 8 }}>
+                  <Text style={styles.syncStatusTitle}>Temporary Phone Storage</Text>
+                  <Text style={styles.syncStatusSub}>
+                    {offlineSyncQueue.filter((q) => !q.synced).length > 0
+                      ? `${offlineSyncQueue.filter((q) => !q.synced).length} record(s) queued. Will push to dataset when online.`
+                      : 'All offline records are pushed and synced to cloud dataset.'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.flushSyncBtn}
+                  onPress={async () => {
+                    const res = await flushOfflineQueue();
+                    Alert.alert('Dataset Synced', `Pushed ${res.syncedCount} offline record(s) to cloud database!`);
+                  }}
+                >
+                  <Ionicons name="cloud-upload-outline" size={15} color="#FFFFFF" />
+                  <Text style={styles.flushSyncBtnText}>Sync Now</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   </GradientBackground>
 );
@@ -850,4 +1096,303 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     lineHeight: 22,
   },
+  modelPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: designTokens.radii.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(41, 51, 50, 0.12)',
+  },
+  modelPillBtnOffline: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#F59E0B',
+  },
+  modelPillText: {
+    ...designTokens.typography.micro,
+    color: designTokens.colors.primaryDark,
+    fontWeight: '700',
+    fontSize: 10,
+  },
+  offlineQueueBanner: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFBEB',
+    borderBottomWidth: 1,
+    borderBottomColor: '#FDE68A',
+    paddingHorizontal: designTokens.spacing.lg,
+    paddingVertical: 8,
+  },
+  queueBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  queueBannerText: {
+    ...designTokens.typography.micro,
+    color: '#92400E',
+    fontSize: 11,
+    flex: 1,
+  },
+  syncQueueBtn: {
+    backgroundColor: '#D97706',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: designTokens.radii.xs,
+  },
+  syncQueueBtnText: {
+    ...designTokens.typography.micro,
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 10,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: '#FAF7F2',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: designTokens.spacing.lg,
+    maxHeight: '85%',
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(41, 51, 50, 0.08)',
+    paddingBottom: 12,
+  },
+  modalTitle: {
+    ...designTokens.typography.cardTitle,
+    fontSize: 16,
+    color: designTokens.colors.textPrimary,
+  },
+  modalSubtitle: {
+    ...designTokens.typography.micro,
+    color: designTokens.colors.textSecondary,
+  },
+  modalCloseBtn: {
+    padding: 6,
+  },
+  modalSectionLabel: {
+    ...designTokens.typography.micro,
+    color: designTokens.colors.textMuted,
+    letterSpacing: 1,
+    fontWeight: '800',
+    marginTop: 14,
+    marginBottom: 8,
+  },
+  modeToggleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  modeToggleBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: designTokens.radii.sm,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(41, 51, 50, 0.1)',
+  },
+  modeToggleBtnActive: {
+    backgroundColor: designTokens.colors.primary,
+    borderColor: designTokens.colors.primary,
+  },
+  modeToggleText: {
+    ...designTokens.typography.micro,
+    color: designTokens.colors.textSecondary,
+    fontWeight: '700',
+    fontSize: 11,
+  },
+  modeToggleTextActive: {
+    color: '#FFFFFF',
+  },
+  modelCard: {
+    marginBottom: 10,
+    padding: 12,
+  },
+  modelCardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 6,
+  },
+  modelCardName: {
+    ...designTokens.typography.cardTitle,
+    fontSize: 13,
+    color: designTokens.colors.textPrimary,
+  },
+  activeTag: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  activeTagText: {
+    ...designTokens.typography.micro,
+    color: '#16A34A',
+    fontWeight: '800',
+    fontSize: 9,
+  },
+  modelCardRepo: {
+    ...designTokens.typography.micro,
+    color: designTokens.colors.textMuted,
+    fontSize: 10,
+    marginTop: 2,
+  },
+  modelCardDesc: {
+    ...designTokens.typography.body,
+    fontSize: 11,
+    color: designTokens.colors.textSecondary,
+    marginTop: 4,
+  },
+  modelCardSize: {
+    ...designTokens.typography.micro,
+    color: designTokens.colors.primaryDeep,
+    fontWeight: '800',
+    backgroundColor: designTokens.colors.primarySoft,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginVertical: 6,
+  },
+  progressBarTrack: {
+    flex: 1,
+    height: 6,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: designTokens.colors.primary,
+  },
+  progressText: {
+    ...designTokens.typography.micro,
+    fontWeight: '700',
+    color: designTokens.colors.primaryDark,
+    fontSize: 10,
+  },
+  modelCardBottom: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(41, 51, 50, 0.06)',
+  },
+  modelSpecialty: {
+    ...designTokens.typography.micro,
+    color: designTokens.colors.textSecondary,
+    fontSize: 11,
+  },
+  modelActionBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: designTokens.radii.xs,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: designTokens.colors.primary,
+  },
+  modelActionBtnActive: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#16A34A',
+  },
+  modelActionBtnDownload: {
+    backgroundColor: designTokens.colors.primary,
+  },
+  modelActionBtnText: {
+    ...designTokens.typography.micro,
+    color: designTokens.colors.primaryDark,
+    fontWeight: '700',
+  },
+  modelActionBtnTextActive: {
+    color: '#16A34A',
+  },
+  customRepoCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: designTokens.radii.sm,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(41, 51, 50, 0.1)',
+    marginBottom: 8,
+  },
+  customRepoInput: {
+    backgroundColor: '#FAF7F2',
+    borderRadius: designTokens.radii.xs,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 12,
+    color: designTokens.colors.textPrimary,
+    marginBottom: 8,
+  },
+  customRepoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: designTokens.colors.primary,
+    paddingVertical: 8,
+    borderRadius: designTokens.radii.xs,
+  },
+  customRepoBtnText: {
+    ...designTokens.typography.micro,
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  syncStatusCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderRadius: designTokens.radii.sm,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(41, 51, 50, 0.1)',
+    marginBottom: 16,
+  },
+  syncStatusTitle: {
+    ...designTokens.typography.cardTitle,
+    fontSize: 12,
+    color: designTokens.colors.textPrimary,
+  },
+  syncStatusSub: {
+    ...designTokens.typography.micro,
+    color: designTokens.colors.textSecondary,
+    fontSize: 10,
+    marginTop: 2,
+  },
+  flushSyncBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: designTokens.colors.primaryDark,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: designTokens.radii.xs,
+  },
+  flushSyncBtnText: {
+    ...designTokens.typography.micro,
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
 });
+
