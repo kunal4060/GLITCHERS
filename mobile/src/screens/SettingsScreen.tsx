@@ -1,228 +1,283 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Switch, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
 import { theme } from '../theme/theme';
+import { NinjaAvatar } from '../components/NinjaAvatar';
 import { useAuthStore } from '../store/authStore';
-import { useFloatingStore } from '../store/floatingStore';
+import { apiClient } from '../api/client';
 
-export const SettingsScreen: React.FC<{ onRestartOnboarding?: () => void }> = ({ onRestartOnboarding }) => {
-  const { user, setUser, logout } = useAuthStore();
-  const { isBubbleVisible, setBubbleVisible } = useFloatingStore();
+interface SettingsScreenProps {
+  onRestartOnboarding?: () => void;
+  navigation?: any;
+}
 
-  const [universityDomain, setUniversityDomain] = useState('university.edu');
+export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboarding, navigation }) => {
+  const { user } = useAuthStore();
+  const [semester, setSemester] = useState('FALL SEMESTER 2026-27');
   const [quietHoursEnabled, setQuietHoursEnabled] = useState(true);
-  const [quietStart, setQuietStart] = useState('23:00');
-  const [quietEnd, setQuietEnd] = useState('07:00');
-  const [criticalBypass, setCriticalBypass] = useState(true);
+  const [floatingAssistantEnabled, setFloatingAssistantEnabled] = useState(true);
+  const [syncing, setSyncing] = useState(false);
 
-  const handleSavePreferences = () => {
-    Alert.alert('Preferences Saved', 'Academic email filter and Quiet Hours updated successfully.');
+  const studentName = user?.fullName || 'KUNAL BALKRUSHN UGALE';
+  const cgpa = '8.71';
+  const credits = 42;
+
+  const handleChangeSemester = () => {
+    Alert.alert('Change Semester', 'Select active academic semester:', [
+      { text: 'FALL 2026-27', onPress: () => setSemester('FALL SEMESTER 2026-27') },
+      { text: 'WINTER 2026-27', onPress: () => setSemester('WINTER SEMESTER 2026-27') },
+      { text: 'SUMMER 2027', onPress: () => setSemester('SUMMER SEMESTER 2027') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const handleSyncNow = async () => {
+    setSyncing(true);
+    try {
+      await apiClient.fetchTimetableClasses();
+      await apiClient.fetchTasks();
+      Alert.alert('Synced', 'All timetable sessions and tasks are synced with cloud backend!');
+    } catch {
+      Alert.alert('Local Sync', 'Synced with local cache.');
+    } finally {
+      setSyncing(false);
+    }
   };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Profile Summary Card */}
-      <Text style={styles.sectionHeader}>STUDENT PROFILE</Text>
-      <View style={styles.card}>
-        <View style={styles.profileRow}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{user?.fullName?.charAt(0) || 'K'}</Text>
-          </View>
-          <View style={styles.profileInfo}>
-            <Text style={styles.nameText}>{user?.fullName || 'Student'}</Text>
-            <Text style={styles.emailText}>{user?.email || 'student@university.edu'}</Text>
-            <Text style={styles.deptText}>
-              {user?.course || 'Computer Science'} • Sem {user?.semester || 6}
-            </Text>
-          </View>
+      {/* Title */}
+      <Text style={styles.screenTitle}>Account</Text>
+
+      {/* Ninja Hero Profile Section */}
+      <View style={styles.heroSection}>
+        <NinjaAvatar size="large" cgpa={cgpa} credits={credits} showBadges={true} />
+
+        <Text style={styles.studentName}>{studentName}</Text>
+
+        {/* Semester Pill */}
+        <View style={styles.semesterPill}>
+          <Text style={styles.semesterText}>{semester}</Text>
         </View>
+
+        {/* Change Semester Link */}
+        <TouchableOpacity onPress={handleChangeSemester}>
+          <Text style={styles.changeSemesterText}>Change semster</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Floating Assistant Control */}
-      <Text style={styles.sectionHeader}>FLOATING ASSISTANT (SYSTEM OVERLAY)</Text>
-      <View style={styles.card}>
-        <View style={styles.switchRow}>
-          <View style={styles.switchTextCol}>
-            <Text style={styles.switchTitle}>Enable Floating Bubble (🎓)</Text>
-            <Text style={styles.switchDesc}>
-              Draws a floating widget over other applications for quick access to schedule, finance, tasks, and AI.
-            </Text>
+      {/* Account Navigation Group */}
+      <Text style={styles.sectionHeader}>Account</Text>
+      <View style={styles.menuCard}>
+        <TouchableOpacity
+          style={styles.menuRow}
+          onPress={() => Alert.alert('Profile Details', `Name: ${studentName}\nDegree: B.Tech Computer Science\nUniversity: VIT AP`)}
+        >
+          <View style={styles.menuLeft}>
+            <Text style={styles.menuIcon}>👤</Text>
+            <Text style={styles.menuLabel}>Profile</Text>
           </View>
-          <Switch
-            value={isBubbleVisible}
-            onValueChange={setBubbleVisible}
-            trackColor={{ false: theme.colors.surfaceBorder, true: theme.colors.primary }}
-          />
-        </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
+
+        <View style={styles.divider} />
+
+        <TouchableOpacity
+          style={styles.menuRow}
+          onPress={() => navigation?.navigate ? navigation.navigate('Privacy') : Alert.alert('Manage Credentials', 'Google OAuth & Supabase authentication keys active.')}
+        >
+          <View style={styles.menuLeft}>
+            <Text style={styles.menuIcon}>🔏</Text>
+            <Text style={styles.menuLabel}>Manage Credentials</Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
+
+        <View style={styles.divider} />
+
+        <TouchableOpacity style={styles.menuRow} onPress={handleSyncNow}>
+          <View style={styles.menuLeft}>
+            <Text style={styles.menuIcon}>🔄</Text>
+            <Text style={styles.menuLabel}>Sync ⓘ</Text>
+          </View>
+          <Text style={styles.chevron}>{syncing ? '...' : '›'}</Text>
+        </TouchableOpacity>
+
+        <View style={styles.divider} />
+
+        <TouchableOpacity
+          style={styles.menuRow}
+          onPress={() => Alert.alert('Preferences', 'Quiet hours: 23:00 - 07:00\nDomain: @vitap.ac.in')}
+        >
+          <View style={styles.menuLeft}>
+            <Text style={styles.menuIcon}>⚙️</Text>
+            <Text style={styles.menuLabel}>Settings</Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* University Domain Filter */}
-      <Text style={styles.sectionHeader}>ACADEMIC EMAIL INTELLIGENCE</Text>
-      <View style={styles.card}>
-        <Text style={styles.inputLabel}>University Email Domain</Text>
-        <TextInput
-          style={styles.input}
-          value={universityDomain}
-          onChangeText={setUniversityDomain}
-          placeholder="university.edu"
-          placeholderTextColor="#64748B"
-        />
-        <Text style={styles.helperText}>
-          Only messages from this domain are processed for timetable changes, circulars, and exam notices.
-        </Text>
-      </View>
-
-      {/* Quiet Hours & Smart Reminders */}
-      <Text style={styles.sectionHeader}>QUIET HOURS & STUDY TIME</Text>
-      <View style={styles.card}>
-        <View style={styles.switchRow}>
-          <View style={styles.switchTextCol}>
-            <Text style={styles.switchTitle}>Enable Quiet Hours</Text>
-            <Text style={styles.switchDesc}>Mutes non-critical reminders during study and sleep time.</Text>
+      {/* Smart Toggles */}
+      <Text style={styles.sectionHeader}>Preferences & Controls</Text>
+      <View style={styles.menuCard}>
+        <View style={styles.toggleRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.toggleTitle}>🌙 Quiet Hours Suppression</Text>
+            <Text style={styles.toggleSub}>Mute non-critical alerts (23:00 - 07:00)</Text>
           </View>
           <Switch
             value={quietHoursEnabled}
             onValueChange={setQuietHoursEnabled}
-            trackColor={{ false: theme.colors.surfaceBorder, true: theme.colors.primary }}
+            trackColor={{ false: '#334155', true: '#2563EB' }}
+            thumbColor="#FFFFFF"
           />
         </View>
 
-        {quietHoursEnabled && (
-          <View style={styles.timeSettings}>
-            <View style={styles.timeRow}>
-              <View style={styles.timeField}>
-                <Text style={styles.timeLabel}>Start Time</Text>
-                <TextInput
-                  style={styles.timeInput}
-                  value={quietStart}
-                  onChangeText={setQuietStart}
-                  placeholder="23:00"
-                  placeholderTextColor="#64748B"
-                />
-              </View>
-              <View style={styles.timeField}>
-                <Text style={styles.timeLabel}>End Time</Text>
-                <TextInput
-                  style={styles.timeInput}
-                  value={quietEnd}
-                  onChangeText={setQuietEnd}
-                  placeholder="07:00"
-                  placeholderTextColor="#64748B"
-                />
-              </View>
-            </View>
+        <View style={styles.divider} />
 
-            <View style={[styles.switchRow, { marginTop: 12 }]}>
-              <View style={styles.switchTextCol}>
-                <Text style={styles.switchTitle}>Critical Alert Bypass</Text>
-                <Text style={styles.switchDesc}>Allow same-day exam or rescheduled class alerts to sound.</Text>
-              </View>
-              <Switch
-                value={criticalBypass}
-                onValueChange={setCriticalBypass}
-                trackColor={{ false: theme.colors.surfaceBorder, true: theme.colors.primary }}
-              />
-            </View>
+        <View style={styles.toggleRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.toggleTitle}>🎓 Floating Student Assistant</Text>
+            <Text style={styles.toggleSub}>Show floating bubble over other apps</Text>
           </View>
-        )}
-
-        <TouchableOpacity style={styles.saveBtn} onPress={handleSavePreferences}>
-          <Text style={styles.saveBtnText}>Save Preferences</Text>
-        </TouchableOpacity>
+          <Switch
+            value={floatingAssistantEnabled}
+            onValueChange={setFloatingAssistantEnabled}
+            trackColor={{ false: '#334155', true: '#2563EB' }}
+            thumbColor="#FFFFFF"
+          />
+        </View>
       </View>
 
-      {/* Onboarding & Session Actions */}
-      <Text style={styles.sectionHeader}>SETUP & ACCOUNT</Text>
-      <View style={styles.card}>
-        {onRestartOnboarding && (
-          <TouchableOpacity style={styles.secondaryBtn} onPress={onRestartOnboarding}>
-            <Text style={styles.secondaryBtnText}>🔄 Replay Onboarding Walkthrough</Text>
-          </TouchableOpacity>
-        )}
-
-        <TouchableOpacity style={styles.dangerBtn} onPress={() => logout()}>
-          <Text style={styles.dangerBtnText}>🚪 Log Out</Text>
+      {/* Onboarding Restart */}
+      {onRestartOnboarding && (
+        <TouchableOpacity style={styles.restartBtn} onPress={onRestartOnboarding}>
+          <Text style={styles.restartBtnText}>↻ Re-run Setup / Onboarding</Text>
         </TouchableOpacity>
-      </View>
+      )}
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
-  content: { padding: 16, paddingBottom: 100 },
-  sectionHeader: { fontSize: 11, fontWeight: 'bold', color: theme.colors.textMuted, letterSpacing: 1, marginBottom: 10, marginTop: 12 },
-  card: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: theme.colors.surfaceBorder,
-  },
-  profileRow: { flexDirection: 'row', alignItems: 'center' },
-  avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: theme.colors.primaryGlow,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
-  avatarText: { fontSize: 22, fontWeight: 'bold', color: theme.colors.primary },
-  profileInfo: { flex: 1 },
-  nameText: { fontSize: 17, fontWeight: 'bold', color: theme.colors.text },
-  emailText: { fontSize: 13, color: theme.colors.textSecondary, marginTop: 2 },
-  deptText: { fontSize: 12, color: theme.colors.textMuted, marginTop: 2 },
-  switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  switchTextCol: { flex: 1, paddingRight: 12 },
-  switchTitle: { fontSize: 14, fontWeight: 'bold', color: theme.colors.text },
-  switchDesc: { fontSize: 12, color: theme.colors.textSecondary, marginTop: 4, lineHeight: 16 },
-  inputLabel: { fontSize: 12, fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: 6 },
-  input: {
-    backgroundColor: theme.colors.surfaceSubtle,
-    borderRadius: 10,
-    padding: 12,
-    color: theme.colors.text,
-    fontSize: 14,
-    borderWidth: 1,
-    borderColor: theme.colors.surfaceBorder,
-  },
-  helperText: { fontSize: 11, color: theme.colors.textMuted, marginTop: 6 },
-  timeSettings: { marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: theme.colors.surfaceBorder },
-  timeRow: { flexDirection: 'row', gap: 12 },
-  timeField: { flex: 1 },
-  timeLabel: { fontSize: 11, color: theme.colors.textSecondary, marginBottom: 4 },
-  timeInput: {
-    backgroundColor: theme.colors.surfaceSubtle,
-    borderRadius: 8,
-    padding: 10,
-    color: theme.colors.text,
+  content: { padding: 20, paddingBottom: 100 },
+  screenTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#FFFFFF',
     textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  heroSection: {
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  studentName: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    marginTop: 20,
+    textAlign: 'center',
+    letterSpacing: 0.8,
+  },
+  semesterPill: {
+    backgroundColor: '#1E293B',
+    paddingHorizontal: 20,
+    paddingVertical: 9,
+    borderRadius: 20,
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  semesterText: {
+    color: '#93C5FD',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  changeSemesterText: {
+    color: '#3B82F6',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 12,
+  },
+  sectionHeader: {
     fontSize: 14,
-    fontWeight: 'bold',
-  },
-  saveBtn: {
-    backgroundColor: theme.colors.primary,
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  saveBtnText: { color: '#0B0F19', fontWeight: 'bold', fontSize: 13 },
-  secondaryBtn: {
-    backgroundColor: theme.colors.surfaceSubtle,
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
+    fontWeight: '800',
+    color: '#93C5FD',
     marginBottom: 10,
+    marginTop: 10,
   },
-  secondaryBtnText: { color: theme.colors.primary, fontWeight: 'bold', fontSize: 13 },
-  dangerBtn: {
-    backgroundColor: theme.colors.dangerGlow,
-    borderRadius: 10,
-    paddingVertical: 12,
+  menuCard: {
+    backgroundColor: '#151D2A',
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#233247',
+    marginBottom: 20,
+  },
+  menuRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
   },
-  dangerBtnText: { color: theme.colors.danger, fontWeight: 'bold', fontSize: 13 },
+  menuLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  menuIcon: {
+    fontSize: 18,
+    width: 24,
+    textAlign: 'center',
+  },
+  menuLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#F8FAFC',
+  },
+  chevron: {
+    fontSize: 20,
+    color: '#64748B',
+    fontWeight: '400',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#233247',
+    marginLeft: 54,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  toggleTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  toggleSub: {
+    fontSize: 11,
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  restartBtn: {
+    backgroundColor: '#1E293B',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  restartBtnText: {
+    color: '#94A3B8',
+    fontSize: 13,
+    fontWeight: '700',
+  },
 });

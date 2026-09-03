@@ -1,238 +1,391 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { NinjaAvatar } from '../components/NinjaAvatar';
 import { useDashboardStore } from '../store/dashboardStore';
-import { useAuthStore } from '../store/authStore';
 
 export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
-  const { user } = useAuthStore();
-  const { classes, tasks, expenses, budget, debts, emails, isBackendConnected, syncWithBackend } = useDashboardStore();
+  const { syncWithBackend, expenses, budget } = useDashboardStore();
 
   useEffect(() => {
     syncWithBackend();
   }, [syncWithBackend]);
 
   const totalSpent = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
-  const remaining = budget ? Math.max(0, budget.monthlyLimit - totalSpent) : 0;
-  const toReceive = debts.filter((d) => d.type === 'OWES_ME' && d.status !== 'PAID').reduce((sum, d) => sum + Number(d.amount), 0);
-  const toPay = debts.filter((d) => d.type === 'I_OWE' && d.status !== 'PAID').reduce((sum, d) => sum + Number(d.amount), 0);
-
-  const nextClass = classes[0];
+  const remaining = budget ? Math.max(0, budget.monthlyLimit - totalSpent) : 3680;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Header Greeting & Connection Status */}
-      <View style={styles.header}>
-        <View style={styles.topRow}>
-          <View>
-            <Text style={styles.greeting}>Good Morning,</Text>
-            <Text style={styles.userName}>{user?.fullName || 'Student'}</Text>
-          </View>
-          <View style={[styles.statusPill, isBackendConnected ? styles.statusOnline : styles.statusOffline]}>
-            <Text style={[styles.statusPillText, isBackendConnected ? styles.statusOnlineText : styles.statusOfflineText]}>
-              {isBackendConnected ? '● Live API' : '○ Local Sync'}
-            </Text>
-          </View>
-        </View>
-        <Text style={styles.subtext}>{user?.university || 'Engineering College'}</Text>
-      </View>
-
-      {/* Next Class Banner */}
-      {nextClass && (
-        <View style={styles.nextClassCard}>
-          <View style={styles.cardHeaderRow}>
-            <Text style={styles.cardHeaderLabel}>NEXT CLASS</Text>
-            <View style={styles.liveTag}>
-              <Text style={styles.liveTagText}>Starts in 18 mins</Text>
-            </View>
-          </View>
-          <Text style={styles.nextClassName}>{nextClass.subjectName}</Text>
-          <Text style={styles.nextClassDetails}>
-            {nextClass.startTime} – {nextClass.endTime} • Room: {nextClass.room || 'AB1-204'}
-          </Text>
-          <Text style={styles.nextClassFaculty}>Faculty: {nextClass.faculty || 'Professor'}</Text>
-        </View>
-      )}
-
-      {/* Today at a Glance Summary */}
-      <View style={styles.glanceRow}>
-        <View style={styles.glanceBox}>
-          <Text style={styles.glanceNumber}>{classes.length}</Text>
-          <Text style={styles.glanceLabel}>Classes Today</Text>
-        </View>
-        <View style={styles.glanceBox}>
-          <Text style={styles.glanceNumber}>{tasks.length}</Text>
-          <Text style={styles.glanceLabel}>Pending Tasks</Text>
-        </View>
-        <View style={styles.glanceBox}>
-          <Text style={styles.glanceNumber}>{emails.length}</Text>
-          <Text style={styles.glanceLabel}>Important Emails</Text>
-        </View>
-      </View>
-
-      {/* Upcoming Academic Deadlines */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>UPCOMING DEADLINES</Text>
-        {tasks.slice(0, 2).map((task) => (
-          <View key={task.id} style={styles.taskCard}>
-            <View style={styles.taskHeader}>
-              <Text style={styles.taskTitle}>{task.title}</Text>
-              <Text style={styles.taskPriority}>{task.priority}</Text>
-            </View>
-            <Text style={styles.taskDue}>Due in 2 days</Text>
-          </View>
-        ))}
-      </View>
-
-      {/* Monthly Finance Overview */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>FINANCE & BUDGET</Text>
-        <View style={styles.financeCard}>
-          <View style={styles.financeRow}>
-            <View>
-              <Text style={styles.financeLabel}>Spent This Month</Text>
-              <Text style={styles.financeValue}>₹{totalSpent.toLocaleString()}</Text>
-            </View>
-            <View>
-              <Text style={styles.financeLabel}>Budget Remaining</Text>
-              <Text style={styles.remainingValue}>₹{remaining.toLocaleString()}</Text>
-            </View>
-          </View>
-          <View style={styles.progressBarBg}>
-            <View
-              style={[
-                styles.progressBarFill,
-                { width: `${Math.min(100, (totalSpent / (budget?.monthlyLimit || 10000)) * 100)}%` },
-              ]}
-            />
-          </View>
-        </View>
-      </View>
-
-      {/* Borrow / Lend Summary */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>BORROW & LEND</Text>
-        <View style={styles.debtSummaryRow}>
-          <View style={[styles.debtBox, { borderColor: '#10B981' }]}>
-            <Text style={styles.debtBoxLabel}>To Receive</Text>
-            <Text style={[styles.debtBoxValue, { color: '#10B981' }]}>₹{toReceive}</Text>
-          </View>
-          <View style={[styles.debtBox, { borderColor: '#F43F5E' }]}>
-            <Text style={styles.debtBoxLabel}>To Pay</Text>
-            <Text style={[styles.debtBoxValue, { color: '#F43F5E' }]}>₹{toPay}</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Student Life Control Center Grid */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>STUDENT CONTROL CENTER</Text>
-        <View style={styles.gridRow}>
-          <TouchableOpacity style={styles.gridCard} onPress={() => navigation.navigate('Calendar')}>
-            <Text style={styles.gridIcon}>📅</Text>
-            <Text style={styles.gridTitle}>Calendar</Text>
-            <Text style={styles.gridSub}>Sync Schedule</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.gridCard} onPress={() => navigation.navigate('Exams')}>
-            <Text style={styles.gridIcon}>📝</Text>
-            <Text style={styles.gridTitle}>Exams & Asg</Text>
-            <Text style={styles.gridSub}>Deadlines</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.gridCard} onPress={() => navigation.navigate('Email')}>
-            <Text style={styles.gridIcon}>📧</Text>
-            <Text style={styles.gridTitle}>Email Notices</Text>
-            <Text style={styles.gridSub}>Circulars</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.gridCard} onPress={() => navigation.navigate('Docs')}>
-            <Text style={styles.gridIcon}>📄</Text>
-            <Text style={styles.gridTitle}>Documents</Text>
-            <Text style={styles.gridSub}>Syllabus AI</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Quick Action Buttons */}
-      <View style={styles.quickActions}>
-        <TouchableOpacity style={styles.quickBtn} onPress={() => navigation.navigate('AI Companion')}>
-          <Text style={styles.quickBtnText}>🤖 Ask AI Student Companion</Text>
+      {/* Top Bar: Ninja Avatar & Weather Pill */}
+      <View style={styles.topBar}>
+        <TouchableOpacity onPress={() => navigation?.navigate('Account')}>
+          <NinjaAvatar size="small" showBadges={false} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.quickBtnSecondary} onPress={() => navigation.navigate('Timetable')}>
-          <Text style={styles.quickBtnSecondaryText}>🗓 View Full Timetable & Rooms</Text>
+
+        <View style={styles.weatherPill}>
+          <Text style={styles.weatherIcon}>☁️</Text>
+          <Text style={styles.weatherText}>28° feels 32°</Text>
+        </View>
+      </View>
+
+      {/* "Today" Header with "4 left" badge */}
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionTitle}>Today</Text>
+        <View style={styles.countBadge}>
+          <Text style={styles.countText}>4 left</Text>
+        </View>
+      </View>
+
+      {/* Hero Featured Next Class Card */}
+      <TouchableOpacity
+        style={styles.heroClassCard}
+        onPress={() => navigation?.navigate('Timetable')}
+      >
+        <View style={styles.cardHeaderRow}>
+          <Text style={styles.courseCodePill}>CSE3002 • ETH</Text>
+          <View style={styles.countdownBadge}>
+            <Text style={styles.countdownText}>IN 7H 2M</Text>
+          </View>
+        </View>
+
+        <Text style={styles.heroClassTitle}>Artificial Intelligence</Text>
+
+        <View style={styles.locationRow}>
+          <Text style={styles.locationPin}>📍</Text>
+          <Text style={styles.locationText}>120-CB • 9:00 AM - 9:50 AM</Text>
+        </View>
+      </TouchableOpacity>
+
+      {/* Upcoming Class Compact Stacked Rows */}
+      <View style={styles.upcomingStack}>
+        <TouchableOpacity
+          style={styles.upcomingRow}
+          onPress={() => navigation?.navigate('Timetable')}
+        >
+          <Text style={styles.timeTag}>10:01 AM</Text>
+          <Text style={styles.classRowName} numberOfLines={1}>Entrepreneurship</Text>
+          <Text style={styles.roomTag}>408-CB</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.upcomingRow}
+          onPress={() => navigation?.navigate('Timetable')}
+        >
+          <Text style={styles.timeTag}>11:00 AM</Text>
+          <Text style={styles.classRowName} numberOfLines={1}>Computer Organization and Ar...</Text>
+          <Text style={styles.roomTag}>220-CB</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.upcomingRow}
+          onPress={() => navigation?.navigate('Timetable')}
+        >
+          <Text style={styles.timeTag}>12:00 PM</Text>
+          <Text style={styles.classRowName} numberOfLines={1}>Discrete Mathematical Structur...</Text>
+          <Text style={styles.roomTag}>120-CB</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Quick Access Section */}
+      <Text style={[styles.sectionTitle, { marginTop: 28, marginBottom: 14 }]}>Quick Access</Text>
+
+      <View style={styles.quickAccessGrid}>
+        {/* Biometric */}
+        <TouchableOpacity style={styles.gridItem} onPress={() => navigation?.navigate('Attendance')}>
+          <View style={styles.iconCircle}>
+            <Text style={styles.actionIcon}>🪪</Text>
+          </View>
+          <Text style={styles.iconLabel}>Biometric</Text>
+        </TouchableOpacity>
+
+        {/* Marks */}
+        <TouchableOpacity style={styles.gridItem} onPress={() => navigation?.navigate('Attendance')}>
+          <View style={styles.iconCircle}>
+            <Text style={styles.actionIcon}>📊</Text>
+          </View>
+          <Text style={styles.iconLabel}>Marks</Text>
+        </TouchableOpacity>
+
+        {/* Grades */}
+        <TouchableOpacity style={styles.gridItem} onPress={() => navigation?.navigate('Attendance')}>
+          <View style={styles.iconCircle}>
+            <Text style={styles.actionIcon}>🥧</Text>
+          </View>
+          <Text style={styles.iconLabel}>Grades</Text>
+        </TouchableOpacity>
+
+        {/* Exams */}
+        <TouchableOpacity style={styles.gridItem} onPress={() => navigation?.navigate('Exams')}>
+          <View style={styles.iconCircle}>
+            <Text style={styles.actionIcon}>📅</Text>
+          </View>
+          <Text style={styles.iconLabel}>Exams</Text>
+        </TouchableOpacity>
+
+        {/* Outing */}
+        <TouchableOpacity style={styles.gridItem} onPress={() => navigation?.navigate('Tasks')}>
+          <View style={styles.iconCircle}>
+            <Text style={styles.actionIcon}>✈️</Text>
+          </View>
+          <Text style={styles.iconLabel}>Outing</Text>
+        </TouchableOpacity>
+
+        {/* Payments / Finance */}
+        <TouchableOpacity style={styles.gridItem} onPress={() => navigation?.navigate('Finance')}>
+          <View style={styles.iconCircle}>
+            <Text style={styles.actionIcon}>🧾</Text>
+          </View>
+          <Text style={styles.iconLabel}>Payments</Text>
+        </TouchableOpacity>
+
+        {/* Assignments */}
+        <TouchableOpacity style={styles.gridItem} onPress={() => navigation?.navigate('Exams')}>
+          <View style={styles.iconCircle}>
+            <Text style={styles.actionIcon}>📝</Text>
+          </View>
+          <Text style={styles.iconLabel}>Assignments</Text>
+        </TouchableOpacity>
+
+        {/* AI Companion */}
+        <TouchableOpacity
+          style={styles.gridItem}
+          onPress={() => navigation?.navigate('AI Companion')}
+        >
+          <View style={[styles.iconCircle, styles.aiCircle]}>
+            <Text style={styles.actionIcon}>🤖</Text>
+          </View>
+          <Text style={[styles.iconLabel, { color: '#60A5FA', fontWeight: '700' }]}>Ask AI</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* "For You" Section */}
+      <View style={[styles.sectionHeaderRow, { marginTop: 24 }]}>
+        <Text style={styles.sectionTitle}>For You</Text>
+        <TouchableOpacity onPress={() => navigation?.navigate('Finance')}>
+          <Text style={styles.viewAllText}>View All →</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Monthly Budget Card */}
+      <TouchableOpacity
+        style={styles.financeCard}
+        onPress={() => navigation?.navigate('Finance')}
+      >
+        <View style={styles.financeRow}>
+          <Text style={styles.financeTitle}>Monthly Student Budget</Text>
+          <Text style={styles.financeRemaining}>₹{remaining} left</Text>
+        </View>
+        <Text style={styles.financeSpent}>₹{totalSpent} spent this month</Text>
+        <View style={styles.progressBg}>
+          <View style={[styles.progressFill, { width: `${Math.min(100, (totalSpent / 10000) * 100)}%` }]} />
+        </View>
+      </TouchableOpacity>
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F172A' },
-  content: { padding: 16, paddingBottom: 100 },
-  header: { marginBottom: 20 },
-  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  statusPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  statusOnline: { backgroundColor: 'rgba(16, 185, 129, 0.15)' },
-  statusOffline: { backgroundColor: 'rgba(148, 163, 184, 0.15)' },
-  statusPillText: { fontSize: 11, fontWeight: 'bold' },
-  statusOnlineText: { color: '#10B981' },
-  statusOfflineText: { color: '#94A3B8' },
-  greeting: { fontSize: 16, color: '#94A3B8' },
-  userName: { fontSize: 26, fontWeight: 'bold', color: '#F8FAFC' },
-  subtext: { fontSize: 13, color: '#64748B', marginTop: 2 },
-  nextClassCard: {
+  container: { flex: 1, backgroundColor: '#0B0F15' },
+  content: { padding: 18, paddingBottom: 110 },
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    marginTop: 4,
+  },
+  weatherPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#151D2A',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#233247',
+    gap: 6,
+  },
+  weatherIcon: { fontSize: 15 },
+  weatherText: { color: '#E2E8F0', fontSize: 12, fontWeight: '600' },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
+  },
+  countBadge: {
+    backgroundColor: '#1C2638',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#233247',
+  },
+  countText: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  heroClassCard: {
+    backgroundColor: '#151D2A',
+    borderRadius: 18,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#233247',
+    marginBottom: 10,
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  courseCodePill: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  countdownBadge: {
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  countdownText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  heroClassTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginBottom: 10,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  locationPin: { fontSize: 13 },
+  locationText: { color: '#CBD5E1', fontSize: 13, fontWeight: '500' },
+  upcomingStack: {
+    gap: 6,
+    marginBottom: 10,
+  },
+  upcomingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#151D2A',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+  },
+  timeTag: {
+    color: '#CBD5E1',
+    fontSize: 12,
+    fontWeight: '700',
+    width: 72,
+  },
+  classRowName: {
+    flex: 1,
+    color: '#F8FAFC',
+    fontSize: 13,
+    fontWeight: '600',
+    paddingRight: 8,
+  },
+  roomTag: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  quickAccessGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  gridItem: {
+    width: '22%',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  iconCircle: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#151D2A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#233247',
+    marginBottom: 6,
+  },
+  aiCircle: {
     backgroundColor: '#1E293B',
+    borderColor: '#2563EB',
+  },
+  actionIcon: {
+    fontSize: 22,
+  },
+  iconLabel: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  viewAllText: {
+    color: '#3B82F6',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  financeCard: {
+    backgroundColor: '#151D2A',
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#38BDF8',
-    marginBottom: 16,
+    borderColor: '#233247',
+    marginTop: 8,
   },
-  cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardHeaderLabel: { fontSize: 12, fontWeight: 'bold', color: '#38BDF8', letterSpacing: 1 },
-  liveTag: { backgroundColor: 'rgba(56, 189, 248, 0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  liveTagText: { fontSize: 11, color: '#38BDF8', fontWeight: 'bold' },
-  nextClassName: { fontSize: 18, fontWeight: 'bold', color: '#F8FAFC', marginTop: 8 },
-  nextClassDetails: { fontSize: 14, color: '#CBD5E1', marginTop: 4 },
-  nextClassFaculty: { fontSize: 12, color: '#94A3B8', marginTop: 4 },
-  glanceRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  glanceBox: { flex: 1, backgroundColor: '#1E293B', borderRadius: 12, padding: 12, marginHorizontal: 4, alignItems: 'center' },
-  glanceNumber: { fontSize: 20, fontWeight: 'bold', color: '#38BDF8' },
-  glanceLabel: { fontSize: 11, color: '#94A3B8', marginTop: 4, textAlign: 'center' },
-  section: { marginBottom: 20 },
-  sectionTitle: { fontSize: 12, fontWeight: 'bold', color: '#64748B', letterSpacing: 1, marginBottom: 10 },
-  taskCard: { backgroundColor: '#1E293B', borderRadius: 12, padding: 12, marginBottom: 8 },
-  taskHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  taskTitle: { fontSize: 14, fontWeight: '600', color: '#F8FAFC', flex: 1 },
-  taskPriority: { fontSize: 10, fontWeight: 'bold', color: '#F59E0B', marginLeft: 8 },
-  taskDue: { fontSize: 12, color: '#94A3B8', marginTop: 4 },
-  financeCard: { backgroundColor: '#1E293B', borderRadius: 16, padding: 16 },
-  financeRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  financeLabel: { fontSize: 12, color: '#94A3B8' },
-  financeValue: { fontSize: 18, fontWeight: 'bold', color: '#F8FAFC', marginTop: 2 },
-  remainingValue: { fontSize: 18, fontWeight: 'bold', color: '#10B981', marginTop: 2 },
-  progressBarBg: { height: 8, backgroundColor: '#334155', borderRadius: 4, overflow: 'hidden' },
-  progressBarFill: { height: 8, backgroundColor: '#38BDF8', borderRadius: 4 },
-  debtSummaryRow: { flexDirection: 'row', gap: 12 },
-  debtBox: { flex: 1, backgroundColor: '#1E293B', borderRadius: 12, padding: 14, borderWidth: 1 },
-  debtBoxLabel: { fontSize: 12, color: '#94A3B8' },
-  debtBoxValue: { fontSize: 18, fontWeight: 'bold', marginTop: 4 },
-  gridRow: { flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
-  gridCard: {
-    flex: 1,
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    padding: 12,
+  financeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#334155',
   },
-  gridIcon: { fontSize: 22, marginBottom: 4 },
-  gridTitle: { fontSize: 11, fontWeight: 'bold', color: '#F8FAFC', textAlign: 'center' },
-  gridSub: { fontSize: 9, color: '#94A3B8', marginTop: 2, textAlign: 'center' },
-  quickActions: { marginTop: 10, gap: 10 },
-  quickBtn: { backgroundColor: '#3B82F6', borderRadius: 12, padding: 14, alignItems: 'center' },
-  quickBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
-  quickBtnSecondary: { backgroundColor: '#1E293B', borderRadius: 12, padding: 14, alignItems: 'center' },
-  quickBtnSecondaryText: { color: '#38BDF8', fontWeight: 'bold', fontSize: 14 },
+  financeTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  financeRemaining: {
+    color: '#10B981',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  financeSpent: {
+    color: '#94A3B8',
+    fontSize: 12,
+    marginTop: 4,
+    marginBottom: 10,
+  },
+  progressBg: {
+    height: 6,
+    backgroundColor: '#1E293B',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#38BDF8',
+    borderRadius: 3,
+  },
 });
