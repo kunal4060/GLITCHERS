@@ -1,220 +1,540 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, Modal } from 'react-native';
+import { designTokens } from '../theme/designTokens';
+import { GlassCard } from '../components/common/GlassCard';
+import { StatCard } from '../components/common/StatCard';
 import { useDashboardStore } from '../store/dashboardStore';
 import type { Expense, Debt } from '@glitchers/shared';
 
 export const FinanceScreen: React.FC = () => {
-  const { expenses, budget, debts, addExpense, addDebt, markDebtPaid } = useDashboardStore();
-  const [expenseInput, setExpenseInput] = useState('');
+  const { expenses, budget, debts, addExpense, deleteExpense, markDebtPaid, splitExpense } = useDashboardStore();
+
+  const [quickInput, setQuickInput] = useState('');
+  const [previewExpense, setPreviewExpense] = useState<{ amount: number; description: string; category: Expense['category'] } | null>(null);
+  const [splitModalVisible, setSplitModalVisible] = useState(false);
   const [splitAmount, setSplitAmount] = useState('');
-  const [splitCount, setSplitCount] = useState('3');
+  const [splitPerson, setSplitPerson] = useState('');
+  const [splitDesc, setSplitDesc] = useState('');
 
+  // Calculations
   const totalSpent = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
-  const remaining = budget ? Math.max(0, budget.monthlyLimit - totalSpent) : 0;
+  const monthlyLimit = budget?.monthlyLimit || 10000;
+  const remaining = Math.max(0, monthlyLimit - totalSpent);
+  const progressPct = Math.min(100, Math.round((totalSpent / monthlyLimit) * 100));
 
-  const handleAddExpense = () => {
-    if (!expenseInput.trim()) return;
+  // Category breakdown
+  const categoryTotals: Record<string, number> = {
+    FOOD: 0,
+    TRANSPORT: 0,
+    EDUCATION: 0,
+    SHOPPING: 0,
+    OTHER: 0,
+  };
+  expenses.forEach((e) => {
+    const cat = categoryTotals[e.category] !== undefined ? e.category : 'OTHER';
+    categoryTotals[cat] += Number(e.amount);
+  });
 
-    // Extract amount
-    const amountMatch = expenseInput.match(/(\d+)/);
-    const amount = amountMatch ? parseFloat(amountMatch[1]) : 100;
+  // Debts
+  const toReceive = debts
+    .filter((d) => d.type === 'OWES_ME' && d.status === 'PENDING')
+    .reduce((sum, d) => sum + Number(d.amount - d.paidAmount), 0);
+  const toPay = debts
+    .filter((d) => d.type === 'I_OWE' && d.status === 'PENDING')
+    .reduce((sum, d) => sum + Number(d.amount - d.paidAmount), 0);
 
+  // Quick entry parser
+  const handleQuickAddPress = () => {
+    if (!quickInput.trim()) return;
+    const match = quickInput.match(/(\d+(?:\.\d{1,2})?)/);
+    const amount = match ? parseFloat(match[1]) : 150;
+    const lower = quickInput.toLowerCase();
     let category: Expense['category'] = 'OTHER';
-    const lower = expenseInput.toLowerCase();
-    if (lower.includes('food') || lower.includes('dinner') || lower.includes('lunch') || lower.includes('canteen')) {
+    if (lower.includes('food') || lower.includes('dinner') || lower.includes('lunch') || lower.includes('canteen') || lower.includes('coffee') || lower.includes('tea') || lower.includes('biryani')) {
       category = 'FOOD';
-    } else if (lower.includes('auto') || lower.includes('cab') || lower.includes('transport')) {
+    } else if (lower.includes('auto') || lower.includes('cab') || lower.includes('bus') || lower.includes('metro') || lower.includes('travel')) {
       category = 'TRANSPORT';
+    } else if (lower.includes('book') || lower.includes('print') || lower.includes('xerox') || lower.includes('course') || lower.includes('fee')) {
+      category = 'EDUCATION';
+    } else if (lower.includes('shirt') || lower.includes('shopping') || lower.includes('clothes')) {
+      category = 'SHOPPING';
     }
 
+    const desc = quickInput.replace(/\d+/g, '').replace(/spent|paid|rs|rupees|on|for/gi, '').trim() || 'Expense';
+    setPreviewExpense({ amount, description: desc, category });
+  };
+
+  const handleConfirmQuickExpense = () => {
+    if (!previewExpense) return;
     const newExp: Expense = {
       id: String(Date.now()),
       userId: 'u1',
-      amount,
-      category,
-      description: expenseInput.replace(/\d+/g, '').trim() || 'General Expense',
+      amount: previewExpense.amount,
+      category: previewExpense.category,
+      description: previewExpense.description,
       date: new Date().toISOString(),
       type: 'EXPENSE',
     };
-
     addExpense(newExp);
-    setExpenseInput('');
+    setPreviewExpense(null);
+    setQuickInput('');
+    Alert.alert('Recorded', `₹${newExp.amount} logged under ${newExp.category}.`);
   };
 
-  const handleSplitBill = () => {
-    const total = parseFloat(splitAmount);
-    const count = parseInt(splitCount, 10);
-    if (!total || count < 2) {
-      Alert.alert('Invalid Input', 'Please enter a valid bill amount and at least 2 people.');
+  const handleSplitBillSubmit = () => {
+    const amt = parseFloat(splitAmount);
+    if (!amt || !splitPerson.trim()) {
+      Alert.alert('Error', 'Please enter amount and friend name');
       return;
     }
-
-    const share = Math.round((total / count) * 100) / 100;
-    const newDebt: Debt = {
-      id: String(Date.now()),
-      userId: 'u1',
-      person: 'Hostel Friends',
-      type: 'OWES_ME',
-      amount: share * (count - 1),
-      status: 'PENDING',
-      paidAmount: 0,
-      notes: `Bill Split: ₹${total} among ${count} people (My share: ₹${share})`,
-    };
-
-    addDebt(newDebt);
-    Alert.alert('Expense Split Added', `Each person's share is ₹${share}. Recorded ₹${newDebt.amount} to receive.`);
+    splitExpense(amt, splitDesc.trim() || 'Dinner / Bill', splitPerson.trim());
     setSplitAmount('');
+    setSplitPerson('');
+    setSplitDesc('');
+    setSplitModalVisible(false);
+    Alert.alert('Bill Split', `Split ₹${amt}: recorded your share & ${splitPerson} owes ₹${Math.round(amt / 2)}.`);
   };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Natural Language Expense Input Bar */}
-      <View style={styles.inputCard}>
-        <TextInput
-          style={styles.input}
-          placeholder="Speak or type: 'Spent 180 on dinner'..."
-          placeholderTextColor="#64748B"
-          value={expenseInput}
-          onChangeText={setExpenseInput}
-        />
-        <TouchableOpacity style={styles.addBtn} onPress={handleAddExpense}>
-          <Text style={styles.addBtnText}>+ Record</Text>
+      {/* 1. Header: Balance & Spending */}
+      <View style={styles.balanceHeader}>
+        <Text style={styles.balanceLabel}>REMAINING ALLOWANCE</Text>
+        <Text style={styles.balanceNumber}>₹{remaining.toLocaleString()}</Text>
+        <Text style={styles.balanceSub}>Safe daily burn: ₹{Math.round(remaining / 27)}/day</Text>
+      </View>
+
+      {/* 2. Monthly Budget Progress Card */}
+      <GlassCard elevated style={styles.budgetCard}>
+        <View style={styles.budgetRow}>
+          <Text style={styles.budgetLabel}>Monthly Budget</Text>
+          <Text style={styles.budgetRatio}>
+            ₹{totalSpent.toLocaleString()} <Text style={styles.budgetTotal}>/ ₹{monthlyLimit.toLocaleString()}</Text>
+          </Text>
+        </View>
+
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
+        </View>
+
+        <Text style={styles.progressSubtext}>{progressPct}% of monthly allowance used</Text>
+      </GlassCard>
+
+      {/* 3. AI Quick Entry Bar */}
+      <GlassCard style={styles.quickEntryCard}>
+        <Text style={styles.quickEntryTitle}>AI Quick Expense Entry</Text>
+        <View style={styles.quickEntryRow}>
+          <TextInput
+            style={styles.quickInput}
+            placeholder="Spent ₹180 on dinner..."
+            placeholderTextColor="#64748B"
+            value={quickInput}
+            onChangeText={setQuickInput}
+            onSubmitEditing={handleQuickAddPress}
+          />
+          <TouchableOpacity
+            style={[styles.quickAddBtn, !quickInput.trim() && { opacity: 0.5 }]}
+            onPress={handleQuickAddPress}
+            disabled={!quickInput.trim()}
+          >
+            <Text style={styles.quickAddText}>Add</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Confirmation Preview */}
+        {previewExpense && (
+          <View style={styles.previewBox}>
+            <View style={styles.previewHeader}>
+              <Text style={styles.previewTitle}>Confirm Expense</Text>
+              <Text style={styles.previewAmount}>₹{previewExpense.amount}</Text>
+            </View>
+            <Text style={styles.previewDesc}>{previewExpense.description} • {previewExpense.category}</Text>
+            <View style={styles.previewActions}>
+              <TouchableOpacity
+                style={styles.editBtn}
+                onPress={() => setPreviewExpense(null)}
+              >
+                <Text style={styles.editBtnText}>Edit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmBtn}
+                onPress={handleConfirmQuickExpense}
+              >
+                <Text style={styles.confirmBtnText}>Confirm & Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      </GlassCard>
+
+      {/* 4. Borrow / Lend Ledger & Split Action */}
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionTitle}>Peer Debts & Splits</Text>
+        <TouchableOpacity style={styles.splitBillBtn} onPress={() => setSplitModalVisible(true)}>
+          <Text style={styles.splitBillText}>⚡ Split Bill</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Monthly Budget Summary */}
-      <View style={styles.budgetCard}>
-        <Text style={styles.cardHeader}>MONTHLY BUDGET STATUS</Text>
-        <View style={styles.budgetRow}>
-          <View>
-            <Text style={styles.budgetSub}>Total Spent</Text>
-            <Text style={styles.budgetVal}>₹{totalSpent}</Text>
-          </View>
-          <View>
-            <Text style={styles.budgetSub}>Remaining</Text>
-            <Text style={styles.budgetRemain}>₹{remaining}</Text>
-          </View>
-          <View>
-            <Text style={styles.budgetSub}>Monthly Limit</Text>
-            <Text style={styles.budgetVal}>₹{budget?.monthlyLimit || 10000}</Text>
-          </View>
-        </View>
+      <View style={styles.debtsRow}>
+        <StatCard
+          label="TO RECEIVE"
+          value={`₹${toReceive.toLocaleString()}`}
+          subtext="Friends owe you"
+          accentColor={designTokens.colors.success}
+        />
+        <View style={{ width: designTokens.spacing.md }} />
+        <StatCard
+          label="TO PAY"
+          value={`₹${toPay.toLocaleString()}`}
+          subtext="You owe friends"
+          accentColor={designTokens.colors.danger}
+        />
       </View>
 
-      {/* Borrow / Lend Tracker */}
-      <View style={styles.section}>
-        <Text style={styles.sectionHeader}>BORROW / LEND TRACKER</Text>
-        {debts.map((d) => (
-          <View key={d.id} style={styles.debtItem}>
-            <View>
-              <Text style={styles.debtPerson}>{d.person}</Text>
-              <Text style={styles.debtType}>
-                {d.type === 'OWES_ME' ? '🟢 Owes you' : '🔴 You owe'} • Status: {d.status}
-              </Text>
-              {d.notes && <Text style={styles.debtNotes}>{d.notes}</Text>}
+      {debts.length > 0 && (
+        <GlassCard style={styles.debtListCard}>
+          {debts.slice(0, 3).map((d) => (
+            <View key={d.id} style={styles.debtItemRow}>
+              <View>
+                <Text style={styles.debtPerson}>{d.person}</Text>
+                <Text style={styles.debtNotes}>{d.notes || (d.type === 'OWES_ME' ? 'Owes you' : 'You owe')}</Text>
+              </View>
+              <View style={styles.debtRight}>
+                <Text
+                  style={[
+                    styles.debtAmount,
+                    d.type === 'OWES_ME' ? styles.textSuccess : styles.textDanger,
+                  ]}
+                >
+                  {d.type === 'OWES_ME' ? `+₹${d.amount}` : `-₹${d.amount}`}
+                </Text>
+                {d.status === 'PENDING' && (
+                  <TouchableOpacity
+                    style={styles.settleBtn}
+                    onPress={() => markDebtPaid(d.id)}
+                  >
+                    <Text style={styles.settleText}>Mark Paid</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
-            <View style={styles.debtActionCol}>
-              <Text style={styles.debtAmount}>₹{d.amount}</Text>
-              {d.status !== 'PAID' && d.id && (
-                <TouchableOpacity style={styles.payBtn} onPress={() => markDebtPaid(d.id!)}>
-                  <Text style={styles.payBtnText}>Mark Paid</Text>
+          ))}
+        </GlassCard>
+      )}
+
+      {/* 5. Spending Breakdown by Category */}
+      <Text style={[styles.sectionTitle, { marginTop: designTokens.spacing.lg }]}>Category Distribution</Text>
+      <GlassCard style={styles.breakdownCard}>
+        {Object.entries(categoryTotals).map(([cat, amt]) => {
+          const catPct = totalSpent > 0 ? Math.round((amt / totalSpent) * 100) : 0;
+          return (
+            <View key={cat} style={styles.categoryRow}>
+              <View style={styles.catLabelRow}>
+                <Text style={styles.catName}>{cat}</Text>
+                <Text style={styles.catAmount}>₹{amt.toLocaleString()} ({catPct}%)</Text>
+              </View>
+              <View style={styles.catBarTrack}>
+                <View style={[styles.catBarFill, { width: `${catPct}%` }]} />
+              </View>
+            </View>
+          );
+        })}
+      </GlassCard>
+
+      {/* 6. Recent Transactions */}
+      <Text style={[styles.sectionTitle, { marginTop: designTokens.spacing.lg }]}>Recent Transactions</Text>
+      <View style={styles.txList}>
+        {expenses.slice(0, 5).map((e) => (
+          <GlassCard key={e.id} style={styles.txCard}>
+            <View style={styles.txRow}>
+              <View style={styles.txLeft}>
+                <Text style={styles.txDesc}>{e.description}</Text>
+                <Text style={styles.txCat}>{e.category} • Today</Text>
+              </View>
+              <View style={styles.txRight}>
+                <Text style={styles.txAmount}>₹{Number(e.amount).toLocaleString()}</Text>
+                <TouchableOpacity onPress={() => deleteExpense(e.id)}>
+                  <Text style={styles.txDelete}>✕</Text>
                 </TouchableOpacity>
-              )}
+              </View>
             </View>
-          </View>
+          </GlassCard>
         ))}
       </View>
 
-      {/* Shared Expense Splitter */}
-      <View style={styles.section}>
-        <Text style={styles.sectionHeader}>🍕 SPLIT BILL WITH FRIENDS</Text>
-        <View style={styles.splitCard}>
-          <View style={styles.splitInputRow}>
+      {/* Split Bill Modal */}
+      <Modal visible={splitModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>Split Bill Equally</Text>
             <TextInput
-              style={[styles.input, { flex: 2 }]}
-              placeholder="Total Bill (e.g. 900)"
+              style={styles.modalInput}
+              placeholder="Total Amount (₹)"
               placeholderTextColor="#64748B"
               keyboardType="numeric"
               value={splitAmount}
               onChangeText={setSplitAmount}
             />
             <TextInput
-              style={[styles.input, { flex: 1, marginLeft: 8 }]}
-              placeholder="People"
+              style={styles.modalInput}
+              placeholder="Friend Name (e.g. Rahul)"
               placeholderTextColor="#64748B"
-              keyboardType="numeric"
-              value={splitCount}
-              onChangeText={setSplitCount}
+              value={splitPerson}
+              onChangeText={setSplitPerson}
             />
-          </View>
-          <TouchableOpacity style={styles.splitBtn} onPress={handleSplitBill}>
-            <Text style={styles.splitBtnText}>Calculate & Record Split</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Recent Expense History */}
-      <View style={styles.section}>
-        <Text style={styles.sectionHeader}>RECENT EXPENSES</Text>
-        {expenses.map((exp) => (
-          <View key={exp.id} style={styles.expenseItem}>
-            <View>
-              <Text style={styles.expDesc}>{exp.description}</Text>
-              <Text style={styles.expCat}>{exp.category}</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Description (e.g. Dinner at Domino's)"
+              placeholderTextColor="#64748B"
+              value={splitDesc}
+              onChangeText={setSplitDesc}
+            />
+            <View style={styles.modalActionRow}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setSplitModalVisible(false)}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalSaveBtn} onPress={handleSplitBillSubmit}>
+                <Text style={styles.modalSaveText}>Split & Record</Text>
+              </TouchableOpacity>
             </View>
-            <Text style={styles.expAmt}>₹{exp.amount}</Text>
           </View>
-        ))}
-      </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F172A' },
-  content: { padding: 16, paddingBottom: 100 },
-  inputCard: { flexDirection: 'row', backgroundColor: '#1E293B', borderRadius: 12, padding: 6, marginBottom: 16 },
-  input: { flex: 1, color: '#F8FAFC', paddingHorizontal: 12, fontSize: 13, backgroundColor: '#0F172A', borderRadius: 8 },
-  addBtn: { backgroundColor: '#3B82F6', borderRadius: 8, paddingHorizontal: 16, justifyContent: 'center' },
-  addBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
-  budgetCard: { backgroundColor: '#1E293B', borderRadius: 16, padding: 16, marginBottom: 20 },
-  cardHeader: { fontSize: 11, fontWeight: 'bold', color: '#64748B', letterSpacing: 1, marginBottom: 12 },
-  budgetRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  budgetSub: { fontSize: 11, color: '#94A3B8' },
-  budgetVal: { fontSize: 16, fontWeight: 'bold', color: '#F8FAFC', marginTop: 2 },
-  budgetRemain: { fontSize: 16, fontWeight: 'bold', color: '#10B981', marginTop: 2 },
-  section: { marginBottom: 20 },
-  sectionHeader: { fontSize: 12, fontWeight: 'bold', color: '#64748B', letterSpacing: 1, marginBottom: 10 },
-  debtItem: {
+  container: { flex: 1, backgroundColor: designTokens.colors.background },
+  content: { padding: designTokens.spacing.lg, paddingBottom: 110 },
+  balanceHeader: {
+    alignItems: 'center',
+    marginVertical: designTokens.spacing.md,
+  },
+  balanceLabel: {
+    ...designTokens.typography.label,
+    letterSpacing: 1,
+  },
+  balanceNumber: {
+    ...designTokens.typography.displayNumber,
+    fontSize: 36,
+    color: '#60A5FA',
+    marginVertical: 4,
+  },
+  balanceSub: {
+    ...designTokens.typography.micro,
+    color: designTokens.colors.textSecondary,
+  },
+  budgetCard: {
+    marginBottom: designTokens.spacing.md,
+  },
+  budgetRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 8,
+    alignItems: 'center',
+    marginBottom: designTokens.spacing.sm,
+  },
+  budgetLabel: { ...designTokens.typography.cardTitle, fontSize: 14 },
+  budgetRatio: { ...designTokens.typography.cardTitle, fontSize: 14, color: '#FFFFFF' },
+  budgetTotal: { color: designTokens.colors.textMuted },
+  progressTrack: {
+    height: 7,
+    backgroundColor: designTokens.colors.surfaceSubtle,
+    borderRadius: 3.5,
+    overflow: 'hidden',
+    marginBottom: designTokens.spacing.xs,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: designTokens.colors.primary,
+    borderRadius: 3.5,
+  },
+  progressSubtext: { ...designTokens.typography.micro, color: designTokens.colors.textSecondary },
+  quickEntryCard: {
+    marginBottom: designTokens.spacing.lg,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: 'rgba(59, 130, 246, 0.3)',
   },
-  debtPerson: { fontSize: 15, fontWeight: 'bold', color: '#F8FAFC' },
-  debtType: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
-  debtNotes: { fontSize: 11, color: '#64748B', marginTop: 2 },
-  debtActionCol: { alignItems: 'flex-end' },
-  debtAmount: { fontSize: 16, fontWeight: 'bold', color: '#38BDF8' },
-  payBtn: { backgroundColor: 'rgba(56, 189, 248, 0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginTop: 4 },
-  payBtnText: { color: '#38BDF8', fontSize: 10, fontWeight: 'bold' },
-  splitCard: { backgroundColor: '#1E293B', borderRadius: 12, padding: 12 },
-  splitInputRow: { flexDirection: 'row', marginBottom: 10 },
-  splitBtn: { backgroundColor: '#3B82F6', borderRadius: 8, padding: 12, alignItems: 'center' },
-  splitBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
-  expenseItem: {
+  quickEntryTitle: { ...designTokens.typography.label, marginBottom: designTokens.spacing.sm },
+  quickEntryRow: {
+    flexDirection: 'row',
+    gap: designTokens.spacing.sm,
+  },
+  quickInput: {
+    flex: 1,
+    backgroundColor: designTokens.colors.surfaceElevated,
+    borderRadius: designTokens.radii.md,
+    paddingHorizontal: designTokens.spacing.md,
+    paddingVertical: designTokens.spacing.sm + 2,
+    color: designTokens.colors.textPrimary,
+    fontSize: 13,
+    borderWidth: 1,
+    borderColor: designTokens.colors.surfaceBorder,
+  },
+  quickAddBtn: {
+    backgroundColor: designTokens.colors.primary,
+    paddingHorizontal: designTokens.spacing.lg,
+    justifyContent: 'center',
+    borderRadius: designTokens.radii.md,
+  },
+  quickAddText: { ...designTokens.typography.cardTitle, fontSize: 13, color: '#FFFFFF' },
+  previewBox: {
+    marginTop: designTokens.spacing.md,
+    backgroundColor: designTokens.colors.surfaceElevated,
+    borderRadius: designTokens.radii.md,
+    padding: designTokens.spacing.md,
+    borderWidth: 1,
+    borderColor: designTokens.colors.surfaceBorderActive,
+  },
+  previewHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 8,
   },
-  expDesc: { fontSize: 14, fontWeight: '600', color: '#F8FAFC' },
-  expCat: { fontSize: 11, color: '#64748B', marginTop: 2 },
-  expAmt: { fontSize: 15, fontWeight: 'bold', color: '#38BDF8' },
+  previewTitle: { ...designTokens.typography.cardTitle, fontSize: 13 },
+  previewAmount: { ...designTokens.typography.cardTitle, fontSize: 16, color: designTokens.colors.success },
+  previewDesc: { ...designTokens.typography.body, marginTop: 2, marginBottom: designTokens.spacing.sm },
+  previewActions: {
+    flexDirection: 'row',
+    gap: designTokens.spacing.sm,
+  },
+  editBtn: {
+    flex: 1,
+    backgroundColor: designTokens.colors.surfaceSubtle,
+    paddingVertical: 6,
+    borderRadius: designTokens.radii.sm,
+    alignItems: 'center',
+  },
+  editBtnText: { ...designTokens.typography.micro, color: designTokens.colors.textSecondary, fontWeight: '700' },
+  confirmBtn: {
+    flex: 2,
+    backgroundColor: designTokens.colors.primary,
+    paddingVertical: 6,
+    borderRadius: designTokens.radii.sm,
+    alignItems: 'center',
+  },
+  confirmBtnText: { ...designTokens.typography.micro, color: '#FFFFFF', fontWeight: '800' },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: designTokens.spacing.sm,
+  },
+  sectionTitle: { ...designTokens.typography.sectionTitle, fontSize: 15 },
+  splitBillBtn: {
+    backgroundColor: designTokens.colors.surfaceElevated,
+    paddingHorizontal: designTokens.spacing.sm + 2,
+    paddingVertical: 4,
+    borderRadius: designTokens.radii.pill,
+    borderWidth: 1,
+    borderColor: designTokens.colors.surfaceBorder,
+  },
+  splitBillText: { ...designTokens.typography.micro, color: '#60A5FA', fontWeight: '700' },
+  debtsRow: { flexDirection: 'row', marginBottom: designTokens.spacing.sm },
+  debtListCard: { marginBottom: designTokens.spacing.md, padding: designTokens.spacing.md },
+  debtItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: designTokens.spacing.xs + 2,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  debtPerson: { ...designTokens.typography.cardTitle, fontSize: 13 },
+  debtNotes: { ...designTokens.typography.micro, color: designTokens.colors.textMuted },
+  debtRight: { alignItems: 'flex-end', gap: 4 },
+  debtAmount: { ...designTokens.typography.cardTitle, fontSize: 14 },
+  textSuccess: { color: designTokens.colors.success },
+  textDanger: { color: designTokens.colors.danger },
+  settleBtn: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: designTokens.radii.xs,
+  },
+  settleText: { ...designTokens.typography.micro, color: designTokens.colors.success, fontWeight: '700' },
+  breakdownCard: {
+    marginTop: designTokens.spacing.sm,
+    gap: designTokens.spacing.md,
+  },
+  categoryRow: { gap: 4 },
+  catLabelRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  catName: { ...designTokens.typography.bodyMedium, fontSize: 12 },
+  catAmount: { ...designTokens.typography.micro, color: designTokens.colors.textSecondary },
+  catBarTrack: {
+    height: 5,
+    backgroundColor: designTokens.colors.surfaceSubtle,
+    borderRadius: 2.5,
+    overflow: 'hidden',
+  },
+  catBarFill: {
+    height: '100%',
+    backgroundColor: '#60A5FA',
+    borderRadius: 2.5,
+  },
+  txList: {
+    marginTop: designTokens.spacing.sm,
+    gap: designTokens.spacing.sm,
+  },
+  txCard: {
+    padding: designTokens.spacing.md,
+  },
+  txRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  txLeft: { flex: 1 },
+  txDesc: { ...designTokens.typography.cardTitle, fontSize: 13 },
+  txCat: { ...designTokens.typography.micro, color: designTokens.colors.textMuted, marginTop: 2 },
+  txRight: { flexDirection: 'row', alignItems: 'center', gap: designTokens.spacing.md },
+  txAmount: { ...designTokens.typography.cardTitle, fontSize: 14, color: '#FFFFFF' },
+  txDelete: { color: designTokens.colors.textMuted, fontSize: 14, padding: 4 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: designTokens.colors.surfaceCard,
+    borderTopLeftRadius: designTokens.radii.xl,
+    borderTopRightRadius: designTokens.radii.xl,
+    padding: designTokens.spacing.xl,
+    paddingBottom: 36,
+    gap: designTokens.spacing.md,
+  },
+  modalTitle: { ...designTokens.typography.sectionTitle, fontSize: 18, marginBottom: designTokens.spacing.xs },
+  modalInput: {
+    backgroundColor: designTokens.colors.surfaceElevated,
+    borderRadius: designTokens.radii.md,
+    paddingHorizontal: designTokens.spacing.md,
+    paddingVertical: designTokens.spacing.md,
+    color: designTokens.colors.textPrimary,
+    fontSize: 13,
+    borderWidth: 1,
+    borderColor: designTokens.colors.surfaceBorder,
+  },
+  modalActionRow: {
+    flexDirection: 'row',
+    gap: designTokens.spacing.md,
+    marginTop: designTokens.spacing.sm,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    backgroundColor: designTokens.colors.surfaceSubtle,
+    paddingVertical: designTokens.spacing.md,
+    borderRadius: designTokens.radii.md,
+    alignItems: 'center',
+  },
+  modalCancelText: { ...designTokens.typography.cardTitle, fontSize: 13, color: designTokens.colors.textSecondary },
+  modalSaveBtn: {
+    flex: 1,
+    backgroundColor: designTokens.colors.primary,
+    paddingVertical: designTokens.spacing.md,
+    borderRadius: designTokens.radii.md,
+    alignItems: 'center',
+  },
+  modalSaveText: { ...designTokens.typography.cardTitle, fontSize: 13, color: '#FFFFFF' },
 });

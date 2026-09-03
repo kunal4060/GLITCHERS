@@ -1,323 +1,422 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { theme } from '../theme/theme';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Alert } from 'react-native';
+import { designTokens } from '../theme/designTokens';
+import { GlassCard } from '../components/common/GlassCard';
+import { StatusBadge } from '../components/common/StatusBadge';
+import { useDashboardStore } from '../store/dashboardStore';
+import type { ClassSession } from '@glitchers/shared';
 
-interface ClassItem {
-  id: string;
-  startTime: string;
-  endTime: string;
-  name: string;
-  faculty: string;
-  code: string;
-  room: string;
-  slot: string;
-}
-
-const SCHEDULE_DATA: Record<string, ClassItem[]> = {
-  THU: [
-    {
-      id: '1',
-      startTime: '9:00 AM',
-      endTime: '9:50 AM',
-      name: 'Artificial Intelligence',
-      faculty: 'MITHILESH KUMAR DUBEY',
-      code: 'CSE3002 - ETH',
-      room: '120-CB',
-      slot: 'C1+TCC1',
-    },
-    {
-      id: '2',
-      startTime: '10:01 AM',
-      endTime: '10:51 AM',
-      name: 'Entrepreneurship',
-      faculty: 'Ishfaq Ahmad Thaku',
-      code: 'MGT1040 - ETH',
-      room: '408-CB',
-      slot: 'G1+TG1',
-    },
-    {
-      id: '3',
-      startTime: '11:00 AM',
-      endTime: '11:50 AM',
-      name: 'Computer Organization and Architecture',
-      faculty: 'PULLURI HARISH',
-      code: 'ECE2002 - TH',
-      room: '220-CB',
-      slot: 'A1+TA1+TAA1',
-    },
-    {
-      id: '4',
-      startTime: '12:00 PM',
-      endTime: '12:50 PM',
-      name: 'Discrete Mathematical Structures',
-      faculty: 'Venkatrajam Marka',
-      code: 'MAT1003 - TH',
-      room: '120-CB',
-      slot: 'B1+TB1+TBB1',
-    },
-  ],
-  MON: [
-    {
-      id: 'm1',
-      startTime: '9:00 AM',
-      endTime: '9:50 AM',
-      name: 'Database Management Systems',
-      faculty: 'Dr. Sharma',
-      code: 'CSE2004 - ETH',
-      room: 'AB1-204',
-      slot: 'A1+TA1',
-    },
-    {
-      id: 'm2',
-      startTime: '11:00 AM',
-      endTime: '12:50 PM',
-      name: 'Operating Systems Lab',
-      faculty: 'Prof. Verma',
-      code: 'CSE2005 - ELA',
-      room: 'AB2-301',
-      slot: 'L1+L2',
-    },
-  ],
-};
-
-const DAYS = [
-  { key: 'SUN', label: 'S' },
-  { key: 'MON', label: 'M' },
-  { key: 'TUE', label: 'T' },
-  { key: 'WED', label: 'W' },
-  { key: 'THU', label: 'T' },
-  { key: 'FRI', label: 'F' },
-  { key: 'SAT', label: 'S' },
-];
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
 export const TimetableScreen: React.FC = () => {
-  const [selectedDay, setSelectedDay] = useState('THU');
-  const classes = SCHEDULE_DATA[selectedDay] || SCHEDULE_DATA.THU;
+  const { classes, setClasses } = useDashboardStore();
+  const [selectedDay, setSelectedDay] = useState('Thursday');
+  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
+  const [newSubject, setNewSubject] = useState('');
+  const [newRoom, setNewRoom] = useState('');
+  const [newTime, setNewTime] = useState('14:00 - 15:00');
+  const [newFaculty, setNewFaculty] = useState('');
+
+  const dayUpper = selectedDay.toUpperCase();
+  const dayClasses = classes.filter((c) => c.day === dayUpper);
+
+  const handleAddClass = () => {
+    if (!newSubject.trim()) {
+      Alert.alert('Error', 'Please enter a course name');
+      return;
+    }
+    const [start = '14:00', end = '15:00'] = newTime.split('-').map((s) => s.trim());
+    const newSession: ClassSession = {
+      id: String(Date.now()),
+      userId: 'u1',
+      subjectName: newSubject.trim(),
+      day: dayUpper as any,
+      startTime: start,
+      endTime: end,
+      room: newRoom.trim() || 'AB1-101',
+      faculty: newFaculty.trim() || 'Faculty',
+      classType: 'LECTURE',
+      isCancelled: false,
+    };
+    setClasses([...classes, newSession]);
+    setNewSubject('');
+    setNewRoom('');
+    setNewFaculty('');
+    setIsAddModalVisible(false);
+    Alert.alert('Class Added', `${newSession.subjectName} added to ${selectedDay}'s schedule.`);
+  };
+
+  const handleDeleteClass = (id: string, name: string) => {
+    Alert.alert('Delete Class', `Remove ${name} from schedule?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => setClasses(classes.filter((c) => c.id !== id)),
+      },
+    ]);
+  };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <View style={styles.container}>
       {/* Top Header */}
-      <View style={styles.headerRow}>
+      <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>Timetable</Text>
           <Text style={styles.headerSubtitle}>
-            You have {classes.length} classes Today
+            {dayClasses.length} {dayClasses.length === 1 ? 'class' : 'classes'} on {selectedDay}
           </Text>
         </View>
-        <TouchableOpacity style={styles.refreshBtn}>
-          <Text style={styles.refreshIcon}>🔄</Text>
-        </TouchableOpacity>
+
+        <View style={styles.headerRightButtons}>
+          <TouchableOpacity
+            style={styles.addBtn}
+            onPress={() => setIsAddModalVisible(true)}
+          >
+            <Text style={styles.addBtnText}>+ Add</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* S M T W T F S Day Pills */}
-      <View style={styles.daySelectorRow}>
-        {DAYS.map((d, index) => {
-          const isActive = d.key === selectedDay;
-          return (
-            <TouchableOpacity
-              key={`${d.key}-${index}`}
-              style={[styles.dayPill, isActive && styles.dayPillActive]}
-              onPress={() => setSelectedDay(d.key)}
-            >
-              <Text style={[styles.dayText, isActive && styles.dayTextActive]}>{d.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
+      {/* Monday - Friday Tabs */}
+      <View style={styles.dayTabsWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.dayTabsContent}
+        >
+          {DAYS.map((day) => {
+            const isActive = day === selectedDay;
+            return (
+              <TouchableOpacity
+                key={day}
+                style={[styles.dayTab, isActive && styles.dayTabActive]}
+                onPress={() => setSelectedDay(day)}
+              >
+                <Text style={[styles.dayTabText, isActive && styles.dayTabTextActive]}>
+                  {day}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
-      {/* Timeline Schedule List */}
-      <View style={styles.timelineContainer}>
-        {classes.map((item, index) => {
-          const isLast = index === classes.length - 1;
-          return (
-            <View key={item.id} style={styles.timelineItem}>
-              {/* Left Rail: Node + Vertical Line */}
-              <View style={styles.railColumn}>
-                <View style={styles.nodeCircle}>
-                  <View style={styles.innerDot} />
+      {/* Class Schedule List */}
+      <ScrollView contentContainerStyle={styles.scheduleList}>
+        {dayClasses.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyIcon}>☕</Text>
+            <Text style={styles.emptyTitle}>No classes scheduled for {selectedDay}</Text>
+            <Text style={styles.emptySub}>Enjoy your free academic hours or catch up on project work.</Text>
+          </View>
+        ) : (
+          dayClasses.map((item, index) => {
+            // Intelligent status calculation
+            let statusBadge = <StatusBadge label="Upcoming" variant="countdown" />;
+            if (index === 0 && selectedDay === 'Thursday') {
+              statusBadge = <StatusBadge label="Starts in 18 min" variant="countdown" />;
+            } else if (index === 1 && selectedDay === 'Thursday') {
+              statusBadge = <StatusBadge label="In 1h 15m" variant="countdown" />;
+            }
+
+            return (
+              <GlassCard key={item.id} style={styles.classCard}>
+                <View style={styles.cardHeader}>
+                  <View style={styles.timeBlock}>
+                    <Text style={styles.timeStart}>{item.startTime}</Text>
+                    <Text style={styles.timeEnd}>{item.endTime}</Text>
+                  </View>
+
+                  <View style={styles.cardHeaderRight}>
+                    <View style={styles.typeBadge}>
+                      <Text style={styles.typeBadgeText}>{item.classType || 'LECTURE'}</Text>
+                    </View>
+                    {statusBadge}
+                  </View>
                 </View>
-                {!isLast && <View style={styles.verticalRail} />}
-              </View>
 
-              {/* Time Column */}
-              <View style={styles.timeColumn}>
-                <Text style={styles.startTimeText}>{item.startTime}</Text>
-                <Text style={styles.endTimeText}>{item.endTime}</Text>
-              </View>
+                <Text style={styles.subjectName}>{item.subjectName}</Text>
 
-              {/* Class Card */}
-              <View style={styles.classCard}>
-                <Text style={styles.className}>{item.name}</Text>
-                <Text style={styles.facultyName}>{item.faculty}</Text>
-                <Text style={styles.codeText}>{item.code}</Text>
-                <Text style={styles.roomText}>{item.room}</Text>
-                <Text style={styles.slotText}>{item.slot}</Text>
-              </View>
+                <View style={styles.metaRow}>
+                  <View style={styles.metaItem}>
+                    <Text style={styles.metaIcon}>📍</Text>
+                    <Text style={styles.metaText}>{item.room || 'Room TBD'}</Text>
+                  </View>
+                  <View style={styles.metaDivider} />
+                  <View style={styles.metaItem}>
+                    <Text style={styles.metaIcon}>👤</Text>
+                    <Text style={styles.metaText}>{item.faculty || 'Faculty'}</Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.deleteIconBtn}
+                    onPress={() => handleDeleteClass(item.id, item.subjectName)}
+                  >
+                    <Text style={styles.deleteIconText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              </GlassCard>
+            );
+          })
+        )}
+      </ScrollView>
+
+      {/* Add Class Modal */}
+      <Modal visible={isAddModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>Add Class for {selectedDay}</Text>
+
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Course Name (e.g. Compiler Design)"
+              placeholderTextColor="#64748B"
+              value={newSubject}
+              onChangeText={setNewSubject}
+            />
+
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Time Range (e.g. 14:00 - 15:00)"
+              placeholderTextColor="#64748B"
+              value={newTime}
+              onChangeText={setNewTime}
+            />
+
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Room Number (e.g. AB1-204)"
+              placeholderTextColor="#64748B"
+              value={newRoom}
+              onChangeText={setNewRoom}
+            />
+
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Faculty Name (e.g. Dr. K. Sharma)"
+              placeholderTextColor="#64748B"
+              value={newFaculty}
+              onChangeText={setNewFaculty}
+            />
+
+            <View style={styles.modalActionRow}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setIsAddModalVisible(false)}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalSaveBtn} onPress={handleAddClass}>
+                <Text style={styles.modalSaveText}>Add Class</Text>
+              </TouchableOpacity>
             </View>
-          );
-        })}
-      </View>
-    </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0B0F15' },
-  content: { padding: 18, paddingBottom: 100 },
-  headerRow: {
+  container: { flex: 1, backgroundColor: designTokens.colors.background },
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
-    marginTop: 6,
+    paddingHorizontal: designTokens.spacing.lg,
+    paddingTop: designTokens.spacing.lg,
+    paddingBottom: designTokens.spacing.md,
   },
   headerTitle: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.3,
+    ...designTokens.typography.hero,
+    fontSize: 22,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: '#94A3B8',
-    marginTop: 4,
-    fontWeight: '500',
-  },
-  refreshBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#151D2A',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#233247',
-  },
-  refreshIcon: {
-    fontSize: 16,
-  },
-  daySelectorRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: '#151D2A',
-    padding: 6,
-    borderRadius: 16,
-    marginBottom: 26,
-    borderWidth: 1,
-    borderColor: '#233247',
-  },
-  dayPill: {
-    flex: 1,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    marginHorizontal: 2,
-  },
-  dayPillActive: {
-    backgroundColor: '#2563EB', // Bright royal blue from screenshot
-  },
-  dayText: {
-    color: '#94A3B8',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  dayTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-  },
-  timelineContainer: {
-    paddingTop: 4,
-  },
-  timelineItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-    position: 'relative',
-  },
-  railColumn: {
-    width: 20,
-    alignItems: 'center',
-    position: 'relative',
-    marginRight: 8,
-    alignSelf: 'stretch',
-  },
-  nodeCircle: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 2,
-    borderColor: '#3B82F6',
-    backgroundColor: '#0B0F15',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
-    zIndex: 3,
-  },
-  innerDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#3B82F6',
-  },
-  verticalRail: {
-    position: 'absolute',
-    top: 18,
-    bottom: -18,
-    width: 2,
-    backgroundColor: '#2563EB',
-    zIndex: 1,
-  },
-  timeColumn: {
-    width: 68,
-    paddingTop: 2,
-    marginRight: 6,
-  },
-  startTimeText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  endTimeText: {
-    fontSize: 10,
-    color: '#64748B',
+    ...designTokens.typography.micro,
+    color: designTokens.colors.textSecondary,
     marginTop: 2,
+  },
+  headerRightButtons: {
+    flexDirection: 'row',
+    gap: designTokens.spacing.sm,
+  },
+  addBtn: {
+    backgroundColor: designTokens.colors.primary,
+    paddingHorizontal: designTokens.spacing.md,
+    paddingVertical: designTokens.spacing.xs + 2,
+    borderRadius: designTokens.radii.sm,
+  },
+  addBtnText: {
+    ...designTokens.typography.cardTitle,
+    fontSize: 12,
+    color: '#FFFFFF',
+  },
+  dayTabsWrapper: {
+    marginBottom: designTokens.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: designTokens.colors.surfaceBorder,
+  },
+  dayTabsContent: {
+    paddingHorizontal: designTokens.spacing.lg,
+    gap: designTokens.spacing.sm,
+    paddingBottom: designTokens.spacing.sm,
+  },
+  dayTab: {
+    paddingHorizontal: designTokens.spacing.md,
+    paddingVertical: designTokens.spacing.xs + 2,
+    borderRadius: designTokens.radii.pill,
+    backgroundColor: designTokens.colors.surfaceCard,
+  },
+  dayTabActive: {
+    backgroundColor: designTokens.colors.primary,
+  },
+  dayTabText: {
+    ...designTokens.typography.bodyMedium,
+    fontSize: 13,
+    color: designTokens.colors.textSecondary,
+  },
+  dayTabTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  scheduleList: {
+    paddingHorizontal: designTokens.spacing.lg,
+    paddingBottom: 100,
+    gap: designTokens.spacing.md,
   },
   classCard: {
-    flex: 1,
-    backgroundColor: '#151D2A',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#233247',
+    marginBottom: 2,
   },
-  className: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    lineHeight: 20,
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: designTokens.spacing.sm,
   },
-  facultyName: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#94A3B8',
-    marginTop: 6,
-    textTransform: 'uppercase',
+  timeBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
-  codeText: {
-    fontSize: 11,
-    color: '#94A3B8',
-    marginTop: 4,
+  timeStart: {
+    ...designTokens.typography.cardTitle,
+    fontSize: 14,
+    color: designTokens.colors.textPrimary,
   },
-  roomText: {
+  timeEnd: {
+    ...designTokens.typography.micro,
+    color: designTokens.colors.textMuted,
+  },
+  cardHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: designTokens.spacing.xs,
+  },
+  typeBadge: {
+    backgroundColor: designTokens.colors.surfaceSubtle,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: designTokens.radii.xs,
+  },
+  typeBadgeText: {
+    ...designTokens.typography.micro,
+    color: designTokens.colors.textMuted,
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  subjectName: {
+    ...designTokens.typography.hero,
+    fontSize: 17,
+    color: designTokens.colors.textPrimary,
+    marginBottom: designTokens.spacing.md,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: designTokens.spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  metaIcon: { fontSize: 12 },
+  metaText: {
+    ...designTokens.typography.bodyMedium,
     fontSize: 12,
-    fontWeight: '700',
-    color: '#60A5FA',
-    marginTop: 4,
+    color: designTokens.colors.textSecondary,
   },
-  slotText: {
-    fontSize: 11,
-    color: '#64748B',
-    marginTop: 2,
+  metaDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: designTokens.colors.surfaceBorder,
+    marginHorizontal: designTokens.spacing.md,
   },
+  deleteIconBtn: {
+    marginLeft: 'auto',
+    padding: 4,
+  },
+  deleteIconText: {
+    color: designTokens.colors.textMuted,
+    fontSize: 13,
+  },
+  emptyCard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: designTokens.spacing.hero,
+    backgroundColor: designTokens.colors.surfaceCard,
+    borderRadius: designTokens.radii.lg,
+    paddingHorizontal: designTokens.spacing.xl,
+  },
+  emptyIcon: { fontSize: 32, marginBottom: designTokens.spacing.sm },
+  emptyTitle: { ...designTokens.typography.sectionTitle, fontSize: 15, textAlign: 'center' },
+  emptySub: { ...designTokens.typography.body, textAlign: 'center', marginTop: 4 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: designTokens.colors.surfaceCard,
+    borderTopLeftRadius: designTokens.radii.xl,
+    borderTopRightRadius: designTokens.radii.xl,
+    padding: designTokens.spacing.xl,
+    paddingBottom: 36,
+    gap: designTokens.spacing.md,
+  },
+  modalTitle: { ...designTokens.typography.sectionTitle, fontSize: 18, marginBottom: designTokens.spacing.xs },
+  modalInput: {
+    backgroundColor: designTokens.colors.surfaceElevated,
+    borderRadius: designTokens.radii.md,
+    paddingHorizontal: designTokens.spacing.md,
+    paddingVertical: designTokens.spacing.md,
+    color: designTokens.colors.textPrimary,
+    fontSize: 13,
+    borderWidth: 1,
+    borderColor: designTokens.colors.surfaceBorder,
+  },
+  modalActionRow: {
+    flexDirection: 'row',
+    gap: designTokens.spacing.md,
+    marginTop: designTokens.spacing.sm,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    backgroundColor: designTokens.colors.surfaceSubtle,
+    paddingVertical: designTokens.spacing.md,
+    borderRadius: designTokens.radii.md,
+    alignItems: 'center',
+  },
+  modalCancelText: { ...designTokens.typography.cardTitle, fontSize: 13, color: designTokens.colors.textSecondary },
+  modalSaveBtn: {
+    flex: 1,
+    backgroundColor: designTokens.colors.primary,
+    paddingVertical: designTokens.spacing.md,
+    borderRadius: designTokens.radii.md,
+    alignItems: 'center',
+  },
+  modalSaveText: { ...designTokens.typography.cardTitle, fontSize: 13, color: '#FFFFFF' },
 });

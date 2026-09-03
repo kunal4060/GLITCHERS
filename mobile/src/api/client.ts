@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import type { AIChatResponse } from '@glitchers/shared';
 
 const DEFAULT_HOST = Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://localhost:5000/api';
 
@@ -98,7 +99,7 @@ class ApiClient {
   }
 
   public async sendAIChat(message: string, conversationId?: string) {
-    return this.post<{ message: string; intent: string; actionRisk: string; toolCalls: any[] }>('/ai/chat', {
+    return this.post<AIChatResponse>('/ai/chat', {
       message,
       conversationId,
     });
