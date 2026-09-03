@@ -9,6 +9,7 @@ import { NinjaAvatar } from '../components/NinjaAvatar';
 import { GradientBackground } from '../components/common/GradientBackground';
 import { AIGemSymbol } from '../components/common/AIGemSymbol';
 import { useDashboardStore } from '../store/dashboardStore';
+import { useAuthStore } from '../store/authStore';
 import { apiClient } from '../api/client';
 
 export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
@@ -23,15 +24,16 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
     syncWithBackend,
     completeTask,
   } = useDashboardStore();
+  const { gmailConnected } = useAuthStore();
 
-  const [emailBullets, setEmailBullets] = useState<string[]>([
-    'End-Term Exam slot booking begins Monday 10:00 AM; report clashes by Friday.',
-    'Hostel mess dues payment window extended until next Wednesday without late fine.',
-    'Annual TechFest 48-hour AI Hackathon registrations open with ₹1L prizes (due Sep 10).',
-  ]);
+  const [emailBullets, setEmailBullets] = useState<string[]>([]);
   const [isSummarizingEmails, setIsSummarizingEmails] = useState(false);
 
   const handleSummarizeEmails = async () => {
+    if (!gmailConnected || emails.length === 0) {
+      setEmailBullets([]);
+      return;
+    }
     setIsSummarizingEmails(true);
     try {
       const res = await apiClient.summarizeEmails();
@@ -39,7 +41,6 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
         setEmailBullets(res.bullets);
       }
     } catch {
-      // Keep existing or generate from local store
       if (emails.length > 0) {
         setEmailBullets(emails.map((e) => `[${e.importance}] ${e.subject}: ${e.summary}`));
       }
@@ -50,8 +51,10 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
 
   useEffect(() => {
     syncWithBackend();
-    handleSummarizeEmails();
-  }, []);
+    if (gmailConnected && emails.length > 0) {
+      handleSummarizeEmails();
+    }
+  }, [gmailConnected]);
 
   const pendingTasks = tasks.filter((t) => t.status === 'TODO');
   const urgentEmail = emails.find((e) => e.importance === 'CRITICAL' || e.importance === 'HIGH');
@@ -151,8 +154,8 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
           <View style={{ width: 10 }} />
           <StatCard
             variant="cream"
-            title={'1 Important\nNotice'}
-            subtext="Official"
+            title={`${urgentEmail ? 1 : 0} Important\nNotice`}
+            subtext={gmailConnected ? (urgentEmail ? 'Official' : 'All clear') : 'Not linked'}
             icon={<Ionicons name="mail-outline" size={20} color={designTokens.colors.textPrimary} />}
             onPress={() => navigation?.navigate('Email')}
           />
@@ -257,52 +260,84 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
           </View>
 
           <GlassCard variant="cream" style={styles.emailDigestCard}>
-            <View style={styles.emailCardTop}>
-              <Text style={styles.emailCardSub}>
-                Executive briefing from university circulars & notices:
-              </Text>
-              <TouchableOpacity
-                onPress={handleSummarizeEmails}
-                disabled={isSummarizingEmails}
-                style={[styles.refreshIconBtn, isSummarizingEmails && { opacity: 0.6 }]}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name="sparkles"
-                  size={14}
-                  color={designTokens.colors.primaryDark}
-                />
-                <Text style={styles.refreshBtnText}>
-                  {isSummarizingEmails ? 'Summarizing...' : 'Re-summarize'}
+            {!gmailConnected ? (
+              <View style={{ alignItems: 'center', paddingVertical: 18, paddingHorizontal: 12 }}>
+                <Ionicons name="mail-unread-outline" size={32} color={designTokens.colors.primaryDark} style={{ marginBottom: 8 }} />
+                <Text style={{ fontSize: 14, fontWeight: '700', color: designTokens.colors.textPrimary, marginBottom: 4 }}>
+                  University Gmail Not Linked
                 </Text>
-              </TouchableOpacity>
-            </View>
-
-            {isSummarizingEmails ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color={designTokens.colors.primaryDark} />
-                <Text style={styles.loadingText}>Gemini is extracting key deadlines & notices...</Text>
+                <Text style={{ fontSize: 12, color: designTokens.colors.textSecondary, textAlign: 'center', lineHeight: 17, marginBottom: 12 }}>
+                  Link your university Google account in Settings to automatically scan circulars, exam dates, and notices.
+                </Text>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: designTokens.colors.primary,
+                    paddingHorizontal: 14,
+                    paddingVertical: 7,
+                    borderRadius: designTokens.radii.pill,
+                  }}
+                  onPress={() => navigation?.navigate('Account')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>Connect in Settings</Text>
+                </TouchableOpacity>
               </View>
             ) : (
-              <View style={styles.bulletsList}>
-                {emailBullets.map((bullet, idx) => (
-                  <View key={idx} style={styles.bulletItem}>
-                    <Text style={styles.bulletDot}>•</Text>
-                    <Text style={styles.bulletText}>{bullet.replace(/^[•\-\*]\s*/, '')}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
+              <>
+                <View style={styles.emailCardTop}>
+                  <Text style={styles.emailCardSub}>
+                    Executive briefing from university circulars & notices:
+                  </Text>
+                  <TouchableOpacity
+                    onPress={handleSummarizeEmails}
+                    disabled={isSummarizingEmails}
+                    style={[styles.refreshIconBtn, isSummarizingEmails && { opacity: 0.6 }]}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name="sparkles"
+                      size={14}
+                      color={designTokens.colors.primaryDark}
+                    />
+                    <Text style={styles.refreshBtnText}>
+                      {isSummarizingEmails ? 'Summarizing...' : 'Re-summarize'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
 
-            <View style={styles.emailCardBottomRow}>
-              <TouchableOpacity
-                style={styles.viewNoticesBtn}
-                onPress={() => navigation?.navigate('Email')}
-                activeOpacity={0.75}
-              >
-                <Text style={styles.viewNoticesBtnText}>View All University Notices ({emails.length}) →</Text>
-              </TouchableOpacity>
-            </View>
+                {isSummarizingEmails ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="small" color={designTokens.colors.primaryDark} />
+                    <Text style={styles.loadingText}>Gemini is extracting key deadlines & notices...</Text>
+                  </View>
+                ) : emailBullets.length > 0 ? (
+                  <View style={styles.bulletsList}>
+                    {emailBullets.map((bullet, idx) => (
+                      <View key={idx} style={styles.bulletItem}>
+                        <Text style={styles.bulletDot}>•</Text>
+                        <Text style={styles.bulletText}>{bullet.replace(/^[•\-\*]\s*/, '')}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <View style={{ paddingVertical: 14, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 13, color: designTokens.colors.textSecondary }}>
+                      No unread circulars from your university. You're all caught up!
+                    </Text>
+                  </View>
+                )}
+
+                <View style={styles.emailCardBottomRow}>
+                  <TouchableOpacity
+                    style={styles.viewNoticesBtn}
+                    onPress={() => navigation?.navigate('Email')}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={styles.viewNoticesBtnText}>View All University Notices ({emails.length}) →</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </GlassCard>
         </View>
 
