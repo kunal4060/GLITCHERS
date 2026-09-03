@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert,
 import { designTokens } from '../theme/designTokens';
 import { GlassCard } from '../components/common/GlassCard';
 import { StatCard } from '../components/common/StatCard';
+import { GradientBackground } from '../components/common/GradientBackground';
 import { useDashboardStore } from '../store/dashboardStore';
 import type { Expense, Debt } from '@glitchers/shared';
 
@@ -96,7 +97,8 @@ export const FinanceScreen: React.FC = () => {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <GradientBackground>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* 1. Header: Balance & Spending */}
       <View style={styles.balanceHeader}>
         <Text style={styles.balanceLabel}>REMAINING ALLOWANCE</Text>
@@ -304,11 +306,12 @@ export const FinanceScreen: React.FC = () => {
         </View>
       </Modal>
     </ScrollView>
-  );
+  </GradientBackground>
+);
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: designTokens.colors.background },
+  container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: designTokens.spacing.lg, paddingBottom: 110 },
   balanceHeader: {
     alignItems: 'center',

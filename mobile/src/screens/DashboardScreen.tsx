@@ -5,6 +5,7 @@ import { GlassCard } from '../components/common/GlassCard';
 import { StatCard } from '../components/common/StatCard';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { NinjaAvatar } from '../components/NinjaAvatar';
+import { GradientBackground } from '../components/common/GradientBackground';
 import { useDashboardStore } from '../store/dashboardStore';
 
 export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
@@ -45,17 +46,18 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
   const budgetPct = Math.min(100, Math.round((totalSpent / monthlyLimit) * 100));
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={isLoading}
-          onRefresh={syncWithBackend}
-          tintColor={designTokens.colors.primary}
-        />
-      }
-    >
+    <GradientBackground>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={isLoading}
+            onRefresh={syncWithBackend}
+            tintColor={designTokens.colors.primary}
+          />
+        }
+      >
       {/* 1. Header: Greeting, Academic Context, Avatar, Notification */}
       <View style={styles.headerRow}>
         <TouchableOpacity
@@ -243,13 +245,14 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
         </>
       )}
     </ScrollView>
-  );
+  </GradientBackground>
+);
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: designTokens.colors.background,
+    backgroundColor: 'transparent',
   },
   content: {
     padding: designTokens.spacing.lg,

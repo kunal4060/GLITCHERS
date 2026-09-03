@@ -33,11 +33,12 @@ function MainTabs({ navigation }: { navigation: any }) {
       <Tab.Navigator
         id="main-tabs"
         screenOptions={{
-          headerStyle: { backgroundColor: designTokens.colors.background },
+          sceneStyle: { backgroundColor: 'transparent' },
+          headerStyle: { backgroundColor: 'transparent' },
           headerTintColor: '#FFFFFF',
           headerTitleStyle: { fontWeight: '800' },
           tabBarStyle: {
-            backgroundColor: designTokens.colors.background,
+            backgroundColor: 'rgba(7, 10, 16, 0.88)',
             borderTopColor: designTokens.colors.surfaceBorder,
             height: 64,
             paddingBottom: 8,
@@ -176,10 +177,10 @@ export const RootNavigator: React.FC = () => {
     <Stack.Navigator
       id="root-stack"
       screenOptions={{
-        headerStyle: { backgroundColor: designTokens.colors.background },
+        headerStyle: { backgroundColor: 'rgba(7, 10, 16, 0.90)' },
         headerTintColor: '#FFFFFF',
         headerTitleStyle: { fontWeight: '800' },
-        contentStyle: { backgroundColor: designTokens.colors.background },
+        contentStyle: { backgroundColor: 'transparent' },
       }}
     >
       <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />

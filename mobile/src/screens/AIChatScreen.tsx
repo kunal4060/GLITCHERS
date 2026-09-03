@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { designTokens } from '../theme/designTokens';
 import { GlassCard } from '../components/common/GlassCard';
+import { GradientBackground } from '../components/common/GradientBackground';
 import { useDashboardStore } from '../store/dashboardStore';
 import { apiClient } from '../api/client';
 import type { Task, Expense, Debt } from '@glitchers/shared';
@@ -297,7 +298,8 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
   };
 
   return (
-    <View style={styles.container}>
+    <GradientBackground>
+      <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -440,11 +442,12 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
         </TouchableOpacity>
       </View>
     </View>
-  );
+  </GradientBackground>
+);
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: designTokens.colors.background },
+  container: { flex: 1, backgroundColor: 'transparent' },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -607,7 +610,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: designTokens.spacing.lg,
     paddingVertical: designTokens.spacing.sm,
-    backgroundColor: designTokens.colors.surfaceCard,
+    backgroundColor: 'rgba(21, 31, 50, 0.85)',
     borderTopWidth: 1,
     borderTopColor: designTokens.colors.surfaceBorder,
     alignItems: 'center',
@@ -616,7 +619,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    backgroundColor: designTokens.colors.background,
+    backgroundColor: 'rgba(7, 10, 16, 0.75)',
     borderRadius: designTokens.radii.pill,
     paddingHorizontal: designTokens.spacing.lg,
     paddingVertical: 10,

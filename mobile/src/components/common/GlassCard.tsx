@@ -47,10 +47,10 @@ const styles = StyleSheet.create({
     ...designTokens.shadows.card,
   },
   standard: {
-    backgroundColor: designTokens.colors.surfaceCard,
+    backgroundColor: 'rgba(21, 31, 50, 0.78)',
   },
   elevated: {
-    backgroundColor: designTokens.colors.surfaceElevated,
+    backgroundColor: 'rgba(26, 38, 61, 0.85)',
   },
   activeBorder: {
     borderColor: designTokens.colors.surfaceBorderActive,

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal,
 import { designTokens } from '../theme/designTokens';
 import { GlassCard } from '../components/common/GlassCard';
 import { StatusBadge } from '../components/common/StatusBadge';
+import { GradientBackground } from '../components/common/GradientBackground';
 import { useDashboardStore } from '../store/dashboardStore';
 import type { Task } from '@glitchers/shared';
 
@@ -47,7 +48,8 @@ export const TasksScreen: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <GradientBackground>
+      <View style={styles.container}>
       {/* Top Header */}
       <View style={styles.header}>
         <View>
@@ -197,11 +199,12 @@ export const TasksScreen: React.FC = () => {
         </View>
       </Modal>
     </View>
-  );
+  </GradientBackground>
+);
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: designTokens.colors.background },
+  container: { flex: 1, backgroundColor: 'transparent' },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',

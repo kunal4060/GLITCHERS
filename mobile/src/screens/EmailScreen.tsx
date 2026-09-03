@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'rea
 import { designTokens } from '../theme/designTokens';
 import { GlassCard } from '../components/common/GlassCard';
 import { StatusBadge } from '../components/common/StatusBadge';
+import { GradientBackground } from '../components/common/GradientBackground';
 import { useDashboardStore } from '../store/dashboardStore';
 import type { Task } from '@glitchers/shared';
 
@@ -32,7 +33,8 @@ export const EmailScreen: React.FC = () => {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <GradientBackground>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>University Communications</Text>
@@ -100,11 +102,12 @@ export const EmailScreen: React.FC = () => {
         ))}
       </View>
     </ScrollView>
-  );
+  </GradientBackground>
+);
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: designTokens.colors.background },
+  container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: designTokens.spacing.lg, paddingBottom: 110 },
   header: { marginBottom: designTokens.spacing.md },
   title: { ...designTokens.typography.hero, fontSize: 22 },
