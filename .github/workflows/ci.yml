@@ -1,0 +1,49 @@
+name: GLITCHERS CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate-and-test:
+    name: Build, Lint & Automated Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Monorepo Dependencies
+        run: npm ci
+
+      - name: Build Shared Types Package
+        run: |
+          cd shared
+          npm run build
+
+      - name: Mobile TypeScript Validation
+        run: |
+          cd mobile
+          npx tsc --noEmit
+
+      - name: Backend Build & Typecheck
+        run: |
+          cd backend
+          npm run build
+
+      - name: Run Backend Automated Test Suites
+        run: |
+          cd backend
+          npm test
+        env:
+          NODE_ENV: test
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'test-mock-key' }}
+          JWT_SECRET: ci-test-secret-key-32-chars-long

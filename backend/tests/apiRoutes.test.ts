@@ -13,7 +13,7 @@ describe('Fastify Modular API Routes Integration Tests', () => {
     await app.close();
   });
 
-  test('GET /health returns 200 OK', async () => {
+  test('GET /health returns 200 OK with full diagnostic telemetry', async () => {
     const res = await app.inject({
       method: 'GET',
       url: '/health',
@@ -21,6 +21,12 @@ describe('Fastify Modular API Routes Integration Tests', () => {
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
     expect(body.status).toBe('ok');
+    expect(body.service).toBe('GLITCHERS Fastify Backend');
+    expect(body.version).toBe('1.0.0');
+    expect(body.database).toBeDefined();
+    expect(body.database.provider).toBeDefined();
+    expect(body.memory.heapUsedMB).toBeGreaterThan(0);
+    expect(typeof body.uptimeSeconds).toBe('number');
   });
 
   test('GET /api/timetable/classes returns classes', async () => {
@@ -207,5 +213,28 @@ describe('Fastify Modular API Routes Integration Tests', () => {
     const getBody = JSON.parse(getRes.body);
     expect(getBody.preferences.universityDomain).toBe('iit.edu');
     expect(getBody.preferences.quietHours.startTime).toBe('23:30');
+  });
+
+  test('POST /api/privacy/export-data exports all student data', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/privacy/export-data',
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.exportTimestamp).toBeDefined();
+    expect(body.classes).toBeDefined();
+    expect(body.tasks).toBeDefined();
+  });
+
+  test('DELETE /api/privacy/delete-account permanently cascades and deletes student data', async () => {
+    const res = await app.inject({
+      method: 'DELETE',
+      url: '/api/privacy/delete-account',
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.success).toBe(true);
+    expect(body.message).toContain('permanently deleted');
   });
 });

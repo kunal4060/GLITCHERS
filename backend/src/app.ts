@@ -19,6 +19,7 @@ import { examRoutes } from './routes/exams.js';
 import { assignmentRoutes } from './routes/assignments.js';
 import { documentRoutes } from './routes/documents.js';
 import { settingsRoutes } from './routes/settings.js';
+import { healthRoutes } from './routes/health.js';
 import { onboardingRoutes } from './routes/onboarding.js';
 
 export function buildApp(): FastifyInstance {
@@ -38,12 +39,8 @@ export function buildApp(): FastifyInstance {
     timeWindow: '1 minute',
   });
 
-  // Health check
-  app.get('/health', async () => ({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    service: 'GLITCHERS Fastify Backend',
-  }));
+  // Health & Diagnostic check
+  app.register(healthRoutes);
 
   // Register All Modular Routes
   app.register(authRoutes, { prefix: '/api/auth' });
