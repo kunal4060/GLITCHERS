@@ -20,11 +20,30 @@ export const LoginScreen: React.FC = () => {
   const { loginWithGoogle, isLoading } = useAuthStore();
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [customEmail, setCustomEmail] = useState('kunalugale4060@gmail.com');
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   const handleGoogleLogin = async () => {
+    try {
+      setIsRedirecting(true);
+      // Fetch Google OAuth URL with returnUrl parameter
+      const returnUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8082';
+      const res = await apiClient.get<{ url: string }>(`/auth/google/url?returnUrl=${encodeURIComponent(returnUrl)}`);
+
+      if (res?.url) {
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          // Redirect browser directly to Google Sign-In!
+          window.location.href = res.url;
+          return;
+        }
+      }
+    } catch (err: any) {
+      console.warn('Google auth redirect error:', err);
+    }
+
     const emailToUse = customEmail.trim() || 'kunalugale4060@gmail.com';
     const nameToUse = 'Kunal Ugale';
     await loginWithGoogle(emailToUse, nameToUse);
+    setIsRedirecting(false);
   };
 
   return (

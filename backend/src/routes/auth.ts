@@ -5,14 +5,18 @@ import { authMiddleware } from '../middleware/auth.js';
 import { randomUUID } from 'crypto';
 
 export const authRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.get('/google/url', async () => {
-    return { url: googleService.getAuthUrl() };
+  fastify.get<{ Querystring: { returnUrl?: string } }>('/google/url', async (req) => {
+    const returnUrl = req.query.returnUrl || (typeof req.headers.referer === 'string' ? req.headers.referer : 'http://localhost:8082');
+    return { url: googleService.getAuthUrl(returnUrl) };
   });
 
-  fastify.get<{ Querystring: { code?: string; error?: string } }>('/google/callback', async (req, reply) => {
-    const { code, error } = req.query || {};
+  fastify.get<{ Querystring: { code?: string; error?: string; state?: string } }>('/google/callback', async (req, reply) => {
+    const { code, error, state } = req.query || {};
+    const frontendUrl = state || 'http://localhost:8082';
+    const cleanBase = frontendUrl.split('?')[0].replace(/\/$/, '');
+
     if (error || !code) {
-      return reply.redirect(`http://localhost:8082/?auth_error=${encodeURIComponent(error || 'access_denied')}`);
+      return reply.redirect(`${cleanBase}/?auth_error=${encodeURIComponent(error || 'access_denied')}`);
     }
 
     try {
@@ -50,10 +54,10 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       return reply.redirect(
-        `http://localhost:8082/?token=jwt_${profile.id}&email=${encodeURIComponent(profile.email)}&name=${encodeURIComponent(profile.fullName)}`
+        `${cleanBase}/?token=jwt_${profile.id}&email=${encodeURIComponent(profile.email)}&name=${encodeURIComponent(profile.fullName)}`
       );
     } catch (err: any) {
-      return reply.redirect(`http://localhost:8082/?auth_error=${encodeURIComponent(err.message)}`);
+      return reply.redirect(`${cleanBase}/?auth_error=${encodeURIComponent(err.message)}`);
     }
   });
 

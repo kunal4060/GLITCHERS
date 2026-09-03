@@ -14,7 +14,7 @@ export class GoogleService {
     }
   }
 
-  public getAuthUrl(): string {
+  public getAuthUrl(stateUrl?: string): string {
     if (!this.oauth2Client) {
       return `http://localhost:5000/api/auth/mock-google-login?code=mock_auth_code`;
     }
@@ -30,6 +30,7 @@ export class GoogleService {
       access_type: 'offline',
       prompt: 'consent',
       scope: scopes,
+      state: stateUrl || 'http://localhost:8082',
     });
   }
 

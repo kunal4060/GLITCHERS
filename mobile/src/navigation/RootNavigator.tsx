@@ -220,8 +220,22 @@ function MainTabs({ navigation }: { navigation: any }) {
 }
 
 export const RootNavigator: React.FC = () => {
-  const { isAuthenticated, isOnboardingComplete, completeOnboarding } = useAuthStore();
+  const { isAuthenticated, isOnboardingComplete, completeOnboarding, loginWithGoogle } = useAuthStore();
   const [showManualOnboarding, setShowManualOnboarding] = useState(false);
+
+  React.useEffect(() => {
+    // Catch Google OAuth redirect credentials from URL query params
+    if (typeof window !== 'undefined' && window.location?.search) {
+      const params = new URLSearchParams(window.location.search);
+      const email = params.get('email');
+      const name = params.get('name');
+      const token = params.get('token');
+      if (email && token) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+        loginWithGoogle(email, name || email.split('@')[0]);
+      }
+    }
+  }, []);
 
   // 1. If not authenticated, render Google Login Screen
   if (!isAuthenticated) {
