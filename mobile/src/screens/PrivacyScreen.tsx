@@ -1,9 +1,33 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAuthStore } from '../store/authStore';
+import { designTokens } from '../theme/designTokens';
 
 export const PrivacyScreen: React.FC = () => {
   const { user, gmailConnected, calendarConnected, setGoogleConnections, logout } = useAuthStore();
+
+  const handleToggleGmail = () => {
+    const next = !gmailConnected;
+    setGoogleConnections(next, calendarConnected);
+    Alert.alert(
+      next ? 'Gmail Connected' : 'Gmail Disconnected',
+      next
+        ? 'University notices and exam circulars will now be scanned and summarized.'
+        : 'Gmail synchronization has been paused.'
+    );
+  };
+
+  const handleToggleCalendar = () => {
+    const next = !calendarConnected;
+    setGoogleConnections(gmailConnected, next);
+    Alert.alert(
+      next ? 'Google Calendar Connected' : 'Google Calendar Disconnected',
+      next
+        ? 'Academic timetable sessions will now sync with your Google Calendar.'
+        : 'Google Calendar synchronization has been paused.'
+    );
+  };
 
   const handleExportData = () => {
     Alert.alert(
@@ -23,7 +47,7 @@ export const PrivacyScreen: React.FC = () => {
           style: 'destructive',
           onPress: () => {
             logout();
-            Alert.alert('Account Deleted', 'All data has been wiped.');
+            Alert.alert('Account Deleted', 'All student data has been wiped.');
           },
         },
       ]
@@ -35,29 +59,57 @@ export const PrivacyScreen: React.FC = () => {
       <Text style={styles.sectionHeader}>CONNECTED GOOGLE SERVICES</Text>
 
       <View style={styles.card}>
-        <View style={styles.itemRow}>
-          <Text style={styles.itemLabel}>Google Account</Text>
-          <Text style={styles.statusConnected}>● {user?.email || 'Connected'}</Text>
+        <View style={styles.serviceRow}>
+          <View style={styles.serviceLeft}>
+            <Ionicons name="logo-google" size={20} color="#EA4335" style={{ marginRight: 10 }} />
+            <View>
+              <Text style={styles.serviceTitle}>Google Account</Text>
+              <Text style={styles.serviceSub}>{user?.email || 'kunalugale4060@gmail.com'}</Text>
+            </View>
+          </View>
+          <View style={styles.verifiedBadge}>
+            <Text style={styles.verifiedBadgeText}>● Verified</Text>
+          </View>
         </View>
 
         <View style={styles.divider} />
 
-        <View style={styles.itemRow}>
-          <Text style={styles.itemLabel}>Gmail API</Text>
-          <TouchableOpacity onPress={() => setGoogleConnections(!gmailConnected, calendarConnected)}>
-            <Text style={gmailConnected ? styles.statusConnected : styles.statusDisconnected}>
-              {gmailConnected ? '● Connected' : '○ Disconnected'}
+        <View style={styles.serviceRow}>
+          <View style={styles.serviceLeft}>
+            <Ionicons name="mail-outline" size={20} color={designTokens.colors.primaryDark} style={{ marginRight: 10 }} />
+            <View>
+              <Text style={styles.serviceTitle}>Gmail API</Text>
+              <Text style={styles.serviceSub}>Sync university circulars & deadlines</Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={gmailConnected ? styles.connectedBtn : styles.connectBtn}
+            onPress={handleToggleGmail}
+            activeOpacity={0.8}
+          >
+            <Text style={gmailConnected ? styles.connectedBtnText : styles.connectBtnText}>
+              {gmailConnected ? '● Connected' : 'Connect'}
             </Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.divider} />
 
-        <View style={styles.itemRow}>
-          <Text style={styles.itemLabel}>Google Calendar</Text>
-          <TouchableOpacity onPress={() => setGoogleConnections(gmailConnected, !calendarConnected)}>
-            <Text style={calendarConnected ? styles.statusConnected : styles.statusDisconnected}>
-              {calendarConnected ? '● Connected' : '○ Disconnected'}
+        <View style={styles.serviceRow}>
+          <View style={styles.serviceLeft}>
+            <Ionicons name="calendar-outline" size={20} color={designTokens.colors.primaryDark} style={{ marginRight: 10 }} />
+            <View>
+              <Text style={styles.serviceTitle}>Google Calendar</Text>
+              <Text style={styles.serviceSub}>Push lectures & exams to calendar</Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={calendarConnected ? styles.connectedBtn : styles.connectBtn}
+            onPress={handleToggleCalendar}
+            activeOpacity={0.8}
+          >
+            <Text style={calendarConnected ? styles.connectedBtnText : styles.connectBtnText}>
+              {calendarConnected ? '● Connected' : 'Connect'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -65,12 +117,14 @@ export const PrivacyScreen: React.FC = () => {
 
       <Text style={styles.sectionHeader}>DATA & PRIVACY CONTROLS</Text>
       <View style={styles.card}>
-        <TouchableOpacity style={styles.btnSecondary} onPress={handleExportData}>
-          <Text style={styles.btnSecondaryText}>📥 Export My Data (JSON)</Text>
+        <TouchableOpacity style={styles.btnSecondary} onPress={handleExportData} activeOpacity={0.8}>
+          <Ionicons name="download-outline" size={16} color={designTokens.colors.primaryDark} style={{ marginRight: 8 }} />
+          <Text style={styles.btnSecondaryText}>Export My Data (JSON)</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.btnDanger} onPress={handleDeleteAccount}>
-          <Text style={styles.btnDangerText}>🗑️ Delete Account & All Data</Text>
+        <TouchableOpacity style={styles.btnDanger} onPress={handleDeleteAccount} activeOpacity={0.8}>
+          <Ionicons name="trash-outline" size={16} color="#DC2626" style={{ marginRight: 8 }} />
+          <Text style={styles.btnDangerText}>Delete Account & All Data</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -78,17 +132,23 @@ export const PrivacyScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F172A' },
+  container: { flex: 1, backgroundColor: '#FAF7F2' },
   content: { padding: 16, paddingBottom: 100 },
-  sectionHeader: { fontSize: 11, fontWeight: 'bold', color: '#64748B', letterSpacing: 1, marginBottom: 12 },
-  card: { backgroundColor: '#1E293B', borderRadius: 16, padding: 16, marginBottom: 20 },
-  itemRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 },
-  itemLabel: { fontSize: 14, color: '#F8FAFC', fontWeight: '500' },
-  statusConnected: { fontSize: 12, color: '#10B981', fontWeight: 'bold' },
-  statusDisconnected: { fontSize: 12, color: '#94A3B8', fontWeight: 'bold' },
-  divider: { height: 1, backgroundColor: '#334155', marginVertical: 6 },
-  btnSecondary: { backgroundColor: '#0F172A', padding: 12, borderRadius: 10, alignItems: 'center', marginBottom: 12 },
-  btnSecondaryText: { color: '#38BDF8', fontWeight: 'bold', fontSize: 13 },
-  btnDanger: { backgroundColor: 'rgba(239, 68, 68, 0.15)', padding: 12, borderRadius: 10, alignItems: 'center' },
-  btnDangerText: { color: '#EF4444', fontWeight: 'bold', fontSize: 13 },
+  sectionHeader: { fontSize: 11, fontWeight: '700', color: designTokens.colors.textSecondary, letterSpacing: 1, marginBottom: 10, marginTop: 6 },
+  card: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(41, 51, 50, 0.08)' },
+  serviceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
+  serviceLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 10 },
+  serviceTitle: { fontSize: 14, color: designTokens.colors.textPrimary, fontWeight: '700' },
+  serviceSub: { fontSize: 12, color: designTokens.colors.textSecondary, marginTop: 2 },
+  verifiedBadge: { backgroundColor: '#E8F5E9', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  verifiedBadgeText: { fontSize: 11, color: '#1B5E20', fontWeight: '700' },
+  connectedBtn: { backgroundColor: '#E6F4EA', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: '#A8D5BA' },
+  connectedBtnText: { fontSize: 11, color: '#1E7E34', fontWeight: '700' },
+  connectBtn: { backgroundColor: designTokens.colors.primary, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
+  connectBtnText: { fontSize: 11, color: '#FFFFFF', fontWeight: '700' },
+  divider: { height: 1, backgroundColor: 'rgba(41, 51, 50, 0.06)', marginVertical: 6 },
+  btnSecondary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F6F3ED', padding: 14, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(41, 51, 50, 0.08)' },
+  btnSecondaryText: { color: designTokens.colors.primaryDark, fontWeight: '700', fontSize: 13 },
+  btnDanger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FEF2F2', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#FECACA' },
+  btnDangerText: { color: '#DC2626', fontWeight: '700', fontSize: 13 },
 });

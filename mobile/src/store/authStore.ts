@@ -100,6 +100,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isOnboardingComplete: false,
         currentOnboardingStep: step,
         onboardingData: statusRes?.state?.data || {},
+        gmailConnected: true,
+        calendarConnected: true,
         isLoading: false,
       });
     } catch (err) {
