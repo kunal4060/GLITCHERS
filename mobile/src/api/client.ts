@@ -46,14 +46,19 @@ class ApiClient {
       ...(options.headers || {}),
     };
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+
     try {
-      const res = await fetch(url, { ...options, headers });
+      const res = await fetch(url, { ...options, headers, signal: controller.signal });
+      clearTimeout(timeoutId);
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.message || `API error: ${res.status}`);
       }
       return (await res.json()) as T;
     } catch (err: any) {
+      clearTimeout(timeoutId);
       console.warn(`API call failed for ${endpoint}:`, err.message);
       throw err;
     }

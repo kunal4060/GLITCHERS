@@ -196,41 +196,46 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Task 1: Complete AI Assignment 2 (EXTREMELY_IMPORTANT) */}
-        <GlassCard
-          variant="teal"
-          style={styles.taskCard}
-          onPress={() => navigation?.navigate('Tasks')}
-        >
-          <View style={styles.taskCardRow}>
-            <Text style={styles.taskIndexNumber}>1</Text>
-            <View style={styles.taskMainCol}>
-              <Text style={styles.taskTitleText}>Complete AI Assignment 2</Text>
-              <View style={styles.taskBadgeRow}>
-                <StatusBadge label="EXTREMELY_IMPORTANT" variant="extremely_important" />
-              </View>
+        {tasks.length === 0 ? (
+          <GlassCard variant="teal" style={styles.taskCard} onPress={() => navigation?.navigate('Tasks')}>
+            <View style={{ paddingVertical: 10, alignItems: 'center' }}>
+              <Text style={{ fontSize: 13, color: '#7A7875', fontWeight: '500' }}>
+                No pending tasks. Tap to add your first deadline! ✨
+              </Text>
             </View>
-            <Text style={styles.taskDueText}>Due in 2 days</Text>
-          </View>
-        </GlassCard>
-
-        {/* Task 2: Submit DBMS Lab Report (HIGH) */}
-        <GlassCard
-          variant="teal"
-          style={styles.taskCard}
-          onPress={() => navigation?.navigate('Tasks')}
-        >
-          <View style={styles.taskCardRow}>
-            <Text style={styles.taskIndexNumber}>2</Text>
-            <View style={styles.taskMainCol}>
-              <Text style={styles.taskTitleText}>Submit DBMS Lab Report</Text>
-              <View style={styles.taskBadgeRow}>
-                <StatusBadge label="HIGH" variant="high" />
-              </View>
-            </View>
-            <Text style={styles.taskDueText}>Due in 2 days</Text>
-          </View>
-        </GlassCard>
+          </GlassCard>
+        ) : (
+          tasks.slice(0, 3).map((task, idx) => {
+            const variantMap: Record<string, any> = {
+              EXTREMELY_IMPORTANT: 'extremely_important',
+              HIGH: 'high',
+              NORMAL: 'normal',
+              LOW: 'low',
+            };
+            const dueText = task.dueDate
+              ? new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+              : 'Pending';
+            return (
+              <GlassCard
+                key={task.id || String(idx)}
+                variant="teal"
+                style={styles.taskCard}
+                onPress={() => navigation?.navigate('Tasks')}
+              >
+                <View style={styles.taskCardRow}>
+                  <Text style={styles.taskIndexNumber}>{idx + 1}</Text>
+                  <View style={styles.taskMainCol}>
+                    <Text style={styles.taskTitleText}>{task.title}</Text>
+                    <View style={styles.taskBadgeRow}>
+                      <StatusBadge label={task.priority} variant={variantMap[task.priority] || 'normal'} />
+                    </View>
+                  </View>
+                  <Text style={styles.taskDueText}>{dueText}</Text>
+                </View>
+              </GlassCard>
+            );
+          })
+        )}
 
         {/* 6. Spending Snapshot */}
         <View style={styles.spendingSection}>

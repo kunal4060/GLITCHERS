@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ClassSession, Task, Expense, Budget, Debt, EmailSummary } from '@glitchers/shared';
 import { apiClient } from '../api/client';
 
@@ -63,7 +65,9 @@ interface DashboardState {
   syncWithBackend: () => Promise<void>;
 }
 
-export const useDashboardStore = create<DashboardState>((set, get) => ({
+export const useDashboardStore = create<DashboardState>()(
+  persist(
+    (set, get) => ({
   cgpa: '8.71',
   credits: 42,
   setCgpa: (cgpa) => set({ cgpa }),
@@ -128,82 +132,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       downloadProgress: { ...s.downloadProgress, [modelId]: 100 },
     }));
   },
-  classes: [
-    {
-      id: 'c1',
-      userId: 'u1',
-      subjectName: 'Artificial Intelligence',
-      day: 'THURSDAY',
-      startTime: '09:00',
-      endTime: '09:50',
-      room: '120-CB',
-      faculty: 'MITHILESH KUMAR DUBEY',
-      classType: 'LECTURE',
-      isCancelled: false,
-    },
-    {
-      id: 'c2',
-      userId: 'u1',
-      subjectName: 'Entrepreneurship',
-      day: 'THURSDAY',
-      startTime: '10:01',
-      endTime: '10:51',
-      room: '408-CB',
-      faculty: 'Ishfaq Ahmad Thaku',
-      classType: 'LECTURE',
-      isCancelled: false,
-    },
-    {
-      id: 'c3',
-      userId: 'u1',
-      subjectName: 'Computer Organization and Architecture',
-      day: 'THURSDAY',
-      startTime: '11:00',
-      endTime: '11:50',
-      room: '220-CB',
-      faculty: 'PULLURI HARISH',
-      classType: 'LECTURE',
-      isCancelled: false,
-    },
-    {
-      id: 'c4',
-      userId: 'u1',
-      subjectName: 'Discrete Mathematical Structures',
-      day: 'THURSDAY',
-      startTime: '12:00',
-      endTime: '12:50',
-      room: '120-CB',
-      faculty: 'Venkatrajam Marka',
-      classType: 'LECTURE',
-      isCancelled: false,
-    },
-  ],
-  tasks: [
-    {
-      id: 't1',
-      userId: 'u1',
-      title: 'Complete AI Assignment 2',
-      priority: 'EXTREMELY_IMPORTANT',
-      status: 'TODO',
-      dueDate: new Date(Date.now() + 86400000).toISOString(),
-    },
-    {
-      id: 't2',
-      userId: 'u1',
-      title: 'DBMS Normalization Lab Report',
-      priority: 'HIGH',
-      status: 'TODO',
-      dueDate: new Date(Date.now() + 2 * 86400000).toISOString(),
-    },
-    {
-      id: 't3',
-      userId: 'u1',
-      title: 'COA Cache Memory Quiz Preparation',
-      priority: 'NORMAL',
-      status: 'TODO',
-      dueDate: new Date(Date.now() + 4 * 86400000).toISOString(),
-    },
-  ],
+  classes: [],
+  tasks: [],
   expenses: [],
   budget: {
     id: 'b1',
@@ -370,4 +300,21 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       set({ isLoading: false });
     }
   },
-}));
+}),
+    {
+      name: 'glitchers-dashboard-storage',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({
+        classes: state.classes,
+        tasks: state.tasks,
+        expenses: state.expenses,
+        budget: state.budget,
+        debts: state.debts,
+        cgpa: state.cgpa,
+        credits: state.credits,
+        avatarUrl: state.avatarUrl,
+        aiMode: state.aiMode,
+      }),
+    }
+  )
+);

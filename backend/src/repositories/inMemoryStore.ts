@@ -107,30 +107,7 @@ class InMemoryStore {
       },
     ]);
 
-    this.tasks.set(userId, [
-      {
-        id: randomUUID(),
-        userId,
-        title: 'Complete AI Assignment 2',
-        description: 'Implement A* search algorithm in Python',
-        priority: 'EXTREMELY_IMPORTANT',
-        status: 'TODO',
-        dueDate: new Date(Date.now() + 2 * 86400000).toISOString(),
-        relatedSubject: 'Artificial Intelligence',
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: randomUUID(),
-        userId,
-        title: 'Submit DBMS Lab Report',
-        description: 'Normalization and BCNF queries report',
-        priority: 'HIGH',
-        status: 'TODO',
-        dueDate: new Date(Date.now() + 86400000).toISOString(),
-        relatedSubject: 'DBMS',
-        createdAt: new Date().toISOString(),
-      },
-    ]);
+    this.tasks.set(userId, []);
 
     this.expenses.set(userId, []);
 

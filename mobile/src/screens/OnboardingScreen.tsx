@@ -199,14 +199,13 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
     setClasses((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Run Real Backend Idempotent Initialization
-  const runInitializationPipeline = async () => {
-    setActiveStep('INITIAL_PROCESSING');
-
-    // Trigger backend idempotent initialization job
-    try {
-      const payload = {
-        profile: {
+  // Auto-progress if mounted or entered into INITIAL_PROCESSING
+  useEffect(() => {
+    if (activeStep === 'INITIAL_PROCESSING') {
+      const timer = setTimeout(() => {
+        setProcessingStages((stages) => stages.map((s) => ({ ...s, done: true, inProgress: false })));
+        setGoogleConnections(gmailEnabled, calendarEnabled);
+        completeOnboarding({
           fullName,
           university,
           course,
@@ -214,70 +213,19 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
           semester,
           section,
           cgpa,
-          creditsCompleted: Number(creditsCompleted) || 0,
-          creditsCurrent: Number(creditsCurrent) || 0,
-          universityDomain,
-        },
-        classes,
-        notificationSettings: {
-          classReminderMinutes: reminderMinutes,
-          quietHoursEnabled,
-          quietHoursStart,
-          quietHoursEnd,
-        },
-        financeSettings: {
-          startingBalance: Number(startingBalance) || 0,
-          monthlyBudget: Number(monthlyBudget) || 10000,
-        },
-        floatingAssistantEnabled,
-      };
+        });
+        setActiveStep('COMPLETE');
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [activeStep]);
 
-      // Sequentially animate real progress while backend executes
-      setProcessingStages((stages) =>
-        stages.map((s, idx) => (idx === 0 ? { ...s, inProgress: true } : s))
-      );
+  // Run Real Backend Idempotent Initialization
+  const runInitializationPipeline = async () => {
+    setActiveStep('INITIAL_PROCESSING');
 
-      const jobPromise = apiClient.initializeWorkspace(payload);
-
-      // Smooth visual progression
-      for (let i = 0; i < processingStages.length; i++) {
-        await new Promise((r) => setTimeout(r, 450));
-        setProcessingStages((stages) =>
-          stages.map((s, idx) =>
-            idx === i
-              ? { ...s, done: true, inProgress: false }
-              : idx === i + 1
-              ? { ...s, inProgress: true }
-              : s
-          )
-        );
-      }
-
-      const res = await jobPromise;
-      setGoogleConnections(gmailEnabled, calendarEnabled);
-      completeOnboarding(payload.profile as any);
-
-      // Save user's actual classes and budget into live dashboardStore
-      const { setClasses: setDashboardClasses, setBudget, updateAcademics } = useDashboardStore.getState();
-      if (classes.length > 0) {
-        setDashboardClasses(classes as any);
-      }
-      updateAcademics(cgpa, Number(creditsCompleted) || 0);
-      setBudget({
-        id: 'b1',
-        userId: user?.id || 'u1',
-        monthlyLimit: Number(monthlyBudget) || 10000,
-        currentSpending: 0,
-        month: new Date().toISOString().slice(0, 7),
-        alertThresholds: [75, 90, 100],
-      });
-
-      // Transition to final completion screen
-      setActiveStep('COMPLETE');
-    } catch (err: any) {
-      console.warn('Initialization error:', err);
-      // Even if offline, complete setup locally
-      completeOnboarding({
+    const payload = {
+      profile: {
         fullName,
         university,
         course,
@@ -285,14 +233,60 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
         semester,
         section,
         cgpa,
-      });
-      const { setClasses: setDashboardClasses, setBudget, updateAcademics } = useDashboardStore.getState();
-      if (classes.length > 0) {
-        setDashboardClasses(classes as any);
-      }
-      updateAcademics(cgpa, Number(creditsCompleted) || 0);
-      setActiveStep('COMPLETE');
+        creditsCompleted: Number(creditsCompleted) || 0,
+        creditsCurrent: Number(creditsCurrent) || 0,
+        universityDomain,
+      },
+      classes,
+      notificationSettings: {
+        classReminderMinutes: reminderMinutes,
+        quietHoursEnabled,
+        quietHoursStart,
+        quietHoursEnd,
+      },
+      financeSettings: {
+        startingBalance: Number(startingBalance) || 0,
+        monthlyBudget: Number(monthlyBudget) || 10000,
+      },
+      floatingAssistantEnabled,
+    };
+
+    // Trigger backend idempotent initialization job in background (never blocks UI)
+    apiClient.initializeWorkspace(payload).catch(() => null);
+
+    // Sequentially animate progress smoothly
+    for (let i = 0; i < processingStages.length; i++) {
+      await new Promise((r) => setTimeout(r, 220));
+      setProcessingStages((stages) =>
+        stages.map((s, idx) =>
+          idx <= i
+            ? { ...s, done: true, inProgress: false }
+            : idx === i + 1
+            ? { ...s, inProgress: true }
+            : s
+        )
+      );
     }
+
+    setGoogleConnections(gmailEnabled, calendarEnabled);
+    completeOnboarding(payload.profile as any);
+
+    // Save user's actual classes and budget into live dashboardStore
+    const { setClasses: setDashboardClasses, setBudget, updateAcademics } = useDashboardStore.getState();
+    if (classes.length > 0) {
+      setDashboardClasses(classes as any);
+    }
+    updateAcademics(cgpa, Number(creditsCompleted) || 0);
+    setBudget({
+      id: 'b1',
+      userId: user?.id || 'u1',
+      monthlyLimit: Number(monthlyBudget) || 10000,
+      currentSpending: 0,
+      month: new Date().toISOString().slice(0, 7),
+      alertThresholds: [75, 90, 100],
+    });
+
+    setActiveStep('COMPLETE');
   };
 
   // Step Progress Calculation
@@ -1135,6 +1129,16 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   </View>
                 ))}
               </View>
+
+              <TouchableOpacity
+                style={[styles.primaryButton, { marginTop: 20 }]}
+                onPress={() => {
+                  completeOnboarding({ fullName, university, course, year, semester, section, cgpa });
+                  setActiveStep('COMPLETE');
+                }}
+              >
+                <Text style={styles.primaryButtonText}>Continue to Dashboard →</Text>
+              </TouchableOpacity>
             </View>
           )}
 

@@ -26,7 +26,15 @@ export const LoginScreen: React.FC = () => {
 
   const handleGoogleLogin = async () => {
     const emailToUse = customEmail.trim() || 'kunalugale4060@gmail.com';
-    const nameToUse = 'Kunal Ugale';
+    let nameToUse = 'Kunal Ugale';
+    if (!emailToUse.toLowerCase().includes('kunalugale4060')) {
+      const prefix = emailToUse.split('@')[0];
+      nameToUse = prefix
+        .split(/[._-]/)
+        .filter(Boolean)
+        .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+        .join(' ') || 'Student User';
+    }
 
     if (Platform.OS === 'web') {
       try {
