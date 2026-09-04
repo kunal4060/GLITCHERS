@@ -145,10 +145,10 @@ Each bullet point MUST start with "• " and clearly highlight:
 
 Do not include greetings or markdown headers, just the list of bullet points.`;
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-flash-lite-latest' });
         const generatePromise = model.generateContent(prompt).then((res) => res.response.text());
         const timeoutPromise = new Promise<string>((_, reject) =>
-          setTimeout(() => reject(new Error('Gemini summarization timeout')), 4000)
+          setTimeout(() => reject(new Error('Gemini summarization timeout')), 15000)
         );
 
         const reply = await Promise.race([generatePromise, timeoutPromise]);

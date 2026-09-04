@@ -8,7 +8,8 @@ import { randomUUID } from 'crypto';
 export class GeminiAssistant {
   private genAI: GoogleGenerativeAI | null = null;
   private candidateModels = [
-    'gemini-3.6-flash',
+    'gemini-flash-lite-latest',
+    'gemini-flash-latest',
   ];
 
   constructor() {
@@ -498,7 +499,7 @@ Rules:
 - Ensure prices are strictly numeric.
 - Return raw JSON only with NO markdown fences, NO extra text.`;
 
-      for (const modelName of ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-3.5-flash']) {
+      for (const modelName of ['gemini-flash-lite-latest', 'gemini-flash-latest']) {
         try {
           const model = this.genAI.getGenerativeModel({ model: modelName });
           const result = await model.generateContent([
@@ -640,9 +641,9 @@ RULES:
       const cleanMime = mimeType?.startsWith('image/') ? mimeType : 'image/jpeg';
 
       // Prioritize fast, reliable multimodal vision models
-      for (const modelName of ['gemini-3.5-flash', 'gemini-flash-lite-latest', 'gemini-flash-latest']) {
+      for (const modelName of ['gemini-flash-lite-latest', 'gemini-flash-latest']) {
         try {
-          const model = this.genAI.getGenerativeModel({ model: modelName }, { timeout: 20000 });
+          const model = this.genAI.getGenerativeModel({ model: modelName }, { timeout: 25000 });
           const result = await model.generateContent([
             {
               inlineData: {

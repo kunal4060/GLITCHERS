@@ -29,6 +29,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
     setOnboardingStep,
     completeOnboarding,
     setGoogleConnections,
+    logout,
   } = useAuthStore();
 
   // Active step state machine
@@ -315,29 +316,43 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
       <View style={styles.container}>
         {/* Top Stepper Bar */}
         <View style={styles.stepperContainer}>
-          <View style={styles.stepperInfo}>
-            <Text style={styles.stepperTitle}>
-              {activeStep === 'COMPLETE' ? 'Setup Finished' : `Step ${stepNumber} of 8`}
-            </Text>
-            <Text style={styles.stepperSubtitle}>
-              {activeStep === 'GOOGLE_SERVICES'
-                ? 'Google Services'
-                : activeStep === 'PROFILE'
-                ? 'Student Profile'
-                : activeStep === 'ACADEMICS'
-                ? 'Academic Information'
-                : activeStep === 'TIMETABLE' || activeStep === 'TIMETABLE_REVIEW'
-                ? 'Timetable & Schedule'
-                : activeStep === 'NOTIFICATION_SETUP'
-                ? 'Notification Preferences'
-                : activeStep === 'FINANCE_SETUP'
-                ? 'Student Budget & Finance'
-                : activeStep === 'FLOATING_ASSISTANT'
-                ? 'Floating AI Assistant'
-                : activeStep === 'INITIAL_PROCESSING'
-                ? 'Preparing Workspace'
-                : 'Welcome to GLITCHERS'}
-            </Text>
+          <View style={styles.stepperHeaderRow}>
+            <View style={styles.stepperInfo}>
+              <Text style={styles.stepperTitle}>
+                {activeStep === 'COMPLETE' ? 'Setup Finished' : `Step ${stepNumber} of 8`}
+              </Text>
+              <Text style={styles.stepperSubtitle}>
+                {activeStep === 'GOOGLE_SERVICES'
+                  ? 'Google Services'
+                  : activeStep === 'PROFILE'
+                  ? 'Student Profile'
+                  : activeStep === 'ACADEMICS'
+                  ? 'Academic Information'
+                  : activeStep === 'TIMETABLE' || activeStep === 'TIMETABLE_REVIEW'
+                  ? 'Timetable & Schedule'
+                  : activeStep === 'NOTIFICATION_SETUP'
+                  ? 'Notification Preferences'
+                  : activeStep === 'FINANCE_SETUP'
+                  ? 'Student Budget & Finance'
+                  : activeStep === 'FLOATING_ASSISTANT'
+                  ? 'Floating AI Assistant'
+                  : activeStep === 'INITIAL_PROCESSING'
+                  ? 'Preparing Workspace'
+                  : 'Welcome to GLITCHERS'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.signOutButton}
+              onPress={() => {
+                Alert.alert('Sign Out', 'Return to login screen?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Sign Out', style: 'destructive', onPress: () => logout() },
+                ]);
+              }}
+            >
+              <Ionicons name="log-out-outline" size={14} color="#7A7875" style={{ marginRight: 4 }} />
+              <Text style={styles.signOutButtonText}>Sign Out</Text>
+            </TouchableOpacity>
           </View>
           <View style={styles.stepProgressBar}>
             <View style={[styles.stepProgressFill, { width: `${(stepNumber / 8) * 100}%` }]} />
@@ -1207,11 +1222,30 @@ const styles = StyleSheet.create({
     borderBottomColor: '#ECE6DC',
     backgroundColor: '#FAF7F2',
   },
-  stepperInfo: {
+  stepperHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+  },
+  stepperInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  signOutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    backgroundColor: '#F0ECE4',
+    borderWidth: 1,
+    borderColor: '#E2DED6',
+  },
+  signOutButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#7A7875',
   },
   stepperTitle: {
     fontSize: 12,

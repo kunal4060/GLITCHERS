@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Text, TouchableOpacity, View, Platform } from 'react-native';
+import { Text, TouchableOpacity, View, Platform, Linking } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { DashboardScreen } from '../screens/DashboardScreen';
@@ -243,6 +243,30 @@ export const RootNavigator: React.FC = () => {
         loginWithGoogle(email, name || email.split('@')[0], token);
       }
     }
+
+    // Catch deep link on mobile native
+    const handleUrl = (url: string | null) => {
+      if (!url) return;
+      try {
+        const queryIndex = url.indexOf('?');
+        if (queryIndex !== -1) {
+          const queryString = url.slice(queryIndex + 1);
+          const params = new URLSearchParams(queryString);
+          const email = params.get('email');
+          const name = params.get('name');
+          const token = params.get('token');
+          if (email && token) {
+            loginWithGoogle(email, name || email.split('@')[0], token);
+          }
+        }
+      } catch (err) {
+        console.warn('Deep link parse error:', err);
+      }
+    };
+
+    Linking.getInitialURL().then(handleUrl);
+    const sub = Linking.addEventListener('url', (e) => handleUrl(e.url));
+    return () => sub.remove();
   }, []);
 
   // 1. If not authenticated, render Google Login Screen

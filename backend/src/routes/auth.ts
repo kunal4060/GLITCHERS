@@ -60,6 +60,35 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     return { url: googleService.getAuthUrl(returnUrl) };
   });
 
+  fastify.get<{ Querystring: { code?: string; returnUrl?: string } }>('/mock-google-login', async (req, reply) => {
+    const returnUrl = req.query.returnUrl || 'http://localhost:8082';
+    const cleanBase = returnUrl.split('?')[0].replace(/\/$/, '');
+    const defaultId = 'mock_user_' + Date.now();
+    let profile = Array.from(inMemoryStore.profiles.values())[0];
+    if (!profile) {
+      profile = {
+        id: defaultId,
+        email: 'kunalugale4060@gmail.com',
+        fullName: 'Kunal Ugale',
+        university: 'State Technological University',
+        course: 'Computer Science & Engineering',
+        year: 3,
+        semester: 6,
+        section: 'A',
+        cgpa: '8.71',
+        creditsCompleted: 42,
+        creditsCurrent: 18,
+        universityDomain: 'gmail.com',
+        isOnboardingComplete: false,
+        createdAt: new Date().toISOString(),
+      };
+      inMemoryStore.profiles.set(profile.id, profile);
+    }
+    return reply.redirect(
+      `${cleanBase}/?token=jwt_${profile.id}&email=${encodeURIComponent(profile.email)}&name=${encodeURIComponent(profile.fullName)}`
+    );
+  });
+
   fastify.get<{ Querystring: { code?: string; error?: string; state?: string } }>('/google/callback', async (req, reply) => {
     const { code, error, state } = req.query || {};
     let frontendUrl = 'http://localhost:8082';

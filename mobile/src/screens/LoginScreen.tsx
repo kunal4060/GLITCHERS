@@ -25,6 +25,43 @@ export const LoginScreen: React.FC = () => {
   const [isRedirecting, setIsRedirecting] = useState(false);
 
   const handleGoogleLogin = async () => {
+    try {
+      setIsRedirecting(true);
+
+      // Determine returnUrl for OAuth callback redirect
+      let returnUrl = 'http://localhost:8082';
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.origin) {
+        returnUrl = window.location.origin;
+      } else {
+        returnUrl = 'glitchers://auth';
+      }
+
+      const res = await apiClient.get<{ url: string }>(`/auth/google/url?returnUrl=${encodeURIComponent(returnUrl)}`);
+
+      if (res?.url) {
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          window.location.href = res.url;
+          return;
+        } else {
+          await Linking.openURL(res.url);
+          return;
+        }
+      }
+      throw new Error('Google Sign-In URL could not be generated.');
+    } catch (err: any) {
+      console.warn('Google Sign-In Error:', err);
+      const msg = err?.message || 'Unable to connect to Google OAuth service. Please check your network.';
+      if (Platform.OS === 'web') {
+        alert('Google Sign-In: ' + msg);
+      } else {
+        Alert.alert('Google Sign-In', msg);
+      }
+    } finally {
+      setIsRedirecting(false);
+    }
+  };
+
+  const handleDirectDemoLogin = async () => {
     const emailToUse = customEmail.trim() || 'kunalugale4060@gmail.com';
     let nameToUse = 'Kunal Ugale';
     if (!emailToUse.toLowerCase().includes('kunalugale4060')) {
@@ -35,27 +72,6 @@ export const LoginScreen: React.FC = () => {
         .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
         .join(' ') || 'Student User';
     }
-
-    if (Platform.OS === 'web') {
-      try {
-        setIsRedirecting(true);
-        const origin = (typeof window !== 'undefined' && window.location?.origin)
-          ? window.location.origin
-          : 'http://localhost:8082';
-        const res = await apiClient.get<{ url: string }>(`/auth/google/url?returnUrl=${encodeURIComponent(origin)}`);
-
-        if (res?.url && typeof window !== 'undefined') {
-          window.location.href = res.url;
-          return;
-        }
-      } catch (err: any) {
-        console.warn('Web Google auth redirect error, falling back to direct login:', err);
-      } finally {
-        setIsRedirecting(false);
-      }
-    }
-
-    // On native mobile (or web fallback), log in directly with Google account
     await loginWithGoogle(emailToUse, nameToUse);
   };
 
@@ -123,14 +139,14 @@ export const LoginScreen: React.FC = () => {
             </View>
           </View>
 
-          {/* Sole Login Action: Continue with Google */}
+          {/* Primary Action: Continue with Google */}
           <TouchableOpacity
             style={styles.googleButton}
             onPress={handleGoogleLogin}
-            disabled={isLoading}
+            disabled={isLoading || isRedirecting}
             activeOpacity={0.88}
           >
-            {isLoading ? (
+            {isLoading || isRedirecting ? (
               <ActivityIndicator size="small" color="#2E7470" />
             ) : (
               <>
@@ -140,6 +156,17 @@ export const LoginScreen: React.FC = () => {
                 <Text style={styles.googleButtonText}>Continue with Google</Text>
               </>
             )}
+          </TouchableOpacity>
+
+          {/* Secondary Action: Direct Demo Sign-In */}
+          <TouchableOpacity
+            style={styles.directButton}
+            onPress={handleDirectDemoLogin}
+            disabled={isLoading || isRedirecting}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="school-outline" size={16} color="#5A5855" style={{ marginRight: 6 }} />
+            <Text style={styles.directButtonText}>Direct Demo Sign In (Offline)</Text>
           </TouchableOpacity>
 
           {/* Privacy note */}
@@ -358,6 +385,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#1A1A1A',
+  },
+  directButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#D8D4CC',
+    backgroundColor: '#FAF7F2',
+    width: '100%',
+  },
+  directButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#5A5855',
   },
   securityNoteContainer: {
     flexDirection: 'row',

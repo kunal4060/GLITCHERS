@@ -46,8 +46,10 @@ class ApiClient {
       ...(options.headers || {}),
     };
 
+    const isAiVision = endpoint.includes('analyze-image') || endpoint.includes('scan-bill') || endpoint.includes('/ai/') || endpoint.includes('summarize');
+    const timeoutMs = isAiVision ? 90000 : 15000;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
       const res = await fetch(url, { ...options, headers, signal: controller.signal });
