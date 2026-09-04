@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "GLITCHERS",
-    "slug": "glitchers",
+    "slug": "kunal",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -32,7 +32,7 @@
     "plugins": [],
     "extra": {
       "eas": {
-        "projectId": "e96ef154-4d59-4b41-be16-5309e1ea1733"
+        "projectId": "144aea28-329c-49de-9961-5697f77236c1"
       }
     },
     "owner": "kunal4060s-team"

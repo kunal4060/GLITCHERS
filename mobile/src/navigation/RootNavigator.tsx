@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View, Platform } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { DashboardScreen } from '../screens/DashboardScreen';
@@ -224,8 +224,8 @@ export const RootNavigator: React.FC = () => {
   const [showManualOnboarding, setShowManualOnboarding] = useState(false);
 
   React.useEffect(() => {
-    // Catch Google OAuth redirect credentials from URL query params
-    if (typeof window !== 'undefined' && window.location?.search) {
+    // Catch Google OAuth redirect credentials from URL query params (web only)
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.search) {
       const params = new URLSearchParams(window.location.search);
       const email = params.get('email');
       const name = params.get('name');
