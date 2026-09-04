@@ -3,7 +3,24 @@ import type { AIChatResponse } from '@glitchers/shared';
 
 const PROD_HOST = 'https://glitchers-backend.onrender.com/api';
 const LOCAL_DEV_HOST = Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://localhost:5000/api';
-const DEFAULT_HOST = process.env.EXPO_PUBLIC_API_URL || PROD_HOST;
+
+function resolveDefaultHost(): string {
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
+  if (typeof window !== 'undefined' && window.location) {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return 'http://localhost:5000/api';
+    }
+  }
+  if (__DEV__) {
+    return LOCAL_DEV_HOST;
+  }
+  return PROD_HOST;
+}
+
+const DEFAULT_HOST = resolveDefaultHost();
 
 class ApiClient {
   private baseUrl: string = DEFAULT_HOST;

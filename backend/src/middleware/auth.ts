@@ -38,6 +38,11 @@ export async function authMiddleware(req: FastifyRequest, reply: FastifyReply) {
     return;
   }
 
+  if (token.startsWith('jwt_')) {
+    req.userId = token.replace('jwt_', '');
+    return;
+  }
+
   // Fallback to dev user
   req.userId = '00000000-0000-0000-0000-000000000001';
 }

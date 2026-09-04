@@ -230,9 +230,17 @@ export const RootNavigator: React.FC = () => {
       const email = params.get('email');
       const name = params.get('name');
       const token = params.get('token');
+      const authError = params.get('auth_error');
+
+      if (authError) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+        alert(`Google login notice: ${decodeURIComponent(authError)}`);
+        return;
+      }
+
       if (email && token) {
         window.history.replaceState({}, document.title, window.location.pathname);
-        loginWithGoogle(email, name || email.split('@')[0]);
+        loginWithGoogle(email, name || email.split('@')[0], token);
       }
     }
   }, []);

@@ -11,13 +11,15 @@ import {
   ScrollView,
   TextInput,
   Platform,
+  Linking,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/authStore';
 import { apiClient } from '../api/client';
 
 export const LoginScreen: React.FC = () => {
-  const { loginWithGoogle, isLoading } = useAuthStore();
+  const { isLoading } = useAuthStore();
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [customEmail, setCustomEmail] = useState('kunalugale4060@gmail.com');
   const [isRedirecting, setIsRedirecting] = useState(false);
@@ -25,25 +27,32 @@ export const LoginScreen: React.FC = () => {
   const handleGoogleLogin = async () => {
     try {
       setIsRedirecting(true);
-      // Fetch Google OAuth URL with returnUrl parameter
+      // Determine current frontend origin for OAuth return redirect
       const returnUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8082';
       const res = await apiClient.get<{ url: string }>(`/auth/google/url?returnUrl=${encodeURIComponent(returnUrl)}`);
 
       if (res?.url) {
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
-          // Redirect browser directly to Google Sign-In!
+          // Direct browser navigation to Google OAuth Sign-In screen
           window.location.href = res.url;
+          return;
+        } else {
+          // Mobile native browser redirect
+          await Linking.openURL(res.url);
           return;
         }
       }
+      throw new Error('Backend did not return an authorization URL.');
     } catch (err: any) {
-      console.warn('Google auth redirect error:', err);
+      console.warn('Google auth error:', err);
+      setIsRedirecting(false);
+      const msg = err?.message || 'Please ensure backend is running at http://localhost:5000.';
+      if (Platform.OS === 'web') {
+        alert('Google Sign-In Error: ' + msg);
+      } else {
+        Alert.alert('Google Sign-In Error', msg);
+      }
     }
-
-    const emailToUse = customEmail.trim() || 'kunalugale4060@gmail.com';
-    const nameToUse = 'Kunal Ugale';
-    await loginWithGoogle(emailToUse, nameToUse);
-    setIsRedirecting(false);
   };
 
   return (

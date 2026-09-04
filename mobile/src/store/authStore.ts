@@ -17,7 +17,7 @@ interface AuthState {
   setAvatarUrl: (avatarUrl: string | null) => void;
   setOnboardingStep: (step: OnboardingStep, data?: Record<string, any>) => void;
   completeOnboarding: (profileUpdates?: Partial<UserProfile>) => void;
-  loginWithGoogle: (email?: string, name?: string) => Promise<void>;
+  loginWithGoogle: (email?: string, name?: string, token?: string) => Promise<void>;
   checkSession: () => Promise<void>;
   logout: () => void;
 }
@@ -63,33 +63,43 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }));
   },
 
-  loginWithGoogle: async (email = 'student@university.edu', name = 'Student User') => {
+  loginWithGoogle: async (email = 'kunalugale4060@gmail.com', name = 'Kunal Ugale', token?: string) => {
     set({ isLoading: true });
     try {
-      // In mobile app, we exchange the Google auth token / call callback
-      const res = await apiClient.post<{ accessToken: string; user: UserProfile }>('/auth/google/callback', {
-        code: 'mock_google_oauth_code',
-      }).catch(() => null);
+      if (token) {
+        apiClient.setToken(token);
+      }
 
-      const user = res?.user || {
-        id: '00000000-0000-0000-0000-000000000001',
-        email,
-        fullName: name,
-        university: 'State Technological University',
-        course: 'Computer Science & Engineering',
-        year: 1,
-        semester: 1,
-        section: 'A',
-        cgpa: '8.00',
-        creditsCompleted: 20,
-        creditsCurrent: 18,
-        universityDomain: email.split('@')[1] || 'university.edu',
-        isOnboardingComplete: false,
-      };
+      // Try to fetch profile from /auth/me
+      const meRes = await apiClient.get<{ user: UserProfile }>('/auth/me').catch(() => null);
+      let user = meRes?.user;
+
+      if (!user) {
+        const res = await apiClient.post<{ accessToken: string; user: UserProfile }>('/auth/google/callback', {
+          code: 'mock_google_oauth_code',
+        }).catch(() => null);
+        if (res?.accessToken && !token) {
+          apiClient.setToken(res.accessToken);
+        }
+        user = res?.user || {
+          id: '00000000-0000-0000-0000-000000000001',
+          email,
+          fullName: name,
+          university: 'State Technological University',
+          course: 'Computer Science & Engineering',
+          year: 3,
+          semester: 6,
+          section: 'A',
+          cgpa: '8.71',
+          creditsCompleted: 42,
+          creditsCurrent: 18,
+          universityDomain: email.split('@')[1] || 'gmail.com',
+          isOnboardingComplete: false,
+        };
+      }
 
       // Check onboarding state for this user - always enter setup after Google login
       const statusRes = await apiClient.getOnboardingStatus().catch(() => null);
-      const isComplete = false;
       const step: OnboardingStep = (statusRes?.state?.currentStep && statusRes.state.currentStep !== 'COMPLETE')
         ? (statusRes.state.currentStep as OnboardingStep)
         : 'GOOGLE_SERVICES';
