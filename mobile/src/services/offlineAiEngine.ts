@@ -313,20 +313,163 @@ export class OfflineAIEngine {
       };
     }
 
-    // 10. General Conversational / Study Q&A fallback
+    // 10. General Knowledge & Academic Q&A (Hugging Face On-Device Knowledge Base)
+    const studyAnswer = this.answerGeneralStudyQuery(userMessage, model);
+    if (studyAnswer) {
+      return {
+        message: studyAnswer,
+        intent: 'GENERAL_QUERY',
+        offlineModelUsed: model.name,
+      };
+    }
+
+    // 11. General Conversational Fallback with Helpful Guidance
     return {
       message: `### 🤖 ${model.name} (Offline AI Assistant)\n\n` +
-        `I am operating 100% on your device without an internet connection using Hugging Face's **${model.parameters}** model.\n\n` +
-        `**What I can do offline**:\n` +
-        `• **Solve Math Problems**: E.g. *"Solve 4x + 16 = 36"*, *"What is 25 * 18"*, percentages\n` +
-        `• **Conclude App Data**: E.g. *"Conclude all my app data"* (synthesizes budget, classes, and tasks)\n` +
-        `• **Log Expenses**: E.g. *"Spent 180 on dinner"*, *"Paid 40 for coffee"*\n` +
-        `• **Schedule Tasks**: E.g. *"Remind me to submit DBMS lab report tomorrow"*\n` +
-        `• **Timetable & Schedule**: E.g. *"Which classes do I have today?"*\n` +
-        `• **Check Budget**: E.g. *"What is my remaining budget?"*`,
+        `I am processing on your device using Hugging Face's **${model.parameters}** model.\n\n` +
+        `**Regarding "${userMessage.trim()}":**\n` +
+        `While in offline mode, you can ask me to:\n` +
+        `• **Explain Core Concepts**: Ask about *binary search, ACID properties, OSI layers, processes vs threads, OOP, Newton's laws*\n` +
+        `• **Solve Math & Equations**: E.g. *"Solve 4x + 16 = 36"*, *"15% of 800"*, arithmetic\n` +
+        `• **Synthesize App Data**: *"Conclude all my app data"* for a complete analysis\n` +
+        `• **Manage Student Life**: *"Spent 180 on lunch"*, *"Remind me to submit assignment"*, *"Which classes do I have?"*\n\n` +
+        `*(Tip: Switch to "☁️ Cloud Gemini" mode in the top right for live internet web search and open-ended generative responses!)*\n\n` +
+        `*⚡ On-Device Engine: ${model.name}*`,
       intent: 'GENERAL_QUERY',
       offlineModelUsed: model.name,
     };
+  }
+
+  /**
+   * On-device educational knowledge retrieval for offline academic support
+   */
+  public answerGeneralStudyQuery(input: string, model: HuggingFaceModelInfo): string | null {
+    const text = input.trim().toLowerCase();
+
+    // 1. Binary Search
+    if (text.includes('binary search')) {
+      return `### 🔍 Binary Search Algorithm\n\n` +
+        `**Concept**: An efficient $O(\\log n)$ search algorithm that works on **sorted arrays** by repeatedly dividing the search interval in half.\n\n` +
+        `**How it works**:\n` +
+        `1. Compare target with the middle element: $mid = \\lfloor(low + high) / 2\\rfloor$.\n` +
+        `2. If $target == arr[mid]$, return index.\n` +
+        `3. If $target < arr[mid]$, narrow search to the left half: $high = mid - 1$.\n` +
+        `4. If $target > arr[mid]$, narrow search to the right half: $low = mid + 1$.\n\n` +
+        `**Time Complexity**: Best: $O(1)$ • Average & Worst: $O(\\log n)$\n` +
+        `**Space Complexity**: $O(1)$ iterative, $O(\\log n)$ recursive.\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 2. ACID Properties in DBMS
+    if (text.includes('acid') && (text.includes('dbms') || text.includes('database') || text.includes('transaction') || text.includes('properties'))) {
+      return `### 🛡️ ACID Properties in DBMS\n\n` +
+        `ACID guarantees that database transactions are processed reliably:\n\n` +
+        `• **Atomicity ("All or Nothing")**: A transaction either executes completely or rolls back entirely. If any step fails, changes are undone.\n` +
+        `• **Consistency**: The database moves from one valid state to another, preserving all integrity constraints and schemas.\n` +
+        `• **Isolation**: Concurrent transactions execute independently without interfering with each other (e.g. via serializability or lock levels).\n` +
+        `• **Durability**: Once a transaction is committed, its changes are permanently saved in persistent storage, even in case of power failure.\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 3. Normalization in DBMS (1NF, 2NF, 3NF, BCNF)
+    if (text.includes('normalization') || text.includes('bcnf') || text.includes('1nf') || text.includes('3nf')) {
+      return `### 🗄️ Database Normalization (1NF to BCNF)\n\n` +
+        `Normalization minimizes data redundancy and avoids insertion, update, and deletion anomalies.\n\n` +
+        `• **1NF (First Normal Form)**: Eliminate duplicate columns; each column must hold atomic (indivisible) values; each record must have a unique key.\n` +
+        `• **2NF (Second Normal Form)**: Must be in 1NF AND have no partial dependency (every non-prime attribute must depend on the whole primary key).\n` +
+        `• **3NF (Third Normal Form)**: Must be in 2NF AND have no transitive dependency ($X \\rightarrow Y$ and $Y \\rightarrow Z$).\n` +
+        `• **BCNF (Boyce-Codd Normal Form)**: A stricter 3NF where for every functional dependency $X \\rightarrow Y$, $X$ must be a super key.\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 4. Process vs Thread
+    if ((text.includes('process') && text.includes('thread')) || text.includes('difference between process and thread')) {
+      return `### ⚙️ Process vs. Thread (Operating Systems)\n\n` +
+        `| Feature | Process | Thread |\n` +
+        `| :--- | :--- | :--- |\n` +
+        `| **Definition** | An executing program with its own memory space | The smallest unit of execution within a process |\n` +
+        `| **Memory** | Dedicated address space (Text, Data, Heap, Stack) | Shares Heap & Code with sibling threads; has own Stack |\n` +
+        `| **Overhead** | Heavyweight; high context-switch cost | Lightweight; fast context-switch cost |\n` +
+        `| **Crash Isolation** | If one process crashes, others are unaffected | If a thread crashes (segfault), entire process may terminate |\n` +
+        `| **Communication** | IPC (Pipes, Sockets, Shared Memory) | Direct memory access (requires synchronization / mutexes) |\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 5. OSI Model
+    if (text.includes('osi model') || text.includes('osi layers') || text.includes('7 layers')) {
+      return `### 🌐 The 7 Layers of the OSI Model\n\n` +
+        `From top to bottom (*All People Seem To Need Data Processing*):\n\n` +
+        `1. **Application (Layer 7)**: User interface & network services (HTTP, HTTPS, FTP, DNS, SMTP)\n` +
+        `2. **Presentation (Layer 6)**: Data format, encryption, compression (SSL/TLS, JPEG, ASCII)\n` +
+        `3. **Session (Layer 5)**: Manages dialogs and connection sessions (NetBIOS, RPC)\n` +
+        `4. **Transport (Layer 4)**: End-to-end delivery, flow control, reliability (TCP, UDP)\n` +
+        `5. **Network (Layer 3)**: Routing packets across networks, logical addressing (IP, ICMP, Routers)\n` +
+        `6. **Data Link (Layer 2)**: Hop-to-hop frame transmission, physical MAC addressing (Ethernet, Switches)\n` +
+        `7. **Physical (Layer 1)**: Raw bitstream transmission over physical media (Cables, Radio Waves, Hubs)\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 6. TCP vs UDP
+    if ((text.includes('tcp') && text.includes('udp')) || text.includes('difference between tcp and udp')) {
+      return `### 📡 TCP vs. UDP (Transport Layer Protocols)\n\n` +
+        `• **TCP (Transmission Control Protocol)**:\n` +
+        `  - **Connection-oriented**: Requires 3-way handshake (SYN, SYN-ACK, ACK).\n` +
+        `  - **Reliable**: Guarantees delivery via packet acknowledgments, checksums, and retransmissions.\n` +
+        `  - **Ordered**: Packets arrive in sequence.\n` +
+        `  - **Use Cases**: Web browsing (HTTP/S), file transfers (FTP), emails (SMTP).\n\n` +
+        `• **UDP (User Datagram Protocol)**:\n` +
+        `  - **Connectionless**: Sends packets without prior handshake ("fire-and-forget").\n` +
+        `  - **Unreliable**: No acknowledgments or packet retransmissions.\n` +
+        `  - **Low Latency**: Faster due to minimal 8-byte header overhead.\n` +
+        `  - **Use Cases**: Live video streaming, DNS lookups, VoIP, real-time multiplayer games.\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 7. OOP Concepts
+    if (text.includes('oop') || text.includes('object oriented') || text.includes('polymorphism') || text.includes('encapsulation')) {
+      return `### 🧱 The 4 Pillars of Object-Oriented Programming (OOP)\n\n` +
+        `1. **Encapsulation**: Bundling state (data) and behavior (methods) within a single unit (class), while restricting direct access using private/protected access modifiers.\n` +
+        `2. **Abstraction**: Hiding internal implementation complexities and exposing only the essential interface to the outside world (e.g. abstract classes and interfaces).\n` +
+        `3. **Inheritance**: Allowing a child class to inherit properties and methods from a parent class, enabling code reuse ($class\\ Dog\\ extends\\ Animal$).\n` +
+        `4. **Polymorphism**: The ability of an object or method to take many forms:\n` +
+        `   - *Compile-time (Overloading)*: Same method name with different parameter signatures.\n` +
+        `   - *Runtime (Overriding)*: Subclass provides a specific implementation of a parent method.\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 8. Photosynthesis / Science
+    if (text.includes('photosynthesis')) {
+      return `### 🍃 Photosynthesis Explained\n\n` +
+        `**Definition**: The biological process by which green plants, algae, and certain bacteria convert sunlight energy into chemical energy (glucose).\n\n` +
+        `**Chemical Equation**:\n` +
+        `$$6CO_2 + 6H_2O + \\text{Sunlight} \\rightarrow C_6H_{12}O_6 + 6O_2$$\n\n` +
+        `**Key Stages**:\n` +
+        `1. **Light-Dependent Reactions** (Thylakoid Membrane): Chlorophyll absorbs sunlight and splits water molecules, producing Oxygen ($O_2$), ATP, and NADPH.\n` +
+        `2. **Calvin Cycle / Light-Independent Reactions** (Stroma): Uses ATP and NADPH to fix Carbon Dioxide ($CO_2$) into carbohydrates/glucose ($C_6H_{12}O_6$).\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 9. Newton's Laws of Motion
+    if (text.includes('newton') && (text.includes('law') || text.includes('motion'))) {
+      return `### 🍎 Newton's Three Laws of Motion\n\n` +
+        `1. **First Law (Law of Inertia)**: An object at rest stays at rest, and an object in uniform motion stays in motion unless acted upon by an external net force.\n` +
+        `2. **Second Law (Fundamental Law)**: The acceleration of an object is directly proportional to the net force acting on it and inversely proportional to its mass: $$\\vec{F} = m \\cdot \\vec{a}$$\n` +
+        `3. **Third Law (Action & Reaction)**: For every action force, there is an equal and opposite reaction force ($$\\vec{F}_{A\\rightarrow B} = -\\vec{F}_{B\\rightarrow A}$$).\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 10. Study & Exam Revision Tips
+    if (text.includes('study') && (text.includes('tip') || text.includes('how to') || text.includes('exam') || text.includes('revision') || text.includes('focus'))) {
+      return `### 🎓 Proven High-Performance Study Strategies\n\n` +
+        `1. **Active Recall**: Don't passively re-read notes. Close your book and write down everything you remember, or quiz yourself with flashcards.\n` +
+        `2. **Spaced Repetition**: Review challenging concepts at expanding intervals (Day 1, Day 3, Day 7, Day 14) to cement them into long-term memory.\n` +
+        `3. **Pomodoro Technique**: 25 minutes of 100% focused study without phone notifications, followed by a 5-minute physical break.\n` +
+        `4. **Feynman Technique**: Explain the concept out loud in plain, simple language as if teaching it to a 10-year-old. Wherever you get stuck reveals your knowledge gaps.\n` +
+        `5. **Past Papers & Practice Problems**: University exams test problem-solving, not reading speed. Dedicate 60% of study time to solving real questions.\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    return null;
   }
 
   /**

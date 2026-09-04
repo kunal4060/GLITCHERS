@@ -25,7 +25,6 @@ import { LoginScreen } from '../screens/LoginScreen';
 import { useAuthStore } from '../store/authStore';
 
 import { designTokens } from '../theme/designTokens';
-import { FloatingAIButton } from '../components/common/FloatingAIButton';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -212,9 +211,6 @@ function MainTabs({ navigation }: { navigation: any }) {
           }}
         />
       </Tab.Navigator>
-
-      {/* Floating 3D Crystal Gem Assistant */}
-      <FloatingAIButton onPress={() => navigation.navigate('AI Companion')} />
     </View>
   );
 }

@@ -10,6 +10,9 @@ export class GeminiAssistant {
   private candidateModels = [
     'gemini-flash-lite-latest',
     'gemini-flash-latest',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+    'gemini-1.5-pro',
   ];
 
   constructor() {
@@ -258,7 +261,8 @@ export class GeminiAssistant {
 
     // Call Google Gemini API with cascade
     if (this.genAI) {
-      const systemPrompt = `You are the ultimate ChatGPT-grade AI Student Companion for ${context.profile?.fullName || 'Kunal Ugale'} at ${context.profile?.university || 'State Technological University'}.
+      const systemPrompt = `You are a universal, world-class AI Student Companion and intelligent tutor for ${context.profile?.fullName || 'Kunal Ugale'} at ${context.profile?.university || 'State Technological University'}, combining the conversational depth of Google Gemini and ChatGPT.
+
 Today's Date: ${context.now.toDateString()} (${context.currentDay}).
 Yesterday's Date: ${context.yesterday.toDateString()} (${context.yesterdayDay}).
 
@@ -287,10 +291,11 @@ ${context.tasks.filter((t) => t.status !== 'COMPLETED').map((t) => `• [${t.pri
 ${context.debts.map((d) => `• ${d.person}: ₹${d.amount} (${d.type === 'OWES_ME' ? 'Owes student' : 'Student owes'}) - ${d.status}`).join('\n')}
 
 INSTRUCTIONS:
-1. Answer with the intelligence, clarity, formatting, and depth of ChatGPT.
-2. MATH QUESTIONS: If the student asks ANY math or scientific question (algebra, arithmetic, calculus, statistics, equations, geometry), provide an accurate, clean, step-by-step mathematical solution with clear steps and the final boxed/bold answer.
+1. UNIVERSAL KNOWLEDGE: Answer ANY and ALL questions from the student on any topic whatsoever (coding, algorithms, computer science, general science, physics, chemistry, history, literature, study tips, writing, career advice, conceptual explanations, mathematics, reasoning). Never restrict yourself to only student database questions. Answer with comprehensive clarity, high quality, and formatting.
+2. MATH & PROGRAMMING QUESTIONS: If the student asks ANY math, engineering, or programming question, provide complete, accurate, step-by-step solutions with code snippets or clean LaTeX-style mathematical equations.
 3. IN-APP DATA & CONCLUDING:
-   - If asked to "conclude", "analyze", or "summarize" their data or status, give a comprehensive synthesis: analyze their spending health, budget burn rate, upcoming class schedule, and pending task workload.
+   - If the student asks about their classes, schedule, expenses, tasks, debts, or budget, provide accurate numbers and items directly from the live database above.
+   - If asked to "conclude", "analyze", or "summarize" their data or status, synthesize their financial health, budget burn rate, upcoming class schedule, and pending task workload.
    - If asked "what amount did I expense yesterday", compute the sum of expenses marked [YESTERDAY] and list the items.
    - If asked "which classes do I have", give their scheduled classes with time and room.
 4. Keep the output neat, well-structured, formatted with markdown, bullet points, and bold text for key figures.`;
@@ -446,7 +451,7 @@ INSTRUCTIONS:
     }
 
     return {
-      message: `I am your AI Student Companion. You can ask me to solve math problems, query your expenses ("What did I spend yesterday?"), check your schedule ("Which classes do I have?"), or schedule assignments and tasks!`,
+      message: `I am your universal AI Student Companion. I can answer academic questions, explain computer science & engineering concepts, solve step-by-step math problems, summarize your schedule, and track expenses.\n\nAsk me anything like:\n• *"Explain binary search"*\n• *"Solve 4x + 16 = 36"*\n• *"What did I spend yesterday?"*\n• *"Which classes do I have today?"*\n• *"Spent 180 on lunch"*\n• *"Remind me to submit project on Friday"*`,
       intent: 'GENERAL_QUERY',
       requiresConfirmation: false,
       confirmationPayload: null,

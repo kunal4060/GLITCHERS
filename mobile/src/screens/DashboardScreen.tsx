@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { designTokens } from '../theme/designTokens';
 import { GlassCard } from '../components/common/GlassCard';
@@ -11,6 +12,11 @@ import { AIGemSymbol } from '../components/common/AIGemSymbol';
 import { useDashboardStore } from '../store/dashboardStore';
 import { useAuthStore } from '../store/authStore';
 import { apiClient } from '../api/client';
+import {
+  getNextUpcomingClass,
+  getDayIndex,
+  parseTimeToMinutes,
+} from '../utils/timetableTimeUtils';
 
 export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
   const {
@@ -63,13 +69,25 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
   const pendingTasks = tasks.filter((t) => t.status === 'TODO');
   const urgentEmail = emails.find((e) => e.importance === 'CRITICAL' || e.importance === 'HIGH');
 
-  // Next class from reference: DBMS
-  const nextClass = classes[0] || {
-    subjectName: 'Database Management\nSystems (DBMS)',
-    startTime: '10:00',
-    endTime: '11:00',
-    room: 'AB1-204',
-    faculty: 'Dr. Sharma',
+  // Real-time dynamic timetable calculations
+  const now = new Date();
+  const currentDayIdx = now.getDay();
+  const curMinutes = now.getHours() * 60 + now.getMinutes();
+  const todayClasses = classes.filter((c) => getDayIndex(c.day) === currentDayIdx && !c.isCancelled);
+  const upcomingCount = todayClasses.filter((c) => parseTimeToMinutes(c.startTime) > curMinutes).length;
+
+  const nextClassInfo = getNextUpcomingClass(classes, now);
+  const nextClass = nextClassInfo.nextClass || {
+    id: 'placeholder',
+    userId: 'u1',
+    subjectName: 'No Classes Scheduled',
+    day: 'MONDAY' as const,
+    startTime: '--:--',
+    endTime: '--:--',
+    room: 'Free Period',
+    faculty: 'Academic Schedule Clear',
+    classType: 'LECTURE' as const,
+    isCancelled: false,
   };
 
   // Spending calculations
@@ -79,114 +97,121 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
 
   return (
     <GradientBackground>
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isLoading}
-            onRefresh={syncWithBackend}
-            tintColor={designTokens.colors.primary}
-          />
-        }
-      >
-        {/* 1. Top App Bar: Title "Home" & Header Action Icons */}
-        <View style={styles.topBar}>
-          <Text style={styles.screenTitle}>Home</Text>
-
-          <View style={styles.topActions}>
-            <TouchableOpacity
-              style={styles.iconBtn}
-              onPress={() => navigation?.navigate('Search')}
-              accessibilityLabel="Search"
-            >
-              <Ionicons name="search-outline" size={22} color={designTokens.colors.textPrimary} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.iconBtn}
-              onPress={() => navigation?.navigate('Alerts')}
-              accessibilityLabel="Notifications"
-            >
-              <Ionicons name="notifications-outline" size={22} color={designTokens.colors.textPrimary} />
-              <View style={styles.notifDot} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.iconBtn}
-              onPress={() => navigation?.navigate('Account')}
-              accessibilityLabel="Settings"
-            >
-              <Ionicons name="settings-outline" size={22} color={designTokens.colors.textPrimary} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* 2. Greeting Profile Section */}
-        <TouchableOpacity
-          style={styles.profileRow}
-          activeOpacity={0.85}
-          onPress={() => navigation?.navigate('Account')}
+      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isLoading}
+              onRefresh={syncWithBackend}
+              tintColor={designTokens.colors.primary}
+            />
+          }
         >
-          <NinjaAvatar size="small" showBadges={false} customImageUri={avatarUrl} />
-          <View style={styles.profileTextCol}>
-            <Text style={styles.greetingTitle}>Good morning, Kunal</Text>
-            <Text style={styles.semesterSubtitle}>VIT AP • Fall Semester 2026-27</Text>
-          </View>
-        </TouchableOpacity>
+          {/* 1. Top App Bar: Title "Home" & Header Action Icons */}
+          <View style={styles.topBar}>
+            <Text style={styles.screenTitle}>Home</Text>
 
-        {/* 3. Three Pastel Information Cards */}
-        <View style={styles.statsRow}>
-          <StatCard
-            variant="teal"
-            title={'3 Classes\nToday'}
-            subtext="1 Upcoming"
-            icon={<Ionicons name="calendar-outline" size={20} color={designTokens.colors.textPrimary} />}
+            <View style={styles.topActions}>
+              <TouchableOpacity
+                style={styles.iconBtn}
+                onPress={() => navigation?.navigate('Search')}
+                accessibilityLabel="Search"
+              >
+                <Ionicons name="search-outline" size={22} color={designTokens.colors.textPrimary} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.iconBtn}
+                onPress={() => navigation?.navigate('Alerts')}
+                accessibilityLabel="Notifications"
+              >
+                <Ionicons name="notifications-outline" size={22} color={designTokens.colors.textPrimary} />
+                <View style={styles.notifDot} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.iconBtn}
+                onPress={() => navigation?.navigate('Account')}
+                accessibilityLabel="Settings"
+              >
+                <Ionicons name="settings-outline" size={22} color={designTokens.colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* 2. Greeting Profile Section */}
+          <TouchableOpacity
+            style={styles.profileRow}
+            activeOpacity={0.85}
+            onPress={() => navigation?.navigate('Account')}
+          >
+            <NinjaAvatar size="small" showBadges={false} customImageUri={avatarUrl} />
+            <View style={styles.profileTextCol}>
+              <Text style={styles.greetingTitle}>Good morning, Kunal</Text>
+              <Text style={styles.semesterSubtitle}>VIT AP • Fall Semester 2026-27</Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* 3. Three Pastel Information Cards */}
+          <View style={styles.statsRow}>
+            <StatCard
+              variant="teal"
+              title={`${todayClasses.length} ${todayClasses.length === 1 ? 'Class' : 'Classes'}\nToday`}
+              subtext={upcomingCount > 0 ? `${upcomingCount} Upcoming` : todayClasses.length > 0 ? 'All Done' : 'No Classes'}
+              icon={<Ionicons name="calendar-outline" size={20} color={designTokens.colors.textPrimary} />}
+              onPress={() => navigation?.navigate('Timetable')}
+            />
+            <View style={{ width: 10 }} />
+            <StatCard
+              variant="peach"
+              title={`${pendingTasks.length} Pending\n${pendingTasks.length === 1 ? 'Task' : 'Tasks'}`}
+              subtext={
+                pendingTasks.filter((t) => t.priority === 'EXTREMELY_IMPORTANT' || t.priority === 'HIGH').length > 0
+                  ? `${pendingTasks.filter((t) => t.priority === 'EXTREMELY_IMPORTANT' || t.priority === 'HIGH').length} Urgent`
+                  : 'On Track'
+              }
+              hasDot={pendingTasks.length > 0}
+              dotColor={designTokens.colors.accentPeachDot}
+              icon={<Ionicons name="checkbox-outline" size={20} color={designTokens.colors.textPrimary} />}
+              onPress={() => navigation?.navigate('Tasks')}
+            />
+            <View style={{ width: 10 }} />
+            <StatCard
+              variant="cream"
+              title={`${urgentEmail ? 1 : 0} Important\nNotice`}
+              subtext={gmailConnected ? (urgentEmail ? 'Official' : 'All clear') : 'Not linked'}
+              icon={<Ionicons name="mail-outline" size={20} color={designTokens.colors.textPrimary} />}
+              onPress={() => navigation?.navigate('Email')}
+            />
+          </View>
+
+          {/* 4. Large Next Class Feature Card */}
+          <GlassCard
+            variant="hero"
+            style={styles.heroCard}
             onPress={() => navigation?.navigate('Timetable')}
-          />
-          <View style={{ width: 10 }} />
-          <StatCard
-            variant="peach"
-            title={'2 Pending\nTasks'}
-            subtext="1 Urgent"
-            hasDot
-            dotColor={designTokens.colors.accentPeachDot}
-            icon={<Ionicons name="checkbox-outline" size={20} color={designTokens.colors.textPrimary} />}
-            onPress={() => navigation?.navigate('Tasks')}
-          />
-          <View style={{ width: 10 }} />
-          <StatCard
-            variant="cream"
-            title={`${urgentEmail ? 1 : 0} Important\nNotice`}
-            subtext={gmailConnected ? (urgentEmail ? 'Official' : 'All clear') : 'Not linked'}
-            icon={<Ionicons name="mail-outline" size={20} color={designTokens.colors.textPrimary} />}
-            onPress={() => navigation?.navigate('Email')}
-          />
-        </View>
+          >
+            <View style={styles.heroTopRow}>
+              <Text style={styles.heroLabel}>
+                {nextClassInfo.isOngoing ? 'CURRENT CLASS' : nextClassInfo.isToday ? 'NEXT CLASS' : 'UPCOMING CLASS'}
+              </Text>
+              <StatusBadge label={nextClassInfo.statusLabel} variant={nextClassInfo.badgeVariant} />
+            </View>
 
-        {/* 4. Large Next Class Feature Card */}
-        <GlassCard
-          variant="hero"
-          style={styles.heroCard}
-          onPress={() => navigation?.navigate('Timetable')}
-        >
-          <View style={styles.heroTopRow}>
-            <Text style={styles.heroLabel}>NEXT CLASS</Text>
-            <StatusBadge label="Starts in 18 mins" variant="countdown" />
-          </View>
+            <Text style={styles.heroSubjectTitle}>
+              {nextClass.subjectName.replace('\\n', '\n')}
+            </Text>
 
-          <Text style={styles.heroSubjectTitle}>
-            {nextClass.subjectName.replace('\\n', '\n')}
-          </Text>
-
-          <Text style={styles.heroMetaText}>
-            {nextClass.startTime} – {nextClass.endTime} • Room: {nextClass.room || 'AB1-204'}
-          </Text>
-          <Text style={styles.heroFacultyText}>
-            Faculty: {nextClass.faculty || 'Dr. Sharma'}
-          </Text>
-        </GlassCard>
+            <Text style={styles.heroMetaText}>
+              {nextClass.startTime} – {nextClass.endTime} • Room: {nextClass.room || 'AB1-204'}
+            </Text>
+            <Text style={styles.heroFacultyText}>
+              Faculty: {nextClass.faculty || 'Faculty'}
+            </Text>
+          </GlassCard>
 
         {/* 5. Priority Deadlines Section */}
         <View style={styles.sectionHeaderRow}>
@@ -352,7 +377,8 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
 
         {/* Space at bottom for navigation and floating gem */}
         <View style={{ height: 80 }} />
-      </ScrollView>
+        </ScrollView>
+      </SafeAreaView>
     </GradientBackground>
   );
 };
@@ -364,7 +390,7 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: designTokens.spacing.lg,
-    paddingTop: 48,
+    paddingTop: 12,
     paddingBottom: 24,
   },
 

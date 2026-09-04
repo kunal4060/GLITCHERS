@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Modal } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { designTokens } from '../theme/designTokens';
 import { GlassCard } from '../components/common/GlassCard';
@@ -523,73 +524,95 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
 
   return (
     <GradientBackground>
-      <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <AIGemSymbol size={34} />
-          <View>
-            <Text style={styles.headerTitle}>AI Student Companion</Text>
-            <View style={styles.statusRow}>
-              <View style={[styles.onlineDot, aiMode === 'OFFLINE' && { backgroundColor: '#F59E0B' }]} />
-              <Text style={styles.statusText}>
-                {aiMode === 'OFFLINE' ? '100% Offline (Hugging Face)' : 'Universal Command Center Active'}
-              </Text>
+      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+        <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <AIGemSymbol size={34} />
+            <View>
+              <Text style={styles.headerTitle}>AI Student Companion</Text>
+              <View style={styles.statusRow}>
+                <View style={[styles.onlineDot, aiMode === 'OFFLINE' && { backgroundColor: '#F59E0B' }]} />
+                <Text style={styles.statusText}>
+                  {aiMode === 'OFFLINE' ? '100% Offline (Hugging Face)' : 'Universal Command Center Active'}
+                </Text>
+              </View>
             </View>
           </View>
-        </View>
 
-        {/* Offline Hugging Face Model Switcher Pill */}
-        <TouchableOpacity
-          style={[styles.modelPillBtn, aiMode === 'OFFLINE' && styles.modelPillBtnOffline]}
-          onPress={() => setModelModalVisible(true)}
-          activeOpacity={0.8}
-        >
-          <Ionicons
-            name={aiMode === 'OFFLINE' ? 'flash' : aiMode === 'AUTO' ? 'sync' : 'cloud'}
-            size={13}
-            color={aiMode === 'OFFLINE' ? '#B45309' : designTokens.colors.primaryDark}
-          />
-          <Text style={[styles.modelPillText, aiMode === 'OFFLINE' && { color: '#B45309' }]}>
-            {aiMode === 'OFFLINE' ? 'SmolLM2 (Offline)' : aiMode === 'AUTO' ? 'Auto (HF/Cloud)' : 'Gemini Cloud'}
-          </Text>
-          <Ionicons name="chevron-down" size={11} color={designTokens.colors.textSecondary} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Offline Pending Sync Banner */}
-      {offlineSyncQueue.filter((q) => !q.synced).length > 0 && (
-        <View style={styles.offlineQueueBanner}>
-          <View style={styles.queueBannerLeft}>
-            <Ionicons name="cloud-offline-outline" size={15} color="#B45309" />
-            <Text style={styles.queueBannerText}>
-              {offlineSyncQueue.filter((q) => !q.synced).length} action(s) stored in phone. Will push to dataset when online.
-            </Text>
-          </View>
+          {/* Offline Hugging Face Model Switcher Pill */}
           <TouchableOpacity
-            style={styles.syncQueueBtn}
-            onPress={async () => {
-              const res = await flushOfflineQueue();
-              Alert.alert('Dataset Synced', `Pushed ${res.syncedCount} offline record(s) to cloud database!`);
-            }}
+            style={[styles.modelPillBtn, aiMode === 'OFFLINE' && styles.modelPillBtnOffline]}
+            onPress={() => setModelModalVisible(true)}
+            activeOpacity={0.7}
+            hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
           >
-            <Text style={styles.syncQueueBtnText}>Sync Now</Text>
+            <Ionicons
+              name={aiMode === 'OFFLINE' ? 'flash' : aiMode === 'AUTO' ? 'sync' : 'cloud'}
+              size={14}
+              color={aiMode === 'OFFLINE' ? '#B45309' : designTokens.colors.primaryDark}
+            />
+            <Text style={[styles.modelPillText, aiMode === 'OFFLINE' && { color: '#B45309' }]}>
+              {aiMode === 'OFFLINE' ? 'Offline (HF)' : aiMode === 'AUTO' ? 'Auto (HF/Cloud)' : 'Gemini Cloud'}
+            </Text>
+            <Ionicons name="chevron-down" size={12} color={designTokens.colors.textSecondary} />
           </TouchableOpacity>
         </View>
-      )}
 
-      {/* Chat Messages Feed or Empty State */}
-      {messages.length === 0 ? (
-        <ScrollView contentContainerStyle={styles.emptyContainer}>
-          <View style={{ marginBottom: 16 }}>
-            <AIGemSymbol size={64} />
+        {/* Offline Pending Sync Banner */}
+        {offlineSyncQueue.filter((q) => !q.synced).length > 0 && (
+          <View style={styles.offlineQueueBanner}>
+            <View style={styles.queueBannerLeft}>
+              <Ionicons name="cloud-offline-outline" size={15} color="#B45309" />
+              <Text style={styles.queueBannerText}>
+                {offlineSyncQueue.filter((q) => !q.synced).length} action(s) stored in phone. Will push to dataset when online.
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.syncQueueBtn}
+              onPress={async () => {
+                const res = await flushOfflineQueue();
+                Alert.alert('Dataset Synced', `Pushed ${res.syncedCount} offline record(s) to cloud database!`);
+              }}
+            >
+              <Text style={styles.syncQueueBtnText}>Sync Now</Text>
+            </TouchableOpacity>
           </View>
-          <Text style={styles.emptyTitle}>Universal Student Command Center</Text>
-          <Text style={styles.emptyDescription}>
-            Speak or type naturally. I can log your expenses, schedule assignments, split bills, and fetch live timetables.
-          </Text>
+        )}
 
-          <Text style={styles.tryExamplesLabel}>TRY SAYING:</Text>
+        {/* Chat Messages Feed or Empty State */}
+        {messages.length === 0 ? (
+          <ScrollView contentContainerStyle={styles.emptyContainer}>
+            <View style={{ marginBottom: 16 }}>
+              <AIGemSymbol size={64} />
+            </View>
+            <Text style={styles.emptyTitle}>Universal Student Command Center</Text>
+            <Text style={styles.emptyDescription}>
+              Speak or type naturally. I can log your expenses, schedule assignments, split bills, and fetch live timetables.
+            </Text>
+
+            {/* Offline Model Switcher Banner Shortcut */}
+            <TouchableOpacity
+              style={styles.offlineEngineBannerBtn}
+              activeOpacity={0.8}
+              onPress={() => setModelModalVisible(true)}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                <Ionicons name="hardware-chip" size={18} color={aiMode === 'OFFLINE' ? '#B45309' : designTokens.colors.primaryDark} />
+                <View>
+                  <Text style={styles.offlineEngineBannerTitle}>
+                    {aiMode === 'OFFLINE' ? '📴 Running 100% Offline' : '⚡ On-Device AI Models Available'}
+                  </Text>
+                  <Text style={styles.offlineEngineBannerSubtitle}>
+                    Active: {activeOfflineModel.split('/')[1] || 'SmolLM2'} • Tap to configure
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={designTokens.colors.textSecondary} />
+            </TouchableOpacity>
+
+            <Text style={styles.tryExamplesLabel}>TRY SAYING:</Text>
           <View style={styles.examplesList}>
             {getContextChips().map((chip, idx) => (
               <TouchableOpacity
@@ -754,75 +777,95 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
               </View>
 
               {/* Hugging Face Offline Models List */}
-              <Text style={styles.modalSectionLabel}>HUGGING FACE ON-DEVICE MODELS</Text>
+              <Text style={styles.modalSectionLabel}>HUGGING FACE ON-DEVICE MODELS (TAP TO ACTIVATE)</Text>
               {HUGGINGFACE_OFFLINE_MODELS.map((m) => {
                 const isDownloaded = downloadedModels.includes(m.id);
                 const isActive = activeOfflineModel === m.id;
                 const progress = downloadProgress[m.id];
                 const isDownloading = progress !== undefined && progress < 100;
 
+                const handleSelectOrDownload = async () => {
+                  if (isDownloading) return;
+                  if (!isDownloaded) {
+                    await downloadOfflineModel(m.id);
+                  }
+                  setActiveOfflineModel(m.id);
+                  setAiMode('OFFLINE');
+                  Alert.alert(
+                    '⚡ Offline Engine Active',
+                    `Activated ${m.name}.\n\nRunning 100% locally on your phone without internet.`
+                  );
+                };
+
                 return (
-                  <GlassCard key={m.id} variant="cream" style={styles.modelCard}>
-                    <View style={styles.modelCardTop}>
-                      <View style={{ flex: 1, paddingRight: 8 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Text style={styles.modelCardName}>{m.name}</Text>
-                          {isActive && (
-                            <View style={styles.activeTag}>
-                              <Text style={styles.activeTagText}>ACTIVE</Text>
-                            </View>
-                          )}
+                  <TouchableOpacity
+                    key={m.id}
+                    activeOpacity={0.78}
+                    onPress={handleSelectOrDownload}
+                    style={{ marginBottom: 10 }}
+                  >
+                    <GlassCard
+                      variant="cream"
+                      style={[
+                        styles.modelCard,
+                        isActive && styles.modelCardActive,
+                      ]}
+                    >
+                      <View style={styles.modelCardTop}>
+                        <View style={{ flex: 1, paddingRight: 8 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={[styles.modelCardName, isActive && { color: designTokens.colors.primaryDark }]}>
+                              {m.name}
+                            </Text>
+                            {isActive && (
+                              <View style={styles.activeTag}>
+                                <Text style={styles.activeTagText}>ACTIVE (TAP TO RE-SELECT)</Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={styles.modelCardRepo}>{m.repo}</Text>
+                          <Text style={styles.modelCardDesc}>{m.description}</Text>
                         </View>
-                        <Text style={styles.modelCardRepo}>{m.repo}</Text>
-                        <Text style={styles.modelCardDesc}>{m.description}</Text>
+                        <Text style={styles.modelCardSize}>{m.sizeMB} MB</Text>
                       </View>
-                      <Text style={styles.modelCardSize}>{m.sizeMB} MB</Text>
-                    </View>
 
-                    {/* Download Progress Bar if downloading */}
-                    {isDownloading && (
-                      <View style={styles.progressRow}>
-                        <View style={styles.progressBarTrack}>
-                          <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
+                      {/* Download Progress Bar if downloading */}
+                      {isDownloading && (
+                        <View style={styles.progressRow}>
+                          <View style={styles.progressBarTrack}>
+                            <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
+                          </View>
+                          <Text style={styles.progressText}>{progress}%</Text>
                         </View>
-                        <Text style={styles.progressText}>{progress}%</Text>
-                      </View>
-                    )}
+                      )}
 
-                    <View style={styles.modelCardBottom}>
-                      <Text style={styles.modelSpecialty}>🎯 {m.specialty}</Text>
-                      <TouchableOpacity
-                        style={[
-                          styles.modelActionBtn,
-                          isActive && styles.modelActionBtnActive,
-                          !isDownloaded && styles.modelActionBtnDownload,
-                        ]}
-                        onPress={async () => {
-                          if (!isDownloaded) {
-                            await downloadOfflineModel(m.id);
-                          } else {
-                            setActiveOfflineModel(m.id);
-                          }
-                        }}
-                        disabled={isDownloading}
-                      >
-                        <Text
+                      <View style={styles.modelCardBottom}>
+                        <Text style={styles.modelSpecialty}>🎯 {m.specialty}</Text>
+                        <View
                           style={[
-                            styles.modelActionBtnText,
-                            isActive && styles.modelActionBtnTextActive,
+                            styles.modelActionBtn,
+                            isActive && styles.modelActionBtnActive,
+                            !isDownloaded && styles.modelActionBtnDownload,
                           ]}
                         >
-                          {isDownloading
-                            ? 'Downloading...'
-                            : isActive
-                            ? 'Active Model'
-                            : isDownloaded
-                            ? 'Select Model'
-                            : 'Download from HF'}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </GlassCard>
+                          <Text
+                            style={[
+                              styles.modelActionBtnText,
+                              isActive && styles.modelActionBtnTextActive,
+                            ]}
+                          >
+                            {isDownloading
+                              ? 'Downloading...'
+                              : isActive
+                              ? '✓ Active Offline Model'
+                              : isDownloaded
+                              ? 'Select Model'
+                              : 'Download from HF'}
+                          </Text>
+                        </View>
+                      </View>
+                    </GlassCard>
+                  </TouchableOpacity>
                 );
               })}
 
@@ -877,9 +920,10 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
           </View>
         </View>
       </Modal>
-    </View>
-  </GradientBackground>
-);
+      </View>
+      </SafeAreaView>
+    </GradientBackground>
+  );
 };
 
 const styles = StyleSheet.create({
@@ -889,10 +933,34 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: designTokens.spacing.lg,
-    paddingTop: designTokens.spacing.lg,
+    paddingTop: 8,
     paddingBottom: designTokens.spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: designTokens.colors.surfaceBorder,
+  },
+  offlineEngineBannerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: 'rgba(117, 167, 165, 0.35)',
+    borderRadius: designTokens.radii.card,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: designTokens.spacing.lg,
+    width: '100%',
+    ...designTokens.shadows.card,
+  },
+  offlineEngineBannerTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: designTokens.colors.textPrimary,
+  },
+  offlineEngineBannerSubtitle: {
+    fontSize: 11,
+    color: designTokens.colors.textSecondary,
+    marginTop: 2,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -1222,6 +1290,11 @@ const styles = StyleSheet.create({
   modelCard: {
     marginBottom: 10,
     padding: 12,
+  },
+  modelCardActive: {
+    borderColor: designTokens.colors.primary,
+    borderWidth: 2,
+    backgroundColor: '#F0FDF4',
   },
   modelCardTop: {
     flexDirection: 'row',

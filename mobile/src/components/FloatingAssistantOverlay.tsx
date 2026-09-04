@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useFloatingStore } from '../store/floatingStore';
 import { useDashboardStore } from '../store/dashboardStore';
+import { useAuthStore } from '../store/authStore';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AIGemSymbol } from './common/AIGemSymbol';
 import { designTokens } from '../theme/designTokens';
@@ -137,7 +138,8 @@ export const FloatingAssistantOverlay: React.FC = () => {
     }
   };
 
-  if (!isBubbleVisible) return null;
+  const { isAuthenticated, isOnboardingComplete } = useAuthStore();
+  if (!isAuthenticated || !isOnboardingComplete || !isBubbleVisible) return null;
 
   return (
     <View pointerEvents="box-none" style={styles.overlayContainer}>
@@ -363,6 +365,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'flex-end',
     padding: 16,
+    paddingBottom: 84,
   },
   floatingBubble: {
     justifyContent: 'center',
@@ -370,7 +373,7 @@ const styles = StyleSheet.create({
   },
   menuDock: {
     position: 'absolute',
-    bottom: 85,
+    bottom: 150,
     right: 16,
     backgroundColor: '#FAF7F2',
     borderRadius: 20,
@@ -402,7 +405,7 @@ const styles = StyleSheet.create({
   },
   miniWindowContainer: {
     position: 'absolute',
-    bottom: 90,
+    bottom: 150,
     left: 16,
     right: 16,
     maxHeight: 400,

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { designTokens } from '../theme/designTokens';
 import { GlassCard } from '../components/common/GlassCard';
 import { StatusBadge } from '../components/common/StatusBadge';
@@ -7,12 +8,19 @@ import { GradientBackground } from '../components/common/GradientBackground';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useDashboardStore } from '../store/dashboardStore';
 import type { ClassSession } from '@glitchers/shared';
+import { getClassStatus } from '../utils/timetableTimeUtils';
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+const getTodayDayName = () => {
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const today = dayNames[new Date().getDay()];
+  return DAYS.includes(today) ? today : 'Monday';
+};
 
 export const TimetableScreen: React.FC = () => {
   const { classes, setClasses } = useDashboardStore();
-  const [selectedDay, setSelectedDay] = useState('Thursday');
+  const [selectedDay, setSelectedDay] = useState<string>(getTodayDayName);
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [newSubject, setNewSubject] = useState('');
   const [newRoom, setNewRoom] = useState('');
@@ -61,86 +69,89 @@ export const TimetableScreen: React.FC = () => {
 
   return (
     <GradientBackground>
-      <View style={styles.container}>
-      {/* Top Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Timetable</Text>
-          <Text style={styles.headerSubtitle}>
-            {dayClasses.length} {dayClasses.length === 1 ? 'class' : 'classes'} on {selectedDay}
-          </Text>
-        </View>
-
-        <View style={styles.headerRightButtons}>
-          <TouchableOpacity
-            style={styles.addBtn}
-            onPress={() => setIsAddModalVisible(true)}
-          >
-            <Ionicons name="add" size={16} color="#FFFFFF" />
-            <Text style={styles.addBtnText}>Add Class</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Monday - Friday Tabs */}
-      <View style={styles.dayTabsWrapper}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.dayTabsContent}
-        >
-          {DAYS.map((day) => {
-            const isActive = day === selectedDay;
-            return (
-              <TouchableOpacity
-                key={day}
-                style={[styles.dayTab, isActive && styles.dayTabActive]}
-                onPress={() => setSelectedDay(day)}
-              >
-                <Text style={[styles.dayTabText, isActive && styles.dayTabTextActive]}>
-                  {day}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      {/* Class Schedule List */}
-      <ScrollView contentContainerStyle={styles.scheduleList}>
-        {dayClasses.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Ionicons name="cafe-outline" size={32} color="#64748B" style={{ marginBottom: 8 }} />
-            <Text style={styles.emptyTitle}>No classes scheduled for {selectedDay}</Text>
-            <Text style={styles.emptySub}>Enjoy your free academic hours or catch up on project work.</Text>
+      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+        <View style={styles.container}>
+        {/* Top Header */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.headerTitle}>Timetable</Text>
+            <Text style={styles.headerSubtitle}>
+              {dayClasses.length} {dayClasses.length === 1 ? 'class' : 'classes'} on {selectedDay}
+            </Text>
           </View>
-        ) : (
-          dayClasses.map((item, index) => {
-            // Intelligent status calculation
-            let statusBadge = <StatusBadge label="Upcoming" variant="countdown" />;
-            if (index === 0 && selectedDay === 'Thursday') {
-              statusBadge = <StatusBadge label="Starts in 18 min" variant="countdown" />;
-            } else if (index === 1 && selectedDay === 'Thursday') {
-              statusBadge = <StatusBadge label="In 1h 15m" variant="countdown" />;
-            }
 
-            return (
-              <GlassCard key={item.id} style={styles.classCard}>
-                <View style={styles.cardHeader}>
-                  <View style={styles.timeBlock}>
-                    <Ionicons name="time-outline" size={13} color="#60A5FA" />
-                    <Text style={styles.timeStart}>{item.startTime}</Text>
-                    <Text style={styles.timeDivider}>–</Text>
-                    <Text style={styles.timeEnd}>{item.endTime}</Text>
-                  </View>
+          <View style={styles.headerRightButtons}>
+            <TouchableOpacity
+              style={styles.addBtn}
+              onPress={() => setIsAddModalVisible(true)}
+            >
+              <Ionicons name="add" size={16} color="#FFFFFF" />
+              <Text style={styles.addBtnText}>Add Class</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
-                  <View style={styles.cardHeaderRight}>
-                    <View style={styles.typeBadge}>
-                      <Text style={styles.typeBadgeText}>{item.classType || 'LECTURE'}</Text>
+        {/* Monday - Saturday Tabs */}
+        <View style={styles.dayTabsWrapper}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.dayTabsContent}
+          >
+            {DAYS.map((day) => {
+              const isActive = day === selectedDay;
+              return (
+                <TouchableOpacity
+                  key={day}
+                  style={[styles.dayTab, isActive && styles.dayTabActive]}
+                  onPress={() => setSelectedDay(day)}
+                >
+                  <Text style={[styles.dayTabText, isActive && styles.dayTabTextActive]}>
+                    {day}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {/* Class Schedule List */}
+        <ScrollView contentContainerStyle={styles.scheduleList}>
+          {dayClasses.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Ionicons name="cafe-outline" size={32} color="#64748B" style={{ marginBottom: 8 }} />
+              <Text style={styles.emptyTitle}>No classes scheduled for {selectedDay}</Text>
+              <Text style={styles.emptySub}>Enjoy your free academic hours or catch up on project work.</Text>
+            </View>
+          ) : (
+            dayClasses.map((item, index) => {
+              // Real-time live status calculation
+              const now = new Date();
+              const live = getClassStatus(item, now);
+              const statusBadge =
+                live.status === 'DIFFERENT_DAY' ? (
+                  <StatusBadge label="Scheduled" variant="safe" />
+                ) : (
+                  <StatusBadge label={live.label} variant={live.badgeVariant} />
+                );
+
+              return (
+                <GlassCard key={item.id} style={styles.classCard}>
+                  <View style={styles.cardHeader}>
+                    <View style={styles.timeBlock}>
+                      <Ionicons name="time-outline" size={13} color="#60A5FA" />
+                      <Text style={styles.timeStart}>{item.startTime}</Text>
+                      <Text style={styles.timeDivider}>–</Text>
+                      <Text style={styles.timeEnd}>{item.endTime}</Text>
                     </View>
-                    {statusBadge}
+
+                    <View style={styles.cardHeaderRight}>
+                      <View style={styles.typeBadge}>
+                        <Text style={styles.typeBadgeText}>{item.classType || 'LECTURE'}</Text>
+                      </View>
+                      {statusBadge}
+                    </View>
                   </View>
-                </View>
 
                 <Text style={styles.subjectName}>{item.subjectName}</Text>
 
@@ -220,9 +231,10 @@ export const TimetableScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
-    </View>
-  </GradientBackground>
-);
+      </View>
+      </SafeAreaView>
+    </GradientBackground>
+  );
 };
 
 const styles = StyleSheet.create({
@@ -232,7 +244,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: designTokens.spacing.lg,
-    paddingTop: designTokens.spacing.lg,
+    paddingTop: 8,
     paddingBottom: designTokens.spacing.md,
   },
   headerTitle: {
