@@ -102,13 +102,17 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         inMemoryStore.profiles.set(id, profile);
       }
 
+      if (accessToken) {
+        googleService.setUserAccessToken(profile.id, accessToken);
+      }
+
       inMemoryStore.googleConnections.set(profile.id, {
         id: randomUUID(),
         userId: profile.id,
         email,
         gmailConnected: true,
         calendarConnected: true,
-        scopes: ['userinfo.email', 'userinfo.profile', 'openid'],
+        scopes: ['userinfo.email', 'userinfo.profile', 'openid', 'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/calendar.events'],
       });
 
       return reply.redirect(
@@ -150,13 +154,17 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       inMemoryStore.profiles.set(id, profile);
     }
 
+    if (accessToken) {
+      googleService.setUserAccessToken(profile.id, accessToken);
+    }
+
     inMemoryStore.googleConnections.set(profile.id, {
       id: randomUUID(),
       userId: profile.id,
       email,
       gmailConnected: true,
       calendarConnected: true,
-      scopes: ['userinfo.email', 'userinfo.profile', 'openid'],
+      scopes: ['userinfo.email', 'userinfo.profile', 'openid', 'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/calendar.events'],
     });
 
     return {

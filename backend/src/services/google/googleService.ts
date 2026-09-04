@@ -3,6 +3,7 @@ import { env } from '../../config/env.js';
 
 export class GoogleService {
   private oauth2Client: any = null;
+  private userTokens = new Map<string, string>();
 
   constructor() {
     if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && !env.GOOGLE_CLIENT_ID.startsWith('dev-')) {
@@ -14,6 +15,14 @@ export class GoogleService {
     }
   }
 
+  public setUserAccessToken(userId: string, token: string) {
+    this.userTokens.set(userId, token);
+  }
+
+  public getUserAccessToken(userId: string): string | undefined {
+    return this.userTokens.get(userId);
+  }
+
   public getAuthUrl(stateUrl?: string): string {
     if (!this.oauth2Client) {
       return `http://localhost:5000/api/auth/mock-google-login?code=mock_auth_code`;
@@ -23,6 +32,8 @@ export class GoogleService {
       'openid',
       'https://www.googleapis.com/auth/userinfo.profile',
       'https://www.googleapis.com/auth/userinfo.email',
+      'https://www.googleapis.com/auth/gmail.readonly',
+      'https://www.googleapis.com/auth/calendar.events',
     ];
 
     return this.oauth2Client.generateAuthUrl({
@@ -63,6 +74,56 @@ export class GoogleService {
       accessToken: tokens.access_token || '',
       refreshToken: tokens.refresh_token || undefined,
     };
+  }
+
+  public async fetchRecentEmails(accessToken: string, maxResults: number = 8): Promise<Array<{
+    id: string;
+    subject: string;
+    sender: string;
+    snippet: string;
+    date: string;
+  }>> {
+    try {
+      const auth = new google.auth.OAuth2();
+      auth.setCredentials({ access_token: accessToken });
+      const gmail = google.gmail({ version: 'v1', auth });
+
+      const listRes = await gmail.users.messages.list({
+        userId: 'me',
+        maxResults,
+      });
+
+      const messages = listRes.data.messages || [];
+      const emailList: Array<{ id: string; subject: string; sender: string; snippet: string; date: string }> = [];
+
+      for (const msg of messages) {
+        if (!msg.id) continue;
+        const msgRes = await gmail.users.messages.get({
+          userId: 'me',
+          id: msg.id,
+          format: 'metadata',
+          metadataHeaders: ['Subject', 'From', 'Date'],
+        });
+
+        const headers = msgRes.data.payload?.headers || [];
+        const subjectHeader = headers.find((h) => h.name?.toLowerCase() === 'subject');
+        const fromHeader = headers.find((h) => h.name?.toLowerCase() === 'from');
+        const dateHeader = headers.find((h) => h.name?.toLowerCase() === 'date');
+
+        emailList.push({
+          id: msg.id,
+          subject: subjectHeader?.value || '(No Subject)',
+          sender: fromHeader?.value || 'Unknown Sender',
+          snippet: msgRes.data.snippet || '',
+          date: dateHeader?.value || new Date().toISOString(),
+        });
+      }
+
+      return emailList;
+    } catch (err) {
+      console.warn('Gmail API fetch warning:', err);
+      return [];
+    }
   }
 }
 

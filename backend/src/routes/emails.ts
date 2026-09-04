@@ -9,13 +9,50 @@ import {
 import type { EmailSummary } from '@glitchers/shared';
 import { randomUUID } from 'crypto';
 import { env } from '../config/env.js';
+import { googleService } from '../services/google/googleService.js';
 
 export const emailRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', authMiddleware);
 
+  async function syncGmailIfAvailable(userId: string) {
+    inMemoryStore.ensureStudentData(userId);
+    const token = googleService.getUserAccessToken(userId);
+    if (!token) return;
+
+    try {
+      const realMsgs = await googleService.fetchRecentEmails(token, 8);
+      if (realMsgs && realMsgs.length > 0) {
+        const prefs = inMemoryStore.preferences.get(userId);
+        const domain = prefs?.universityDomain || 'university.edu';
+        const formatted: EmailSummary[] = realMsgs.map((re) => {
+          const isUni = isUniversityEmail(re.sender, domain);
+          const urgency = classifyEmailUrgency(re.subject, re.snippet);
+          const sched = parseScheduleChangeNotice(re.subject, re.snippet);
+          return {
+            id: re.id,
+            userId,
+            providerMessageId: re.id,
+            sender: re.sender,
+            subject: re.subject,
+            receivedAt: re.date,
+            isUniversityRelated: isUni,
+            importance: urgency,
+            summary: re.snippet || re.subject,
+            actionRequired: sched.hasScheduleChange || urgency === 'CRITICAL' || urgency === 'HIGH',
+            actionItem: sched.hasScheduleChange ? 'Schedule notice from faculty' : undefined,
+            isProcessed: true,
+          };
+        });
+        inMemoryStore.emails.set(userId, formatted);
+      }
+    } catch (err) {
+      console.warn('Gmail sync warning:', err);
+    }
+  }
+
   fastify.get('/', async (req) => {
     const userId = req.userId!;
-    inMemoryStore.ensureStudentData(userId);
+    await syncGmailIfAvailable(userId);
     const emails = inMemoryStore.emails.get(userId) || [];
     return { emails };
   });
@@ -73,7 +110,7 @@ export const emailRoutes: FastifyPluginAsync = async (fastify) => {
 
   const handleSummarize = async (req: any) => {
     const userId = req.userId!;
-    inMemoryStore.ensureStudentData(userId);
+    await syncGmailIfAvailable(userId);
     const emails = inMemoryStore.emails.get(userId) || [];
 
     if (emails.length === 0) {

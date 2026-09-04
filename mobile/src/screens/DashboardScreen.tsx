@@ -73,7 +73,7 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
   };
 
   // Spending calculations
-  const totalSpent = expenses.reduce((sum, e) => sum + Number(e.amount), 0) || 710;
+  const totalSpent = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
   const monthlyLimit = budget?.monthlyLimit || 10000;
   const budgetPct = Math.min(100, Math.round((totalSpent / monthlyLimit) * 100));
 

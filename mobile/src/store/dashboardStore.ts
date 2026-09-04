@@ -348,16 +348,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         });
       }
       if (expRes.status === 'fulfilled' && expRes.value.expenses) {
-        const backendExps = expRes.value.expenses;
-        set((s) => {
-          const merged = [...backendExps];
-          for (const localE of s.expenses) {
-            if (!merged.some((m) => m.id === localE.id)) {
-              merged.push(localE);
-            }
-          }
-          return { expenses: merged };
-        });
+        set({ expenses: expRes.value.expenses });
       }
       if (budgetRes.status === 'fulfilled' && budgetRes.value.budget) {
         set({ budget: budgetRes.value.budget });

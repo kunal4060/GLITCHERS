@@ -8,9 +8,7 @@ import { randomUUID } from 'crypto';
 export class GeminiAssistant {
   private genAI: GoogleGenerativeAI | null = null;
   private candidateModels = [
-    'gemini-2.0-flash',
-    'gemini-1.5-flash',
-    'gemini-1.5-pro',
+    'gemini-3.6-flash',
   ];
 
   constructor() {
@@ -604,7 +602,7 @@ RULES:
       const cleanBase64 = base64Data.replace(/^data:[^;]+;base64,/, '').trim();
       const cleanMime = mimeType?.startsWith('image/') ? mimeType : 'image/jpeg';
 
-      for (const modelName of ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro']) {
+      for (const modelName of ['gemini-3.6-flash']) {
         try {
           const model = this.genAI.getGenerativeModel({ model: modelName });
           const result = await model.generateContent([
