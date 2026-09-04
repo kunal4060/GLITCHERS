@@ -65,17 +65,30 @@ export const timetableRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-  fastify.post<{ Body: { imageBase64: string; mimeType?: string } }>('/analyze-image', async (req) => {
-    const { imageBase64, mimeType } = req.body || {};
-    const { geminiAssistant } = await import('../services/gemini/geminiClient.js');
-    const result = await geminiAssistant.analyzeTimetableImage(imageBase64, mimeType);
-    const conflicts = detectScheduleConflicts(result.classes as any);
+  fastify.post<{ Body: { imageBase64: string; mimeType?: string } }>('/analyze-image', async (req, reply) => {
+    try {
+      const { imageBase64, mimeType } = req.body || {};
+      if (!imageBase64) {
+        return reply.code(400).send({ success: false, error: 'No image provided', classes: [], conflicts: [] });
+      }
+      const { geminiAssistant } = await import('../services/gemini/geminiClient.js');
+      const result = await geminiAssistant.analyzeTimetableImage(imageBase64, mimeType);
+      const conflicts = detectScheduleConflicts(result.classes as any);
 
-    return {
-      success: true,
-      classes: result.classes,
-      conflicts,
-    };
+      return {
+        success: true,
+        classes: result.classes,
+        conflicts,
+      };
+    } catch (err: any) {
+      console.error('Error analyzing timetable image:', err);
+      return reply.code(500).send({
+        success: false,
+        error: err.message || 'Timetable analysis failed',
+        classes: [],
+        conflicts: [],
+      });
+    }
   });
 
   fastify.post<{ Body: { classes: ClassSession[] } }>('/classes/bulk', async (req) => {

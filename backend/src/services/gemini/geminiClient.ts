@@ -574,10 +574,46 @@ Rules:
   }> {
     let classes: any[] = [];
 
+    const normalizeDay = (day: any): string => {
+      if (!day || typeof day !== 'string') return 'MONDAY';
+      const upper = day.toUpperCase().trim();
+      if (upper.includes('MON')) return 'MONDAY';
+      if (upper.includes('TUE')) return 'TUESDAY';
+      if (upper.includes('WED')) return 'WEDNESDAY';
+      if (upper.includes('THU')) return 'THURSDAY';
+      if (upper.includes('FRI')) return 'FRIDAY';
+      if (upper.includes('SAT')) return 'SATURDAY';
+      if (upper.includes('SUN')) return 'SUNDAY';
+      return 'MONDAY';
+    };
+
+    const normalizeTime = (time: any, defaultVal: string): string => {
+      if (!time || typeof time !== 'string') return defaultVal;
+      const t = time.trim();
+      const match12 = t.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+      if (match12) {
+        let hours = parseInt(match12[1], 10);
+        const mins = match12[2] ? parseInt(match12[2], 10) : 0;
+        const ampm = match12[3] ? match12[3].toUpperCase() : null;
+        if (ampm === 'PM' && hours < 12) hours += 12;
+        if (ampm === 'AM' && hours === 12) hours = 0;
+        return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+      }
+      const match24 = t.match(/^(\d{1,2}):(\d{2})/);
+      if (match24) {
+        const hours = parseInt(match24[1], 10);
+        const mins = parseInt(match24[2], 10);
+        return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+      }
+      return defaultVal;
+    };
+
     if (this.genAI && base64Data) {
-      const visionPrompt = `You are an expert academic timetable OCR assistant.
-Analyze this image or document of a university timetable/schedule.
+      const visionPrompt = `You are an expert academic timetable OCR parser for university student schedules (including VIT AP, SRM, IITs, NITs, and other colleges).
+Analyze this timetable image or document.
 Extract all scheduled lecture, lab, and tutorial classes into a structured JSON array.
+If the schedule uses slots (e.g. A1, B1, C1, D1, E1, F1, G1, L1-L6), map each slot to its corresponding day and time slot.
+If the document is a course list table or grid, extract every course session.
 
 Output schema:
 {
@@ -595,16 +631,18 @@ Output schema:
 }
 
 RULES:
-- Day MUST be uppercase English weekday (MONDAY through SUNDAY).
-- Times MUST be in HH:MM format (24-hour).
+- Day MUST be uppercase English weekday (MONDAY through SUNDAY). If day is not explicitly named, infer from column header or default to MONDAY.
+- Times MUST be in HH:MM format (24-hour, e.g. 09:00, 14:00).
+- "classType" MUST be "LECTURE" or "LAB".
 - Return raw JSON only with NO markdown code fences.`;
 
       const cleanBase64 = base64Data.replace(/^data:[^;]+;base64,/, '').trim();
       const cleanMime = mimeType?.startsWith('image/') ? mimeType : 'image/jpeg';
 
-      for (const modelName of ['gemini-3.6-flash']) {
+      // Prioritize fast, reliable multimodal vision models
+      for (const modelName of ['gemini-3.5-flash', 'gemini-flash-lite-latest', 'gemini-flash-latest']) {
         try {
-          const model = this.genAI.getGenerativeModel({ model: modelName });
+          const model = this.genAI.getGenerativeModel({ model: modelName }, { timeout: 20000 });
           const result = await model.generateContent([
             {
               inlineData: {
@@ -616,11 +654,23 @@ RULES:
           ]);
 
           const rawText = result.response.text();
-          const cleanJson = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-          const parsed = JSON.parse(cleanJson);
-          if (parsed && Array.isArray(parsed.classes) && parsed.classes.length > 0) {
-            classes = parsed.classes;
-            break;
+          const jsonMatch = rawText.match(/\{[\s\S]*\}/) || rawText.match(/\[[\s\S]*\]/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            const rawClasses = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.classes) ? parsed.classes : []);
+            if (rawClasses.length > 0) {
+              classes = rawClasses.map((c: any) => ({
+                subjectName: String(c.subjectName || c.courseName || c.subject || c.course || 'Class').trim(),
+                day: normalizeDay(c.day),
+                startTime: normalizeTime(c.startTime, '10:00'),
+                endTime: normalizeTime(c.endTime, '11:00'),
+                room: c.room ? String(c.room).trim() : 'AB1-204',
+                faculty: c.faculty ? String(c.faculty).trim() : 'Faculty Member',
+                classType: String(c.classType || 'LECTURE').toUpperCase().includes('LAB') ? 'LAB' : 'LECTURE',
+              }));
+              console.log(`[Timetable Vision] Successfully extracted ${classes.length} classes via ${modelName}`);
+              break;
+            }
           }
         } catch (err: any) {
           console.warn(`Timetable vision model ${modelName} failed (${err.message}), trying next...`);

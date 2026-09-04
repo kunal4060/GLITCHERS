@@ -115,26 +115,61 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
         base64: true,
-        quality: 0.8,
+        quality: 0.6,
       });
 
-      if (!result.canceled && result.assets && result.assets[0]?.base64) {
+      if (!result.canceled && result.assets && result.assets.length > 0) {
         setIsAnalyzingImage(true);
-        const mimeType = result.assets[0].mimeType || 'image/jpeg';
-        const res = await apiClient.analyzeTimetableImage(result.assets[0].base64, mimeType);
+        const asset = result.assets[0];
+        let base64 = asset.base64;
+        const mimeType = asset.mimeType || 'image/jpeg';
+
+        // Fallback for Web if asset.base64 is not populated by expo-image-picker
+        if (!base64 && asset.uri) {
+          try {
+            const blobRes = await fetch(asset.uri);
+            const blob = await blobRes.blob();
+            base64 = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                const dataUrl = reader.result as string;
+                resolve(dataUrl.replace(/^data:[^;]+;base64,/, ''));
+              };
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            });
+          } catch (blobErr: any) {
+            console.warn('Could not read asset uri as blob:', blobErr);
+          }
+        }
+
+        if (!base64) {
+          setIsAnalyzingImage(false);
+          Alert.alert('Upload Error', 'Could not read the image data. Please try selecting the image again.');
+          return;
+        }
+
+        const res = await apiClient.analyzeTimetableImage(base64, mimeType);
+        setIsAnalyzingImage(false);
+
         if (res.classes && res.classes.length > 0) {
           setClasses(res.classes);
           Alert.alert('Timetable Analyzed', `Successfully extracted ${res.classes.length} classes from your schedule!`);
+          setActiveStep('TIMETABLE_REVIEW');
         } else {
-          Alert.alert('Extraction Info', 'No classes could be automatically recognized from this image. Please add your classes manually.');
+          Alert.alert(
+            'Extraction Notice',
+            'No classes could be automatically recognized from this image. Please verify the image is clear, enter classes manually, or load the sample schedule.',
+            [
+              { text: 'Add Manually', onPress: () => setTimetableMode('MANUAL') },
+              { text: 'Retry', style: 'cancel' },
+            ]
+          );
         }
-        setIsAnalyzingImage(false);
-        setActiveStep('TIMETABLE_REVIEW');
       }
     } catch (err: any) {
       setIsAnalyzingImage(false);
       Alert.alert('Analysis Notice', err.message || 'Could not analyze image.');
-      setActiveStep('TIMETABLE_REVIEW');
     }
   };
 
@@ -591,7 +626,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
 
               {/* Option A: Upload image/document */}
               <TouchableOpacity
-                style={styles.optionCard}
+                style={[styles.optionCard, isAnalyzingImage && { borderColor: '#2E7470', backgroundColor: '#F0F8F6' }]}
                 onPress={handleUploadTimetable}
                 disabled={isAnalyzingImage}
               >
@@ -603,9 +638,13 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   )}
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.optionTitle}>Upload Timetable Photo or PDF</Text>
+                  <Text style={styles.optionTitle}>
+                    {isAnalyzingImage ? 'Scanning Timetable with Gemini AI...' : 'Upload Timetable Photo or PDF'}
+                  </Text>
                   <Text style={styles.optionDesc}>
-                    Gemini Multimodal AI will scan the document, parse all classes, rooms, and professors automatically.
+                    {isAnalyzingImage
+                      ? 'Please wait a moment while Gemini Multimodal AI extracts your subjects, timings, and rooms...'
+                      : 'Gemini Multimodal AI will scan the document, parse all classes, rooms, and professors automatically.'}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -800,6 +839,37 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   </View>
                 ))}
               </View>
+
+              {/* Empty state if 0 classes */}
+              {classes.length === 0 && (
+                <View style={{ padding: 24, alignItems: 'center', backgroundColor: '#FAF8F5', borderRadius: 12, marginVertical: 12, borderWidth: 1, borderColor: '#EAE6E1' }}>
+                  <Ionicons name="calendar-outline" size={38} color="#A09E9B" style={{ marginBottom: 8 }} />
+                  <Text style={{ fontSize: 15, fontWeight: '600', color: '#1B3B36', marginBottom: 4 }}>No classes added yet</Text>
+                  <Text style={{ fontSize: 13, color: '#666', textAlign: 'center', marginBottom: 16, lineHeight: 18 }}>
+                    Your schedule hasn't been populated yet. Re-upload a clearer timetable photo, add your subjects manually, or load sample courses.
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <TouchableOpacity
+                      style={[styles.secondaryButton, { paddingVertical: 8, paddingHorizontal: 14 }]}
+                      onPress={() => {
+                        setTimetableMode('CHOICE');
+                        setActiveStep('TIMETABLE');
+                      }}
+                    >
+                      <Text style={styles.secondaryButtonText}>Re-upload Photo</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.primaryButton, { paddingVertical: 8, paddingHorizontal: 14 }]}
+                      onPress={() => {
+                        setTimetableMode('MANUAL');
+                        setActiveStep('TIMETABLE');
+                      }}
+                    >
+                      <Text style={styles.primaryButtonText}>+ Add Manually</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
 
               <TouchableOpacity
                 style={styles.addMoreBtn}

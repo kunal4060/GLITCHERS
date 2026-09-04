@@ -25,6 +25,7 @@ import { onboardingRoutes } from './routes/onboarding.js';
 export function buildApp(): FastifyInstance {
   const app = Fastify({
     logger: false,
+    bodyLimit: 50 * 1024 * 1024, // 50MB to support high-resolution base64 timetable images/documents
   });
 
   // CORS
