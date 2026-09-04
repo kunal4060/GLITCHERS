@@ -47,7 +47,7 @@ class ApiClient {
     };
 
     const isAiVision = endpoint.includes('analyze-image') || endpoint.includes('scan-bill') || endpoint.includes('/ai/') || endpoint.includes('summarize');
-    const timeoutMs = isAiVision ? 90000 : 15000;
+    const timeoutMs = isAiVision ? 90000 : 45000;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -61,8 +61,12 @@ class ApiClient {
       return (await res.json()) as T;
     } catch (err: any) {
       clearTimeout(timeoutId);
-      console.warn(`API call failed for ${endpoint}:`, err.message);
-      throw err;
+      const isAbort = err?.name === 'AbortError' || (err?.message && err.message.toLowerCase().includes('abort'));
+      const friendlyErr = isAbort
+        ? new Error('Request timed out while contacting server. Please try again.')
+        : err;
+      console.warn(`API call failed for ${endpoint}:`, friendlyErr.message);
+      throw friendlyErr;
     }
   }
 

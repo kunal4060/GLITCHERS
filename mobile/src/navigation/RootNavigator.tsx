@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Text, TouchableOpacity, View, Platform, Linking } from 'react-native';
+import { Text, TouchableOpacity, View, Platform, Linking, Alert } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { DashboardScreen } from '../screens/DashboardScreen';
@@ -252,6 +252,11 @@ export const RootNavigator: React.FC = () => {
         if (queryIndex !== -1) {
           const queryString = url.slice(queryIndex + 1);
           const params = new URLSearchParams(queryString);
+          const authError = params.get('auth_error');
+          if (authError) {
+            Alert.alert('Google Sign-In', decodeURIComponent(authError));
+            return;
+          }
           const email = params.get('email');
           const name = params.get('name');
           const token = params.get('token');

@@ -36,21 +36,73 @@ export const LoginScreen: React.FC = () => {
         returnUrl = 'glitchers://auth';
       }
 
-      const res = await apiClient.get<{ url: string }>(`/auth/google/url?returnUrl=${encodeURIComponent(returnUrl)}`);
+      let googleAuthUrl: string | null = null;
 
-      if (res?.url) {
-        if (Platform.OS === 'web' && typeof window !== 'undefined') {
-          window.location.href = res.url;
-          return;
-        } else {
-          await Linking.openURL(res.url);
-          return;
+      // 1. Try to fetch dynamic OAuth URL from backend
+      try {
+        const res = await apiClient.get<{ url: string }>(`/auth/google/url?returnUrl=${encodeURIComponent(returnUrl)}`);
+        if (res?.url) {
+          googleAuthUrl = res.url;
         }
+      } catch (backendErr: any) {
+        console.warn('Backend OAuth URL fetch delayed, using direct OAuth composition:', backendErr?.message);
       }
-      throw new Error('Google Sign-In URL could not be generated.');
+
+      // 2. Resilient Fallback: If backend is slow/cold, compose the exact OAuth URL directly
+      if (!googleAuthUrl) {
+        const clientId = '536972184941-i8lk8v0n5csl128mo12ougplo6bbf7ao.apps.googleusercontent.com';
+        const isLocalWeb = Platform.OS === 'web' && typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+        const redirectUri = isLocalWeb
+          ? 'http://localhost:5000/api/auth/google/callback'
+          : 'https://glitchers-backend.onrender.com/api/auth/google/callback';
+
+        // Safe Base64 encoding of returnUrl for OAuth state
+        let stateB64 = '';
+        try {
+          if (typeof btoa === 'function') {
+            stateB64 = btoa(returnUrl);
+          } else {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+            let output = '';
+            for (let block = 0, charCode, i = 0, map = chars; returnUrl.charAt(i | 0) || ((map = '='), i % 1); output += map.charAt(63 & (block >> (8 - (i % 1) * 8)))) {
+              charCode = returnUrl.charCodeAt((i += 3 / 4));
+              if (charCode > 0xff) throw new Error();
+              block = (block << 8) | charCode;
+            }
+            stateB64 = output;
+          }
+        } catch {
+          stateB64 = encodeURIComponent(returnUrl);
+        }
+
+        const scopes = [
+          'openid',
+          'https://www.googleapis.com/auth/userinfo.profile',
+          'https://www.googleapis.com/auth/userinfo.email',
+          'https://www.googleapis.com/auth/gmail.readonly',
+          'https://www.googleapis.com/auth/calendar.events',
+        ].join(' ');
+
+        googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?access_type=offline&prompt=consent&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(stateB64)}&response_type=code&client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+
+        // Wake up backend in background so it is warm when Google redirects
+        apiClient.get('/health').catch(() => null);
+      }
+
+      // 3. Open Google OAuth Consent Page
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.location.href = googleAuthUrl;
+        return;
+      } else {
+        await Linking.openURL(googleAuthUrl);
+        return;
+      }
     } catch (err: any) {
       console.warn('Google Sign-In Error:', err);
-      const msg = err?.message || 'Unable to connect to Google OAuth service. Please check your network.';
+      const rawMsg = err?.message || '';
+      const msg = rawMsg.toLowerCase().includes('abort')
+        ? 'Connection timed out while opening Google login. Please tap again to retry.'
+        : rawMsg || 'Unable to open Google Sign-In. Please check your network connection.';
       if (Platform.OS === 'web') {
         alert('Google Sign-In: ' + msg);
       } else {
