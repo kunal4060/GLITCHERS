@@ -30,31 +30,35 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
   const [isSummarizingEmails, setIsSummarizingEmails] = useState(false);
 
   const handleSummarizeEmails = async () => {
-    if (!gmailConnected || emails.length === 0) {
-      setEmailBullets([]);
-      return;
-    }
     setIsSummarizingEmails(true);
     try {
       const res = await apiClient.summarizeEmails();
-      if (res.bullets && res.bullets.length > 0) {
+      if (res?.bullets && res.bullets.length > 0) {
         setEmailBullets(res.bullets);
+        return;
       }
-    } catch {
-      if (emails.length > 0) {
-        setEmailBullets(emails.map((e) => `[${e.importance}] ${e.subject}: ${e.summary}`));
-      }
+    } catch (err) {
+      console.warn('Email summarize error:', err);
     } finally {
       setIsSummarizingEmails(false);
+    }
+
+    if (emails.length > 0) {
+      setEmailBullets(emails.map((e) => `• [${e.importance}] ${e.subject}: ${e.summary}`));
     }
   };
 
   useEffect(() => {
-    syncWithBackend();
-    if (gmailConnected && emails.length > 0) {
+    syncWithBackend().then(() => {
+      handleSummarizeEmails();
+    });
+  }, []);
+
+  useEffect(() => {
+    if (emails.length > 0 && emailBullets.length === 0) {
       handleSummarizeEmails();
     }
-  }, [gmailConnected]);
+  }, [emails.length]);
 
   const pendingTasks = tasks.filter((t) => t.status === 'TODO');
   const urgentEmail = emails.find((e) => e.importance === 'CRITICAL' || e.importance === 'HIGH');

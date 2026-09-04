@@ -15,6 +15,7 @@ export const emailRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.get('/', async (req) => {
     const userId = req.userId!;
+    inMemoryStore.ensureStudentData(userId);
     const emails = inMemoryStore.emails.get(userId) || [];
     return { emails };
   });
@@ -70,8 +71,9 @@ export const emailRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-  fastify.post('/summarize', async (req) => {
+  const handleSummarize = async (req: any) => {
     const userId = req.userId!;
+    inMemoryStore.ensureStudentData(userId);
     const emails = inMemoryStore.emails.get(userId) || [];
 
     if (emails.length === 0) {
@@ -82,7 +84,7 @@ export const emailRoutes: FastifyPluginAsync = async (fastify) => {
       };
     }
 
-    // Try summarizing using Gemini 3.6 Flash
+    // Try summarizing using Gemini 3.6 Flash with 4-second timeout
     if (env.GEMINI_API_KEY && !env.GEMINI_API_KEY.startsWith('dev-')) {
       try {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
@@ -93,12 +95,12 @@ export const emailRoutes: FastifyPluginAsync = async (fastify) => {
           .join('\n\n');
 
         const prompt = `You are an AI university email summarizer for a college student.
-Below are the recent official university emails:
+Below are recent official university circulars:
 
 ${emailText}
 
 Task:
-Summarize all the emails into 3 to 4 concise, high-impact bullet points for the student dashboard.
+Summarize the emails into 3 to 4 concise, high-impact bullet points for the student dashboard.
 Each bullet point MUST start with "• " and clearly highlight:
 - Key action required or announcement
 - Any specific deadline, dates, time, or location
@@ -106,34 +108,30 @@ Each bullet point MUST start with "• " and clearly highlight:
 
 Do not include greetings or markdown headers, just the list of bullet points.`;
 
-        let reply = '';
-        for (const modelName of ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-3.5-flash']) {
-          try {
-            const model = genAI.getGenerativeModel({ model: modelName });
-            const res = await model.generateContent(prompt);
-            reply = res.response.text();
-            if (reply && reply.trim()) break;
-          } catch (mErr: any) {
-            console.warn(`Email summarizer model ${modelName} failed (${mErr.message}), trying next...`);
+        const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
+        const generatePromise = model.generateContent(prompt).then((res) => res.response.text());
+        const timeoutPromise = new Promise<string>((_, reject) =>
+          setTimeout(() => reject(new Error('Gemini summarization timeout')), 4000)
+        );
+
+        const reply = await Promise.race([generatePromise, timeoutPromise]);
+        if (reply && reply.trim()) {
+          const lines = reply
+            .split('\n')
+            .map((l) => l.trim())
+            .filter((l) => l.startsWith('•') || l.startsWith('-') || l.startsWith('*'))
+            .map((l) => '• ' + l.replace(/^[-*•]\s*/, '').trim());
+
+          if (lines.length > 0) {
+            return {
+              bullets: lines,
+              summary: reply,
+              count: emails.length,
+            };
           }
         }
-
-        const text = reply;
-        const lines = text
-          .split('\n')
-          .map((l) => l.trim())
-          .filter((l) => l.startsWith('•') || l.startsWith('-') || l.startsWith('*'))
-          .map((l) => '• ' + l.replace(/^[-*•]\s*/, '').trim());
-
-        if (lines.length > 0) {
-          return {
-            bullets: lines,
-            summary: text,
-            count: emails.length,
-          };
-        }
-      } catch (err) {
-        console.warn('Gemini email summarization failed, falling back to local summaries:', err);
+      } catch (err: any) {
+        console.warn('Gemini email summarization fallback:', err?.message || err);
       }
     }
 
@@ -148,6 +146,9 @@ Do not include greetings or markdown headers, just the list of bullet points.`;
       summary: bullets.join('\n'),
       count: emails.length,
     };
-  });
+  };
+
+  fastify.get('/summarize', handleSummarize);
+  fastify.post('/summarize', handleSummarize);
 };
 

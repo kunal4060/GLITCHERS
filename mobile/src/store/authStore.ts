@@ -132,6 +132,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           isOnboardingComplete: isComplete,
           currentOnboardingStep: (statusRes?.state?.currentStep as OnboardingStep) || (isComplete ? 'COMPLETE' : 'GOOGLE_SERVICES'),
           onboardingData: statusRes?.state?.data || {},
+          gmailConnected: true,
+          calendarConnected: true,
         });
       }
     } catch (err) {
