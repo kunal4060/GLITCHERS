@@ -16,6 +16,9 @@ export class GeminiAssistant {
   constructor() {
     if (env.GEMINI_API_KEY && !env.GEMINI_API_KEY.startsWith('dev-')) {
       this.genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
+      console.log(`[GeminiAssistant] Initialized with key (length: ${env.GEMINI_API_KEY.length})`);
+    } else {
+      console.warn('[GeminiAssistant] No valid GEMINI_API_KEY found, Gemini queries will use local fallbacks');
     }
   }
 
