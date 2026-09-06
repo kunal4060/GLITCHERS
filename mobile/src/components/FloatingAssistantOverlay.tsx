@@ -342,13 +342,17 @@ export const FloatingAssistantOverlay: React.FC = () => {
         </View>
       )}
 
-      {/* 3. Draggable Floating Bubble with 3D Gem Symbol */}
+      {/* 3. Floating AI Assistant Circular Action Button */}
       <TouchableOpacity
-        style={styles.floatingBubble}
-        activeOpacity={0.82}
+        style={[styles.floatingBubble, isMenuExpanded && styles.floatingBubbleActive]}
+        activeOpacity={0.85}
         onPress={() => setMenuExpanded(!isMenuExpanded)}
       >
-        <AIGemSymbol size={56} />
+        {isMenuExpanded ? (
+          <Ionicons name="close" size={26} color={designTokens.colors.primaryDark} />
+        ) : (
+          <AIGemSymbol size={42} />
+        )}
       </TouchableOpacity>
     </View>
   );
@@ -368,8 +372,23 @@ const styles = StyleSheet.create({
     paddingBottom: 84,
   },
   floatingBubble: {
-    justifyContent: 'center',
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(117, 167, 165, 0.35)',
+    shadowColor: '#3D352E',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: 14,
+    elevation: 8,
+  },
+  floatingBubbleActive: {
+    backgroundColor: '#FAF7F2',
+    borderColor: designTokens.colors.primary,
   },
   menuDock: {
     position: 'absolute',
