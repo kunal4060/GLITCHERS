@@ -88,6 +88,18 @@ class ApiClient {
   }
 
   // Domain-specific typed API methods
+  public async login(email: string, name?: string) {
+    const res = await this.post<{ accessToken: string; user: any }>('/auth/login', { email, name });
+    if (res?.accessToken) {
+      this.setToken(res.accessToken);
+    }
+    return res;
+  }
+
+  public async getProfile() {
+    return this.get<{ user: any }>('/auth/me');
+  }
+
   public async fetchTimetableClasses() {
     return this.get<{ classes: any[] }>('/timetable/classes');
   }
@@ -100,6 +112,14 @@ class ApiClient {
     return this.post<{ task: any }>('/tasks', task);
   }
 
+  public async updateTask(taskId: string, updates: any) {
+    return this.patch<{ task: any }>(`/tasks/${taskId}`, updates);
+  }
+
+  public async deleteTask(taskId: string) {
+    return this.delete<{ success: boolean }>(`/tasks/${taskId}`);
+  }
+
   public async createTaskFromText(text: string) {
     return this.post<{ task: any }>('/tasks', { text });
   }
@@ -108,8 +128,12 @@ class ApiClient {
     return this.get<{ expenses: any[]; totalSpent: number }>('/expenses');
   }
 
-  public async createExpense(expense: { amount: number; category?: string; description?: string }) {
+  public async createExpense(expense: { amount: number; category?: string; description?: string; merchant?: string }) {
     return this.post<{ expense: any }>('/expenses', expense);
+  }
+
+  public async deleteExpense(expenseId: string) {
+    return this.delete<{ success: boolean }>(`/expenses/${expenseId}`);
   }
 
   public async createExpenseFromText(text: string) {
@@ -121,7 +145,15 @@ class ApiClient {
   }
 
   public async fetchDebts() {
-    return this.get<{ debts: any[]; summary: any }>('/debts');
+    return this.get<{ debts: any[]; totals?: any; summary?: any }>('/debts');
+  }
+
+  public async createDebt(debt: { person: string; amount: number; type?: string; notes?: string }) {
+    return this.post<{ debt: any }>('/debts', debt);
+  }
+
+  public async payDebt(debtId: string, paidAmount?: number) {
+    return this.patch<{ debt: any }>(`/debts/${debtId}/pay`, { paidAmount });
   }
 
   public async splitBill(data: { totalAmount: number; description: string; numberOfPeople: number; friends: string[] }) {
@@ -145,6 +177,14 @@ class ApiClient {
       message,
       conversationId,
     });
+  }
+
+  public async getChatHistory() {
+    return this.get<{ messages: Array<{ id: string; sender: 'user' | 'assistant'; text: string; actionCard?: any; timestamp: string }> }>('/ai/history');
+  }
+
+  public async clearChatHistory() {
+    return this.delete<{ success: boolean }>('/ai/history');
   }
 
   public async fetchExams() {

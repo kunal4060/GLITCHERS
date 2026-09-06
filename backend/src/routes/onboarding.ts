@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { inMemoryStore } from '../repositories/inMemoryStore.js';
+import { supabaseStore } from '../repositories/supabaseStore.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { randomUUID } from 'crypto';
 import type {
@@ -34,7 +35,7 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
       inMemoryStore.onboardingStates.set(userId, state);
     }
 
-    const profile = inMemoryStore.profiles.get(userId);
+    const profile = await supabaseStore.getProfile(userId);
     return {
       state,
       profile,
@@ -106,10 +107,8 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
     inMemoryStore.onboardingStates.set(userId, updatedState);
 
     // If profile data was updated, partially merge into profile
-    const profile = inMemoryStore.profiles.get(userId);
-    if (profile && data) {
-      const updatedProfile = {
-        ...profile,
+    if (data) {
+      await supabaseStore.updateProfile(userId, {
         ...(data.fullName ? { fullName: data.fullName } : {}),
         ...(data.university ? { university: data.university } : {}),
         ...(data.course ? { course: data.course } : {}),
@@ -120,9 +119,8 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
         ...(data.creditsCompleted !== undefined ? { creditsCompleted: Number(data.creditsCompleted) } : {}),
         ...(data.creditsCurrent !== undefined ? { creditsCurrent: Number(data.creditsCurrent) } : {}),
         ...(data.universityDomain ? { universityDomain: data.universityDomain } : {}),
-        updatedAt: new Date().toISOString(),
-      };
-      inMemoryStore.profiles.set(userId, updatedProfile);
+        ...(isComplete !== undefined ? { isOnboardingComplete: isComplete } : {}),
+      });
     }
 
     return {
@@ -187,7 +185,7 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
     inMemoryStore.initializationJobs.set(jobId, job);
 
     // 1. Profile initialization
-    const existingProfile = inMemoryStore.profiles.get(userId) || {
+    const existingProfile = (await supabaseStore.getProfile(userId)) || {
       id: userId,
       email: 'student@university.edu',
       fullName: 'Student User',
@@ -209,7 +207,7 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
       isOnboardingComplete: true,
       updatedAt: new Date().toISOString(),
     };
-    inMemoryStore.profiles.set(userId, updatedProfile);
+    await supabaseStore.updateProfile(userId, updatedProfile);
     job.stepStatuses.profile = { status: 'COMPLETED', message: 'Profile created' };
 
     // 2. Timetable & Subject initialization (Idempotent by subject + day + start_time)

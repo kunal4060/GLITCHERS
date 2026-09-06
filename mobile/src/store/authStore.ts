@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { UserProfile, OnboardingStep } from '@glitchers/shared';
 import { apiClient } from '../api/client';
+import { useDashboardStore } from './dashboardStore';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -75,11 +76,18 @@ export const useAuthStore = create<AuthState>()(
           }
 
           const safeEmail = email.trim().toLowerCase();
-          const uniqueUserId = `usr_${safeEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
-          // Try to fetch profile from /auth/me
-          const meRes = await apiClient.get<{ user: UserProfile }>('/auth/me').catch(() => null);
-          let user = meRes?.user;
+          // 1. Authenticate with backend /auth/login or /auth/me
+          let user: UserProfile | null = null;
+          try {
+            const loginRes = await apiClient.login(safeEmail, name);
+            if (loginRes?.user) {
+              user = loginRes.user;
+            }
+          } catch {
+            const meRes = await apiClient.get<{ user: UserProfile }>('/auth/me').catch(() => null);
+            user = meRes?.user || null;
+          }
 
           if (!user) {
             const res = await apiClient.post<{ accessToken: string; user: UserProfile }>('/auth/google/callback', {
@@ -89,7 +97,7 @@ export const useAuthStore = create<AuthState>()(
               apiClient.setToken(res.accessToken);
             }
             user = res?.user || {
-              id: uniqueUserId,
+              id: `usr_${safeEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
               email: safeEmail,
               fullName: name,
               university: safeEmail.includes('@') && !safeEmail.endsWith('gmail.com')
@@ -129,6 +137,9 @@ export const useAuthStore = create<AuthState>()(
             calendarConnected: true,
             isLoading: false,
           });
+
+          // HYDRATE ALL USER DATA FROM CLOUD (Expenses, Tasks, Classes, Debts, Chat History)
+          useDashboardStore.getState().syncWithBackend().catch(() => null);
         } catch (err) {
           console.warn('Google login error:', err);
           set({ isLoading: false });
@@ -150,6 +161,9 @@ export const useAuthStore = create<AuthState>()(
               gmailConnected: true,
               calendarConnected: true,
             });
+
+            // Hydrate latest data on session restore
+            useDashboardStore.getState().syncWithBackend().catch(() => null);
           }
         } catch (err) {
           console.warn('Check session error:', err);

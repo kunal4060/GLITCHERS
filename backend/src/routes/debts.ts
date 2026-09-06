@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { inMemoryStore } from '../repositories/inMemoryStore.js';
+import { supabaseStore } from '../repositories/supabaseStore.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { calculateDebtTotals, calculateEqualSplit } from '../services/finance/calculator.js';
 import { geminiAssistant } from '../services/gemini/geminiClient.js';
@@ -11,7 +12,7 @@ export const debtRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.get('/', async (req) => {
     const userId = req.userId!;
-    const debts = inMemoryStore.debts.get(userId) || [];
+    const debts = await supabaseStore.getDebts(userId);
     const totals = calculateDebtTotals(debts);
 
     return {
@@ -53,26 +54,23 @@ export const debtRoutes: FastifyPluginAsync = async (fastify) => {
       createdAt: new Date().toISOString(),
     };
 
-    const debts = inMemoryStore.debts.get(userId) || [];
-    debts.unshift(newDebt);
-    inMemoryStore.debts.set(userId, debts);
-
-    return { debt: newDebt };
+    const saved = await supabaseStore.createDebt(userId, newDebt);
+    return { debt: saved };
   });
 
   fastify.patch<{ Params: { id: string }; Body: { paidAmount?: number } }>('/:id/pay', async (req, reply) => {
     const userId = req.userId!;
     const { id } = req.params;
-    const debts = inMemoryStore.debts.get(userId) || [];
+    const debts = await supabaseStore.getDebts(userId);
     const debt = debts.find((d) => d.id === id);
 
     if (!debt) return reply.status(404).send({ error: 'Debt not found' });
 
     const payAmount = req.body.paidAmount !== undefined ? req.body.paidAmount : debt.amount;
-    debt.paidAmount = payAmount;
-    debt.status = debt.paidAmount >= debt.amount ? 'PAID' : 'PARTIALLY_PAID';
+    const status = payAmount >= debt.amount ? 'PAID' : 'PARTIALLY_PAID';
+    const updated = await supabaseStore.updateDebt(userId, id, { paidAmount: payAmount, status });
 
-    return { debt };
+    return { debt: updated || debt };
   });
 
   fastify.post<{ Body: { totalAmount: number; description: string; numberOfPeople: number; friends: string[] } }>(
@@ -86,8 +84,6 @@ export const debtRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const sharePerPerson = calculateEqualSplit(totalAmount, numberOfPeople);
-      const debts = inMemoryStore.debts.get(userId) || [];
-
       const createdDebts: Debt[] = [];
       const peopleList = friends && friends.length > 0 ? friends : Array.from({ length: numberOfPeople - 1 }, (_, i) => `Friend ${i + 1}`);
 
@@ -103,11 +99,9 @@ export const debtRoutes: FastifyPluginAsync = async (fastify) => {
           notes: `Split for ${description} (Total: ₹${totalAmount})`,
           createdAt: new Date().toISOString(),
         };
-        debts.unshift(debt);
-        createdDebts.push(debt);
+        const saved = await supabaseStore.createDebt(userId, debt);
+        createdDebts.push(saved);
       }
-
-      inMemoryStore.debts.set(userId, debts);
 
       return {
         totalAmount,

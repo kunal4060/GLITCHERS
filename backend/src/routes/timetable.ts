@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { inMemoryStore } from '../repositories/inMemoryStore.js';
+import { supabaseStore } from '../repositories/supabaseStore.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { detectScheduleConflicts } from '../services/timetable/conflictDetector.js';
 import { ClassSessionSchema, type ClassSession } from '@glitchers/shared';
@@ -11,7 +12,7 @@ export const timetableRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.get('/classes', async (req) => {
     const userId = req.userId!;
-    const classes = inMemoryStore.classes.get(userId) || [];
+    const classes = await supabaseStore.getClasses(userId);
     const conflicts = detectScheduleConflicts(classes);
 
     return {
@@ -34,9 +35,9 @@ export const timetableRoutes: FastifyPluginAsync = async (fastify) => {
       userId,
     };
 
-    const userClasses = inMemoryStore.classes.get(userId) || [];
+    const userClasses = await supabaseStore.getClasses(userId);
     userClasses.push(newClass);
-    inMemoryStore.classes.set(userId, userClasses);
+    await supabaseStore.saveClasses(userId, userClasses);
 
     const conflicts = detectScheduleConflicts(userClasses);
 
@@ -51,9 +52,9 @@ export const timetableRoutes: FastifyPluginAsync = async (fastify) => {
     const text = req.body?.timetableText || 'Monday: 10:00 - 11:00 AM DBMS Lecture Room AB1-204 Dr. Sharma\nMonday: 14:00 - 16:00 OS Lab Room AB2-301 Prof. Verma';
     const extractedClasses = extractClassesFromText(text, userId);
 
-    const currentClasses = inMemoryStore.classes.get(userId) || [];
+    const currentClasses = await supabaseStore.getClasses(userId);
     const merged = [...currentClasses, ...extractedClasses];
-    inMemoryStore.classes.set(userId, merged);
+    await supabaseStore.saveClasses(userId, merged);
 
     const conflicts = detectScheduleConflicts(merged);
 
@@ -95,7 +96,7 @@ export const timetableRoutes: FastifyPluginAsync = async (fastify) => {
     const userId = req.userId!;
     const incomingClasses = req.body?.classes || [];
 
-    const existing = inMemoryStore.classes.get(userId) || [];
+    const existing = await supabaseStore.getClasses(userId);
     const merged = [...existing];
 
     for (const c of incomingClasses) {
@@ -108,7 +109,7 @@ export const timetableRoutes: FastifyPluginAsync = async (fastify) => {
       }
     }
 
-    inMemoryStore.classes.set(userId, merged);
+    await supabaseStore.saveClasses(userId, merged);
     const conflicts = detectScheduleConflicts(merged);
 
     return {
@@ -121,7 +122,7 @@ export const timetableRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.post('/check-conflicts', async (req) => {
     const userId = req.userId!;
-    const classes = inMemoryStore.classes.get(userId) || [];
+    const classes = await supabaseStore.getClasses(userId);
     const conflicts = detectScheduleConflicts(classes);
     return { conflicts };
   });

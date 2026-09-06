@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { inMemoryStore } from '../repositories/inMemoryStore.js';
+import { supabaseStore } from '../repositories/supabaseStore.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { calculateCategoryBreakdown, calculateTotalSpent } from '../services/finance/calculator.js';
 import { geminiAssistant } from '../services/gemini/geminiClient.js';
@@ -11,7 +12,7 @@ export const expenseRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.get('/', async (req) => {
     const userId = req.userId!;
-    const expenses = inMemoryStore.expenses.get(userId) || [];
+    const expenses = await supabaseStore.getExpenses(userId);
     const total = calculateTotalSpent(expenses);
     const breakdown = calculateCategoryBreakdown(expenses);
 
@@ -53,24 +54,14 @@ export const expenseRoutes: FastifyPluginAsync = async (fastify) => {
       type: 'EXPENSE',
     };
 
-    const expenses = inMemoryStore.expenses.get(userId) || [];
-    expenses.unshift(newExpense);
-    inMemoryStore.expenses.set(userId, expenses);
-
-    return { expense: newExpense };
+    const saved = await supabaseStore.createExpense(userId, newExpense);
+    return { expense: saved };
   });
 
   fastify.delete<{ Params: { id: string } }>('/:id', async (req, reply) => {
     const userId = req.userId!;
     const { id } = req.params;
-    const expenses = inMemoryStore.expenses.get(userId) || [];
-    const filtered = expenses.filter((e) => e.id !== id);
-
-    if (filtered.length === expenses.length) {
-      return reply.status(404).send({ error: 'Expense not found' });
-    }
-
-    inMemoryStore.expenses.set(userId, filtered);
+    await supabaseStore.deleteExpense(userId, id);
     return { success: true };
   });
 

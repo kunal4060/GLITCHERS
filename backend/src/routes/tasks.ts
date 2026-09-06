@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { inMemoryStore } from '../repositories/inMemoryStore.js';
+import { supabaseStore } from '../repositories/supabaseStore.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { generateReminderTimes } from '../services/tasks/reminderEngine.js';
 import { geminiAssistant } from '../services/gemini/geminiClient.js';
@@ -11,7 +12,7 @@ export const taskRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.get('/', async (req) => {
     const userId = req.userId!;
-    const tasks = inMemoryStore.tasks.get(userId) || [];
+    const tasks = await supabaseStore.getTasks(userId);
     return { tasks };
   });
 
@@ -44,14 +45,11 @@ export const taskRoutes: FastifyPluginAsync = async (fastify) => {
         createdAt: new Date().toISOString(),
       };
 
-      const tasks = inMemoryStore.tasks.get(userId) || [];
-      tasks.unshift(newTask);
-      inMemoryStore.tasks.set(userId, tasks);
-
-      const reminders = generateReminderTimes(newTask);
+      const savedTask = await supabaseStore.createTask(userId, newTask);
+      const reminders = generateReminderTimes(savedTask);
 
       return {
-        task: newTask,
+        task: savedTask,
         scheduledReminders: reminders,
       };
     }
@@ -60,24 +58,11 @@ export const taskRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.patch<{ Params: { id: string }; Body: Partial<Task> }>('/:id', async (req, reply) => {
     const userId = req.userId!;
     const { id } = req.params;
-    const tasks = inMemoryStore.tasks.get(userId) || [];
-    const taskIndex = tasks.findIndex((t) => t.id === id);
+    const updatedTask = await supabaseStore.updateTask(userId, id, req.body);
 
-    if (taskIndex === -1) {
+    if (!updatedTask) {
       return reply.status(404).send({ error: 'Task not found' });
     }
-
-    const updatedTask = {
-      ...tasks[taskIndex],
-      ...req.body,
-    };
-
-    if (req.body.status === 'COMPLETED' && !updatedTask.completedAt) {
-      updatedTask.completedAt = new Date().toISOString();
-    }
-
-    tasks[taskIndex] = updatedTask;
-    inMemoryStore.tasks.set(userId, tasks);
 
     return { task: updatedTask };
   });
@@ -85,14 +70,7 @@ export const taskRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.delete<{ Params: { id: string } }>('/:id', async (req, reply) => {
     const userId = req.userId!;
     const { id } = req.params;
-    const tasks = inMemoryStore.tasks.get(userId) || [];
-    const filtered = tasks.filter((t) => t.id !== id);
-
-    if (filtered.length === tasks.length) {
-      return reply.status(404).send({ error: 'Task not found' });
-    }
-
-    inMemoryStore.tasks.set(userId, filtered);
+    await supabaseStore.deleteTask(userId, id);
     return { success: true };
   });
 

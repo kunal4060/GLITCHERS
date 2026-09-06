@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Modal, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { designTokens } from '../theme/designTokens';
@@ -52,14 +52,28 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
     offlineSyncQueue,
     queueOfflineAction,
     flushOfflineQueue,
+    chatMessages,
+    addChatMessage,
+    setChatMessages,
+    clearChatMessages,
   } = useDashboardStore();
 
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const messages = chatMessages;
   const [modelModalVisible, setModelModalVisible] = useState(false);
   const [customRepoInput, setCustomRepoInput] = useState('');
   const scrollRef = useRef<ScrollView>(null);
+
+  React.useEffect(() => {
+    if (chatMessages.length === 0) {
+      apiClient.getChatHistory().then((res) => {
+        if (res?.messages && res.messages.length > 0) {
+          setChatMessages(res.messages as any);
+        }
+      }).catch(() => null);
+    }
+  }, []);
 
   // Dynamic contextual prompt chips
   const lastUserText = messages.filter((m) => m.sender === 'user').slice(-1)[0]?.text.toLowerCase() || '';
@@ -107,7 +121,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    addChatMessage(userMessage);
     if (!customPrompt) setInput('');
     setLoading(true);
 
@@ -169,7 +183,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
-      setMessages((prev) => [...prev, assistantMsg]);
+      addChatMessage(assistantMsg);
       setLoading(false);
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
       return;
@@ -384,7 +398,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
-      setMessages((prev) => [...prev, assistantMsg]);
+      addChatMessage(assistantMsg);
     } catch {
       // Offline fallback: Process via Hugging Face on-device model and queue for later sync
       const offlineRes = offlineAiEngine.processMessage(
@@ -435,16 +449,13 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
         };
       }
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: String(Date.now() + 1),
-          sender: 'assistant',
-          text: `${offlineRes.message}\n\n*(Cloud unavailable • Processed by offline ${offlineRes.offlineModelUsed} model. Data saved on phone and will push to dataset when online.)*`,
-          actionCard,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
+      addChatMessage({
+        id: String(Date.now() + 1),
+        sender: 'assistant',
+        text: `${offlineRes.message}\n\n*(Cloud unavailable • Processed by offline ${offlineRes.offlineModelUsed} model. Data saved on phone and will push to dataset when online.)*`,
+        actionCard,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      });
     } finally {
       setLoading(false);
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
@@ -471,7 +482,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
           text: '📄 [Uploaded Bill/Receipt Photo for Analysis]',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         };
-        setMessages((prev) => [...prev, userMsg]);
+        addChatMessage(userMsg);
         setLoading(true);
 
         try {
@@ -494,7 +505,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
                 navigationScreen: 'Finance',
               },
             };
-            setMessages((prev) => [...prev, assistantMsg]);
+            addChatMessage(assistantMsg);
           } else {
             const errorMsg: ChatMessage = {
               id: String(Date.now() + 1),
@@ -502,7 +513,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
               text: 'I could not parse this receipt image clearly. Please try another clear photo of the bill.',
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             };
-            setMessages((prev) => [...prev, errorMsg]);
+            addChatMessage(errorMsg);
           }
         } catch {
           const errorMsg: ChatMessage = {
@@ -511,7 +522,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
             text: 'I could not process this bill photo. Please try uploading another well-lit receipt.',
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           };
-          setMessages((prev) => [...prev, errorMsg]);
+          addChatMessage(errorMsg);
         } finally {
           setLoading(false);
           setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
@@ -541,23 +552,44 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
             </View>
           </View>
 
-          {/* Offline Hugging Face Model Switcher Pill */}
-          <TouchableOpacity
-            style={[styles.modelPillBtn, aiMode === 'OFFLINE' && styles.modelPillBtnOffline]}
-            onPress={() => setModelModalVisible(true)}
-            activeOpacity={0.7}
-            hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
-          >
-            <Ionicons
-              name={aiMode === 'OFFLINE' ? 'flash' : aiMode === 'AUTO' ? 'sync' : 'cloud'}
-              size={14}
-              color={aiMode === 'OFFLINE' ? '#B45309' : designTokens.colors.primaryDark}
-            />
-            <Text style={[styles.modelPillText, aiMode === 'OFFLINE' && { color: '#B45309' }]}>
-              {aiMode === 'OFFLINE' ? 'Offline (HF)' : aiMode === 'AUTO' ? 'Auto (HF/Cloud)' : 'Gemini Cloud'}
-            </Text>
-            <Ionicons name="chevron-down" size={12} color={designTokens.colors.textSecondary} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {chatMessages.length > 0 && (
+              <TouchableOpacity
+                onPress={() => {
+                  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                    if ((window as any).confirm('Clear chat history?')) clearChatMessages();
+                  } else {
+                    Alert.alert('Clear Chat', 'Do you want to clear your conversation history?', [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Clear', style: 'destructive', onPress: () => clearChatMessages() },
+                    ]);
+                  }
+                }}
+                style={[styles.modelPillBtn, { paddingHorizontal: 8 }]}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="trash-outline" size={14} color={designTokens.colors.textSecondary} />
+              </TouchableOpacity>
+            )}
+
+            {/* Offline Hugging Face Model Switcher Pill */}
+            <TouchableOpacity
+              style={[styles.modelPillBtn, aiMode === 'OFFLINE' && styles.modelPillBtnOffline]}
+              onPress={() => setModelModalVisible(true)}
+              activeOpacity={0.7}
+              hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+            >
+              <Ionicons
+                name={aiMode === 'OFFLINE' ? 'flash' : aiMode === 'AUTO' ? 'sync' : 'cloud'}
+                size={14}
+                color={aiMode === 'OFFLINE' ? '#B45309' : designTokens.colors.primaryDark}
+              />
+              <Text style={[styles.modelPillText, aiMode === 'OFFLINE' && { color: '#B45309' }]}>
+                {aiMode === 'OFFLINE' ? 'Offline (HF)' : aiMode === 'AUTO' ? 'Auto (HF/Cloud)' : 'Gemini Cloud'}
+              </Text>
+              <Ionicons name="chevron-down" size={12} color={designTokens.colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Offline Pending Sync Banner */}
