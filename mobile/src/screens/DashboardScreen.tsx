@@ -245,11 +245,6 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
               <Text style={styles.heroMetaText}>
                 No academic lectures scheduled for today. Enjoy your free time or catch up on project work!
               </Text>
-              {nextClassInfo.nextClass && nextClassInfo.nextClass.id !== 'placeholder' ? (
-                <Text style={[styles.heroFacultyText, { marginTop: 8, opacity: 0.9 }]}>
-                  Next class: {nextClassInfo.nextClass.subjectName} ({nextClassInfo.statusLabel})
-                </Text>
-              ) : null}
             </GlassCard>
           ) : (
             <GlassCard

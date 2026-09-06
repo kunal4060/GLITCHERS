@@ -25,7 +25,7 @@ const DEFAULT_HOST = resolveDefaultHost();
 
 class ApiClient {
   private baseUrl: string = DEFAULT_HOST;
-  private token: string = 'dev-token';
+  private token: string = '';
 
   constructor() {
     this.initializeToken().catch(() => null);
@@ -41,7 +41,9 @@ class ApiClient {
 
   public setToken(token: string) {
     this.token = token;
-    AsyncStorage.setItem('glitchers-auth-token', token).catch(() => null);
+    if (token) {
+      AsyncStorage.setItem('glitchers-auth-token', token).catch(() => null);
+    }
   }
 
   public getToken(): string {
@@ -49,29 +51,81 @@ class ApiClient {
   }
 
   public clearToken() {
-    this.token = 'dev-token';
+    this.token = '';
     AsyncStorage.removeItem('glitchers-auth-token').catch(() => null);
   }
 
-  public async initializeToken(): Promise<string> {
+  public async getEffectiveToken(): Promise<string> {
+    if (this.token && this.token.trim() && this.token !== 'dev-token') {
+      return this.token.trim();
+    }
+
+    // 1. Try reading from active authStore in memory
+    try {
+      const { useAuthStore } = require('../store/authStore');
+      const authState = useAuthStore?.getState?.();
+      if (authState?.token && authState.token !== 'dev-token') {
+        this.token = authState.token;
+        return this.token;
+      }
+      if (authState?.user?.id && authState.user.id !== '00000000-0000-0000-0000-000000000001') {
+        this.token = `jwt_${authState.user.id}`;
+        return this.token;
+      }
+    } catch {
+      // ignore
+    }
+
+    // 2. Try reading from dedicated token storage
     try {
       const stored = await AsyncStorage.getItem('glitchers-auth-token');
-      if (stored && stored.trim()) {
+      if (stored && stored.trim() && stored !== 'dev-token') {
         this.token = stored.trim();
         return this.token;
       }
     } catch {
       // ignore
     }
-    return this.token;
+
+    // 3. Try reading from persisted authStore storage in AsyncStorage
+    try {
+      const rawAuth = await AsyncStorage.getItem('glitchers-auth-storage');
+      if (rawAuth) {
+        const parsed = JSON.parse(rawAuth);
+        const storedToken = parsed?.state?.token;
+        const storedUserId = parsed?.state?.user?.id;
+        if (storedToken && storedToken !== 'dev-token') {
+          this.token = storedToken;
+          return this.token;
+        }
+        if (storedUserId && storedUserId !== '00000000-0000-0000-0000-000000000001') {
+          this.token = `jwt_${storedUserId}`;
+          return this.token;
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    // Fallback for local development only if no real session exists
+    if (__DEV__) {
+      return 'dev-token';
+    }
+
+    return '';
+  }
+
+  public async initializeToken(): Promise<string> {
+    return await this.getEffectiveToken();
   }
 
   public async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const activeToken = await this.getEffectiveToken();
     const url = `${this.baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
-    const headers = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${this.token}`,
-      ...(options.headers || {}),
+      ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
+      ...((options.headers as Record<string, string>) || {}),
     };
 
     const isAiVision = endpoint.includes('analyze-image') || endpoint.includes('scan-bill') || endpoint.includes('/ai/') || endpoint.includes('summarize');

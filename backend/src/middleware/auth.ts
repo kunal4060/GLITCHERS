@@ -29,6 +29,9 @@ export async function authMiddleware(req: FastifyRequest, reply: FastifyReply) {
   }
 
   if (token === 'dev-token' || token.startsWith('mock_')) {
+    if (process.env.NODE_ENV === 'production') {
+      return reply.status(401).send({ error: 'Unauthorized: Dev token not permitted in production environment' });
+    }
     req.userId = '00000000-0000-0000-0000-000000000001';
     return;
   }
@@ -43,6 +46,10 @@ export async function authMiddleware(req: FastifyRequest, reply: FastifyReply) {
     return;
   }
 
-  // Fallback to dev user
+  if (process.env.NODE_ENV === 'production') {
+    return reply.status(401).send({ error: 'Unauthorized: Invalid token' });
+  }
+
+  // Fallback to dev user in dev environment only
   req.userId = '00000000-0000-0000-0000-000000000001';
 }

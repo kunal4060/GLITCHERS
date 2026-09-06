@@ -32,6 +32,7 @@ export interface LoadedModelFileInfo {
 }
 
 interface DashboardState {
+  isHydrated: boolean;
   classes: ClassSession[];
   tasks: Task[];
   expenses: Expense[];
@@ -44,6 +45,7 @@ interface DashboardState {
   isLoading: boolean;
   isBackendConnected: boolean;
 
+  setIsHydrated: (isHydrated: boolean) => void;
   setClasses: (classes: ClassSession[]) => void;
   setTasks: (tasks: Task[]) => void;
   setExpenses: (expenses: Expense[]) => void;
@@ -219,6 +221,8 @@ export const useDashboardStore = create<DashboardState>()(
         return { syncedCount };
       },
 
+      isHydrated: false,
+      setIsHydrated: (isHydrated) => set({ isHydrated }),
       classes: [],
       tasks: [],
       expenses: [],
@@ -397,8 +401,11 @@ export const useDashboardStore = create<DashboardState>()(
       syncWithBackend: async () => {
         set({ isLoading: true });
         try {
-          // Initialize/confirm token is ready before batch fetch
-          await apiClient.initializeToken();
+          // Initialize/confirm real user token is ready before batch fetch
+          const activeToken = await apiClient.getEffectiveToken();
+          if (activeToken) {
+            apiClient.setToken(activeToken);
+          }
 
           const [classRes, taskRes, expRes, budgetRes, debtRes, emailRes, chatRes, profileRes] = await Promise.allSettled([
             apiClient.fetchTimetableClasses(),
@@ -427,7 +434,10 @@ export const useDashboardStore = create<DashboardState>()(
             const localTasks = get().tasks;
             if (backendTasks.length > 0) {
               const backendIds = new Set(backendTasks.map((t) => t.id));
-              const unsynced = localTasks.filter((t) => !backendIds.has(t.id));
+              const backendTitles = new Set(backendTasks.map((t) => t.title.toLowerCase().trim()));
+              const unsynced = localTasks.filter(
+                (t) => !backendIds.has(t.id) && !backendTitles.has(t.title.toLowerCase().trim())
+              );
               set({ tasks: [...backendTasks, ...unsynced] });
               for (const t of unsynced) {
                 apiClient.createTask({
@@ -457,6 +467,14 @@ export const useDashboardStore = create<DashboardState>()(
               const backendIds = new Set(backendExps.map((e) => e.id));
               const unsynced = localExps.filter((e) => !backendIds.has(e.id));
               set({ expenses: [...backendExps, ...unsynced] });
+              for (const e of unsynced) {
+                apiClient.createExpense({
+                  amount: Number(e.amount),
+                  category: e.category,
+                  description: e.description,
+                  merchant: e.merchant || undefined,
+                }).catch(() => null);
+              }
             } else if (localExps.length > 0) {
               for (const e of localExps) {
                 apiClient.createExpense({
@@ -532,9 +550,11 @@ export const useDashboardStore = create<DashboardState>()(
           // 8. Profile
           if (profileRes.status === 'fulfilled' && profileRes.value?.user) {
             const u = profileRes.value.user;
-            if (u.cgpa) set({ cgpa: String(u.cgpa) });
-            if (u.creditsCompleted !== undefined) set({ credits: Number(u.creditsCompleted) });
-            if (u.avatarUrl) set({ avatarUrl: u.avatarUrl });
+            if (u.id !== '00000000-0000-0000-0000-000000000001') {
+              if (u.cgpa) set({ cgpa: String(u.cgpa) });
+              if (u.creditsCompleted !== undefined) set({ credits: Number(u.creditsCompleted) });
+              if (u.avatarUrl) set({ avatarUrl: u.avatarUrl });
+            }
           }
 
           // Automatically push temporary offline queued actions to cloud dataset
@@ -551,6 +571,11 @@ export const useDashboardStore = create<DashboardState>()(
     {
       name: 'glitchers-dashboard-storage',
       storage: createJSONStorage(() => AsyncStorage),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.setIsHydrated(true);
+        }
+      },
       partialize: (state) => ({
         classes: state.classes,
         tasks: state.tasks,

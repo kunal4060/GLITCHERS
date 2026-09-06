@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Text, TouchableOpacity, View, Platform, Linking, Alert } from 'react-native';
+import { Text, TouchableOpacity, View, Platform, Linking, Alert, ActivityIndicator } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { DashboardScreen } from '../screens/DashboardScreen';
@@ -217,12 +217,12 @@ function MainTabs({ navigation }: { navigation: any }) {
 }
 
 export const RootNavigator: React.FC = () => {
-  const { isAuthenticated, isOnboardingComplete, completeOnboarding, loginWithGoogle, checkSession, token, user } = useAuthStore();
+  const { isHydrated, isAuthenticated, isOnboardingComplete, completeOnboarding, loginWithGoogle, checkSession, token, user } = useAuthStore();
   const [showManualOnboarding, setShowManualOnboarding] = useState(false);
 
   React.useEffect(() => {
-    // Restore and verify active session on startup
-    if (isAuthenticated) {
+    // Restore and verify active session on startup once storage is hydrated
+    if (isHydrated && isAuthenticated) {
       if (token) {
         apiClient.setToken(token);
       } else if (user?.id) {
@@ -230,7 +230,7 @@ export const RootNavigator: React.FC = () => {
       }
       checkSession().catch(() => null);
     }
-  }, [isAuthenticated]);
+  }, [isHydrated, isAuthenticated]);
 
   React.useEffect(() => {
     // Catch Google OAuth redirect credentials from URL query params (web only)
@@ -282,6 +282,15 @@ export const RootNavigator: React.FC = () => {
     const sub = Linking.addEventListener('url', (e) => handleUrl(e.url));
     return () => sub.remove();
   }, []);
+
+  // 0. Wait for AsyncStorage to rehydrate persisted auth session before displaying UI
+  if (!isHydrated) {
+    return (
+      <View style={{ flex: 1, backgroundColor: designTokens.colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={designTokens.colors.primary} />
+      </View>
+    );
+  }
 
   // 1. If not authenticated, render Google Login Screen
   if (!isAuthenticated) {

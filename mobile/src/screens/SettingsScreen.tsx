@@ -16,7 +16,7 @@ interface SettingsScreenProps {
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboarding, navigation }) => {
   const { user, logout } = useAuthStore();
-  const { cgpa, credits, setCgpa, setCredits, avatarUrl, setAvatarUrl } = useDashboardStore();
+  const { cgpa, credits, setCgpa, setCredits, avatarUrl, setAvatarUrl, syncWithBackend } = useDashboardStore();
 
   const [semester, setSemester] = useState('FALL SEMESTER 2026-27');
   const [quietHoursEnabled, setQuietHoursEnabled] = useState(true);
@@ -103,9 +103,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
   const handleSyncNow = async () => {
     setSyncing(true);
     try {
-      await apiClient.fetchTimetableClasses();
-      await apiClient.fetchTasks();
-      Alert.alert('Synced', 'All timetable sessions and tasks are synced with cloud backend!');
+      await syncWithBackend();
+      Alert.alert('Synced', 'All timetable sessions, tasks, and finances are synchronized with cloud backend!');
     } catch {
       Alert.alert('Local Sync', 'Synced with local cache.');
     } finally {

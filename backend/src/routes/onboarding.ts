@@ -9,6 +9,7 @@ import type {
   InitializationJob,
   ClassSession,
   Subject,
+  Budget,
 } from '@glitchers/shared';
 
 export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
@@ -260,6 +261,9 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
 
       inMemoryStore.classes.set(userId, currentClasses);
       inMemoryStore.subjects.set(userId, userSubjects);
+      await supabaseStore.saveClasses(userId, currentClasses).catch((err) =>
+        console.warn('saveClasses to Supabase in onboarding error:', err)
+      );
     }
     job.stepStatuses.timetable = {
       status: 'COMPLETED',
@@ -286,7 +290,7 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
     if (body.financeSettings) {
       const { monthlyBudget } = body.financeSettings;
       if (monthlyBudget && monthlyBudget > 0) {
-        inMemoryStore.budgets.set(userId, {
+        const budgetData: Budget = {
           id: randomUUID(),
           userId,
           monthlyLimit: monthlyBudget,
@@ -294,7 +298,11 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
           month: new Date().toISOString().slice(0, 7),
           categoryLimits: {},
           alertThresholds: [75, 90, 100],
-        });
+        };
+        inMemoryStore.budgets.set(userId, budgetData);
+        await supabaseStore.saveBudget(userId, budgetData).catch((err) =>
+          console.warn('saveBudget to Supabase in onboarding error:', err)
+        );
       }
     }
     job.stepStatuses.finance = { status: 'COMPLETED', message: 'Finance tracker initialized' };

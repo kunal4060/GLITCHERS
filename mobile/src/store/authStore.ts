@@ -6,6 +6,7 @@ import { apiClient } from '../api/client';
 import { useDashboardStore } from './dashboardStore';
 
 interface AuthState {
+  isHydrated: boolean;
   isAuthenticated: boolean;
   isOnboardingComplete: boolean;
   currentOnboardingStep: OnboardingStep;
@@ -15,6 +16,7 @@ interface AuthState {
   gmailConnected: boolean;
   calendarConnected: boolean;
   isLoading: boolean;
+  setHydrated: (hydrated: boolean) => void;
   setUser: (user: UserProfile | null) => void;
   setToken: (token: string | null) => void;
   setAuthenticated: (status: boolean) => void;
@@ -30,6 +32,7 @@ interface AuthState {
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
+      isHydrated: false,
       isAuthenticated: false,
       isOnboardingComplete: false,
       currentOnboardingStep: 'GOOGLE_AUTH',
@@ -40,6 +43,7 @@ export const useAuthStore = create<AuthState>()(
       calendarConnected: false,
       isLoading: false,
 
+      setHydrated: (isHydrated) => set({ isHydrated }),
       setUser: (user) => {
         const token = get().token || (user?.id ? `jwt_${user.id}` : null);
         if (token) apiClient.setToken(token);
@@ -182,11 +186,23 @@ export const useAuthStore = create<AuthState>()(
       checkSession: async () => {
         try {
           const currentToken = get().token || (get().user?.id ? `jwt_${get().user!.id}` : null);
-          if (currentToken) {
-            apiClient.setToken(currentToken);
+          if (!currentToken) {
+            return;
           }
+          apiClient.setToken(currentToken);
+
           const res = await apiClient.get<{ user: UserProfile }>('/auth/me').catch(() => null);
           if (res?.user) {
+            // Guard: never let dev-token mock user overwrite an actual student profile
+            if (
+              res.user.id === '00000000-0000-0000-0000-000000000001' &&
+              get().user?.id &&
+              get().user!.id !== '00000000-0000-0000-0000-000000000001'
+            ) {
+              console.warn('Blocked checkSession from overwriting real user with dev user');
+              return;
+            }
+
             const statusRes = await apiClient.getOnboardingStatus().catch(() => null);
             const isComplete = statusRes?.isComplete ?? res.user.isOnboardingComplete ?? false;
             set({
@@ -229,12 +245,15 @@ export const useAuthStore = create<AuthState>()(
       name: 'glitchers-auth-storage',
       storage: createJSONStorage(() => AsyncStorage),
       onRehydrateStorage: () => (state) => {
-        if (state?.token) {
-          apiClient.setToken(state.token);
-        } else if (state?.user?.id) {
-          const derived = `jwt_${state.user.id}`;
-          state.token = derived;
-          apiClient.setToken(derived);
+        if (state) {
+          state.setHydrated(true);
+          if (state.token) {
+            apiClient.setToken(state.token);
+          } else if (state.user?.id) {
+            const derived = `jwt_${state.user.id}`;
+            state.token = derived;
+            apiClient.setToken(derived);
+          }
         }
       },
       partialize: (state) => ({
