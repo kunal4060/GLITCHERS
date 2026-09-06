@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
 import { designTokens } from '../theme/designTokens';
 import { GlassCard } from '../components/common/GlassCard';
 import { StatusBadge } from '../components/common/StatusBadge';
@@ -9,6 +10,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useDashboardStore } from '../store/dashboardStore';
 import type { ClassSession } from '@glitchers/shared';
 import { getClassStatus } from '../utils/timetableTimeUtils';
+import { apiClient } from '../api/client';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -22,6 +24,8 @@ export const TimetableScreen: React.FC = () => {
   const { classes, setClasses } = useDashboardStore();
   const [selectedDay, setSelectedDay] = useState<string>(getTodayDayName);
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
+  const [isScanModalVisible, setIsScanModalVisible] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
   const [newSubject, setNewSubject] = useState('');
   const [newRoom, setNewRoom] = useState('');
   const [newTime, setNewTime] = useState('14:00 - 15:00');
@@ -29,6 +33,115 @@ export const TimetableScreen: React.FC = () => {
 
   const dayUpper = selectedDay.toUpperCase();
   const dayClasses = classes.filter((c) => c.day === dayUpper);
+
+  const processTimetableAsset = async (asset: ImagePicker.ImagePickerAsset) => {
+    setIsScanModalVisible(false);
+    setIsScanning(true);
+    try {
+      let base64 = asset.base64;
+      const mimeType = asset.mimeType || 'image/jpeg';
+
+      if (!base64 && asset.uri) {
+        try {
+          const res = await fetch(asset.uri);
+          const blob = await res.blob();
+          base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const str = reader.result as string;
+              resolve(str.replace(/^data:[^;]+;base64,/, ''));
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        } catch (readErr) {
+          console.warn('Could not read asset uri as blob:', readErr);
+        }
+      }
+
+      if (!base64) {
+        setIsScanning(false);
+        Alert.alert('Scan Notice', 'Could not read image file. Please try again.');
+        return;
+      }
+
+      const result = await apiClient.analyzeTimetableImage(base64, mimeType);
+      setIsScanning(false);
+
+      if (result && result.classes && result.classes.length > 0) {
+        const incoming = result.classes.map((c: any, idx: number) => ({
+          ...c,
+          id: String(Date.now() + idx),
+          userId: 'u1',
+          isCancelled: false,
+        }));
+
+        setClasses(incoming);
+        // Persist to backend database as well
+        apiClient.saveTimetableClasses(incoming).catch((e) => console.warn('Sync classes failed:', e));
+
+        const firstDay = incoming[0]?.day;
+        if (firstDay) {
+          const matchedDay = DAYS.find((d) => d.toUpperCase() === firstDay.toUpperCase());
+          if (matchedDay) setSelectedDay(matchedDay);
+        }
+
+        Alert.alert(
+          'Timetable Imported! 🎉',
+          `Successfully extracted ${incoming.length} classes using AI Vision OCR.`
+        );
+      } else {
+        Alert.alert('Scan Notice', 'Could not detect courses in this photo. Please ensure good lighting and legible text.');
+      }
+    } catch (err: any) {
+      setIsScanning(false);
+      console.warn('Timetable scan error:', err);
+      Alert.alert('Scan Notice', err?.message || 'Failed to process timetable image.');
+    }
+  };
+
+  const handlePickGallery = async () => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Permission Required', 'Please grant photo library access to upload a timetable.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        base64: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        await processTimetableAsset(result.assets[0]);
+      }
+    } catch (e: any) {
+      Alert.alert('Gallery Error', e?.message || 'Could not open photo library.');
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Permission Required', 'Please grant camera access to take a timetable photo.');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: false,
+        base64: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        await processTimetableAsset(result.assets[0]);
+      }
+    } catch (e: any) {
+      Alert.alert('Camera Error', e?.message || 'Could not open camera.');
+    }
+  };
 
   const handleAddClass = () => {
     if (!newSubject.trim()) {
@@ -82,14 +195,35 @@ export const TimetableScreen: React.FC = () => {
 
           <View style={styles.headerRightButtons}>
             <TouchableOpacity
+              style={styles.scanBtn}
+              onPress={() => setIsScanModalVisible(true)}
+              disabled={isScanning}
+            >
+              {isScanning ? (
+                <ActivityIndicator size="small" color={designTokens.colors.primaryDeep} />
+              ) : (
+                <Ionicons name="scan-outline" size={15} color={designTokens.colors.primaryDeep} />
+              )}
+              <Text style={styles.scanBtnText}>{isScanning ? 'Scanning...' : 'Scan'}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={styles.addBtn}
               onPress={() => setIsAddModalVisible(true)}
             >
               <Ionicons name="add" size={16} color="#FFFFFF" />
-              <Text style={styles.addBtnText}>Add Class</Text>
+              <Text style={styles.addBtnText}>Add</Text>
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Real-time scanning feedback banner */}
+        {isScanning && (
+          <View style={styles.scanningBanner}>
+            <ActivityIndicator size="small" color="#FFFFFF" />
+            <Text style={styles.scanningBannerText}>Analyzing timetable photo with AI Vision OCR...</Text>
+          </View>
+        )}
 
         {/* Monday - Saturday Tabs */}
         <View style={styles.dayTabsWrapper}>
@@ -231,6 +365,51 @@ export const TimetableScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Modal: Scan Timetable Options */}
+      <Modal
+        visible={isScanModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsScanModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>📷 Scan Timetable Schedule</Text>
+            <Text style={styles.scanSubtitle}>
+              Upload a clear photo or screenshot of your college timetable. Our Gemini AI Vision OCR automatically parses class timings, courses, and venues.
+            </Text>
+
+            <TouchableOpacity style={styles.scanOptionCard} onPress={handleTakePhoto}>
+              <View style={styles.scanIconBox}>
+                <Ionicons name="camera" size={24} color={designTokens.colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.scanOptionTitle}>Take Photo</Text>
+                <Text style={styles.scanOptionSub}>Use your camera to snap your printed schedule</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.scanOptionCard} onPress={handlePickGallery}>
+              <View style={styles.scanIconBox}>
+                <Ionicons name="images" size={24} color={designTokens.colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.scanOptionTitle}>Choose from Gallery</Text>
+                <Text style={styles.scanOptionSub}>Select screenshot, image, or syllabus table</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.modalCancelBtn, { marginTop: 4 }]}
+              onPress={() => setIsScanModalVisible(false)}
+            >
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       </View>
       </SafeAreaView>
     </GradientBackground>
@@ -258,7 +437,25 @@ const styles = StyleSheet.create({
   },
   headerRightButtons: {
     flexDirection: 'row',
-    gap: designTokens.spacing.sm,
+    alignItems: 'center',
+    gap: 8,
+  },
+  scanBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(117, 167, 165, 0.15)',
+    borderWidth: 1,
+    borderColor: designTokens.colors.primary,
+    paddingHorizontal: designTokens.spacing.md,
+    paddingVertical: designTokens.spacing.xs + 2,
+    borderRadius: designTokens.radii.pill,
+  },
+  scanBtnText: {
+    ...designTokens.typography.cardTitle,
+    fontSize: 12,
+    color: designTokens.colors.primaryDeep,
+    fontWeight: '700',
   },
   addBtn: {
     backgroundColor: designTokens.colors.primary,
@@ -273,6 +470,56 @@ const styles = StyleSheet.create({
     ...designTokens.typography.cardTitle,
     fontSize: 12,
     color: '#FFFFFF',
+  },
+  scanningBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: designTokens.colors.primary,
+    marginHorizontal: designTokens.spacing.lg,
+    marginBottom: designTokens.spacing.sm,
+    paddingHorizontal: designTokens.spacing.md,
+    paddingVertical: 8,
+    borderRadius: designTokens.radii.sm,
+  },
+  scanningBannerText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  scanSubtitle: {
+    ...designTokens.typography.body,
+    fontSize: 12,
+    color: designTokens.colors.textSecondary,
+    marginBottom: designTokens.spacing.xs,
+  },
+  scanOptionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: designTokens.spacing.md,
+    backgroundColor: '#FFFFFF',
+    padding: designTokens.spacing.md,
+    borderRadius: designTokens.radii.card,
+    borderWidth: 1,
+    borderColor: 'rgba(41, 51, 50, 0.08)',
+  },
+  scanIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: designTokens.colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scanOptionTitle: {
+    ...designTokens.typography.cardTitle,
+    fontSize: 14,
+    color: designTokens.colors.textPrimary,
+  },
+  scanOptionSub: {
+    ...designTokens.typography.micro,
+    color: designTokens.colors.textSecondary,
+    marginTop: 2,
   },
   dayTabsWrapper: {
     marginBottom: designTokens.spacing.md,

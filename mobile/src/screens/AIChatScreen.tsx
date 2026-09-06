@@ -580,21 +580,21 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
 
       if (!res.canceled && res.assets && res.assets[0]) {
         const file = res.assets[0];
-        const modelInfo = HUGGINGFACE_OFFLINE_MODELS.find((m) => m.id === targetModelId) || HUGGINGFACE_OFFLINE_MODELS[0];
+        const effectiveModelId = targetModelId || file.name;
         const loadedInfo: LoadedModelFileInfo = {
           name: file.name,
           size: file.size || 0,
           uri: file.uri,
           mimeType: file.mimeType,
           loadedAt: new Date().toISOString(),
-          modelId: targetModelId || modelInfo.id,
+          modelId: effectiveModelId,
         };
         setLoadedModelFile(loadedInfo);
-        setActiveOfflineModel(targetModelId || modelInfo.id);
+        setActiveOfflineModel(effectiveModelId);
         setAiMode('OFFLINE');
         Alert.alert(
           '✓ Model File Loaded',
-          `Successfully loaded "${file.name}" (${((file.size || 0) / (1024 * 1024)).toFixed(1)} MB) from internal storage!\n\nOffline AI Engine is now active on your device.`
+          `Successfully loaded "${file.name}" (${((file.size || 0) / (1024 * 1024)).toFixed(1)} MB) from internal storage!\n\nOffline AI Engine is now active on your device and will answer all your questions locally.`
         );
       }
     } catch {

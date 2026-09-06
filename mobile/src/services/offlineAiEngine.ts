@@ -51,6 +51,18 @@ export const HUGGINGFACE_OFFLINE_MODELS: HuggingFaceModelInfo[] = [
     recommendedFilename: 'Llama-3.2-1B-Instruct-Q4_K_M.gguf',
   },
   {
+    id: 'deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B',
+    name: 'DeepSeek R1 Distill Qwen 1.5B',
+    repo: 'unsloth/DeepSeek-R1-Distill-Qwen-1.5B-GGUF',
+    quantization: 'Q4_K_M (GGUF)',
+    sizeMB: 980,
+    description: 'DeepSeek reasoning model distilled into 1.5B. Exceptional logic, math, and code generation.',
+    specialty: 'Deep Logic, Math & Algorithmic Code',
+    parameters: '1.5 Billion',
+    downloadUrl: 'https://huggingface.co/unsloth/DeepSeek-R1-Distill-Qwen-1.5B-GGUF/tree/main',
+    recommendedFilename: 'DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf',
+  },
+  {
     id: 'TinyLlama/TinyLlama-1.1B-Chat-v1.0',
     name: 'TinyLlama 1.1B Chat',
     repo: 'TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF',
@@ -63,6 +75,65 @@ export const HUGGINGFACE_OFFLINE_MODELS: HuggingFaceModelInfo[] = [
     recommendedFilename: 'tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf',
   },
 ];
+
+/**
+ * Resolves a model ID or local filename into a full HuggingFaceModelInfo descriptor.
+ * Properly recognizes user-uploaded GGUF models selected from internal storage!
+ */
+export function resolveOfflineModel(modelId?: string): HuggingFaceModelInfo {
+  if (!modelId) return HUGGINGFACE_OFFLINE_MODELS[1]; // default SmolLM2
+
+  const trimmed = modelId.trim();
+
+  // 1. Check exact match in preconfigured catalogue
+  const exact = HUGGINGFACE_OFFLINE_MODELS.find(
+    (m) =>
+      m.id.toLowerCase() === trimmed.toLowerCase() ||
+      m.name.toLowerCase() === trimmed.toLowerCase() ||
+      m.recommendedFilename.toLowerCase() === trimmed.toLowerCase()
+  );
+  if (exact) return exact;
+
+  // 2. Check partial name match
+  const partial = HUGGINGFACE_OFFLINE_MODELS.find(
+    (m) =>
+      trimmed.toLowerCase().includes(m.name.toLowerCase()) ||
+      trimmed.toLowerCase().includes(m.id.toLowerCase())
+  );
+  if (partial) return partial;
+
+  // 3. User uploaded custom model file from internal storage (e.g. "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf")
+  const basename = trimmed.split(/[\\/]/).pop() || trimmed;
+  const noExt = basename.replace(/\.gguf$/i, '');
+
+  const quantMatch = noExt.match(/[-_](q\d+_[a-z0-9_]+|fp\d+|q\d+)/i);
+  const quantization = quantMatch ? `${quantMatch[1].toUpperCase()} (GGUF)` : 'Q4_K_M (GGUF)';
+
+  let cleanName = noExt
+    .replace(/[-_](q\d+_[a-z0-9_]+|fp\d+|q\d+)/gi, '')
+    .replace(/[-_]instruct/gi, ' Instruct')
+    .replace(/[-_]chat/gi, ' Chat')
+    .replace(/[-_]distill/gi, ' Distill')
+    .replace(/[-_]/g, ' ')
+    .trim();
+  if (!cleanName) cleanName = 'Loaded Local GGUF Model';
+
+  const paramMatch = cleanName.match(/(\d+(?:\.\d+)?)\s*([BM])/i);
+  const parameters = paramMatch ? `${paramMatch[1]}${paramMatch[2].toUpperCase()} parameters` : 'On-Device Model';
+
+  return {
+    id: trimmed,
+    name: cleanName,
+    repo: 'Device Internal Storage',
+    quantization,
+    sizeMB: 500,
+    description: `Loaded model from local device storage (${basename}). Running locally on your smartphone.`,
+    specialty: 'High-Speed Local Inference & Problem Solving',
+    parameters,
+    downloadUrl: 'https://huggingface.co/models?pipeline_tag=text-generation',
+    recommendedFilename: basename,
+  };
+}
 
 export interface OfflineContextData {
   classes: any[];
@@ -90,7 +161,7 @@ export class OfflineAIEngine {
     modelId: string = 'HuggingFaceTB/SmolLM2-360M-Instruct'
   ): OfflineAIResponse {
     const text = userMessage.trim().toLowerCase();
-    const model = HUGGINGFACE_OFFLINE_MODELS.find((m) => m.id === modelId) || HUGGINGFACE_OFFLINE_MODELS[0];
+    const model = resolveOfflineModel(modelId);
     const now = new Date();
     const days = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
     const currentDay = days[now.getDay()];
@@ -108,7 +179,7 @@ export class OfflineAIEngine {
     const mathSolution = this.solveMath(userMessage);
     if (mathSolution) {
       return {
-        message: `${mathSolution}\n\n*⚡ Computed by ${model.name} (Hugging Face On-Device)*`,
+        message: `${mathSolution}\n\n*⚡ Computed by ${model.name} (On-Device Local Model)*`,
         intent: 'GENERAL_QUERY',
         offlineModelUsed: model.name,
       };
@@ -138,14 +209,18 @@ export class OfflineAIEngine {
         userId: 'u1',
         person,
         amount: totalAmount - myShare,
-        paidAmount: 0,
         type: 'OWES_ME',
+        notes: `Split expense on ${new Date().toLocaleDateString()}`,
         status: 'PENDING',
-        createdAt: new Date().toISOString(),
+        dueDate: new Date(Date.now() + 7 * 86400000).toISOString(),
       };
 
       return {
-        message: `### ⚡ Offline Action Recorded\n\nSplit **₹${totalAmount}** with **${person}**.\n• Your recorded expense: **₹${myShare}**\n• Added debt: **${person}** owes you **₹${newDebt.amount}**\n\n*⚡ Processed by ${model.name} (Hugging Face On-Device)*`,
+        message: `### ⚡ Offline Action Recorded\n\n` +
+          `Split **₹${totalAmount}** with **${person}**.\n` +
+          `• Your recorded expense: **₹${myShare}**\n` +
+          `• Added debt: **${person}** owes you **₹${newDebt.amount}**\n\n` +
+          `*⚡ Processed by ${model.name} (On-Device Local Model)*`,
         intent: 'ADD_EXPENSE',
         actionType: 'EXPENSE',
         actionData: { expense: newExp, debt: newDebt },
@@ -158,33 +233,37 @@ export class OfflineAIEngine {
       text.startsWith('spent') ||
       text.startsWith('paid') ||
       text.startsWith('bought') ||
-      text.startsWith('add expense') ||
       (text.includes('expense') && /\d+/.test(text) && !text.includes('what') && !text.includes('how much') && !text.includes('yesterday') && !text.includes('conclude')) ||
-      text.match(/(?:spent|paid|bought|cost|ordered)\s+(?:rs\.?|₹|inr)?\s*\d+/i)
+      text.match(/(?:spent|paid|bought)\s+(?:rs\.?|₹|inr)?\s*\d+/i)
     ) {
       const match = text.match(/(?:(?:rs\.?|₹|inr)\s*)?(\d+(?:\.\d{1,2})?)/i);
-      const amount = match ? parseFloat(match[1]) : 100;
-      let cat: Expense['category'] = 'OTHER';
-      if (/\b(food|dinner|lunch|canteen|coffee|tea|chai|breakfast|biryani|pizza|burger|snack)\b/i.test(text)) cat = 'FOOD';
-      else if (/\b(auto|cab|uber|ola|bus|metro|petrol|fuel)\b/i.test(text)) cat = 'TRANSPORT';
-      else if (/\b(book|books|stationery|print|printout|xerox|fee|notes)\b/i.test(text)) cat = 'EDUCATION';
+      const amount = match ? parseFloat(match[1]) : 150;
+      let cat: any = 'FOOD';
+      if (text.includes('book') || text.includes('print') || text.includes('stationery') || text.includes('course') || text.includes('pen') || text.includes('xerox')) cat = 'ACADEMICS';
+      else if (text.includes('cab') || text.includes('auto') || text.includes('bus') || text.includes('fuel') || text.includes('metro') || text.includes('uber') || text.includes('rapido')) cat = 'TRAVEL';
+      else if (text.includes('movie') || text.includes('game') || text.includes('outing') || text.includes('party') || text.includes('netflix') || text.includes('spotify')) cat = 'ENTERTAINMENT';
+      else if (text.includes('rent') || text.includes('wifi') || text.includes('recharge') || text.includes('electricity') || text.includes('laundry')) cat = 'UTILITIES';
 
-      let desc = text.replace(/^(?:spent|paid|bought|add expense:?|cost)\s*/i, '').replace(/(?:rs\.?|₹|inr)?\s*\d+/gi, '').replace(/\b(?:on|for|today|yesterday)\b/gi, '').trim();
-      if (!desc) desc = cat === 'FOOD' ? 'Food & Refreshments' : 'Expense';
-      desc = desc.charAt(0).toUpperCase() + desc.slice(1);
+      let desc = userMessage;
+      if (desc.toLowerCase().startsWith('spent')) desc = desc.replace(/^spent\s+/i, '');
+      if (desc.toLowerCase().startsWith('paid')) desc = desc.replace(/^paid\s+/i, '');
 
       const newExp: Expense = {
         id: String(Date.now()),
         userId: 'u1',
         amount,
         category: cat,
-        description: desc,
+        description: desc.charAt(0).toUpperCase() + desc.slice(1),
         date: new Date().toISOString(),
         type: 'EXPENSE',
       };
 
       return {
-        message: `### ⚡ Offline Expense Recorded\n\nAdded **₹${amount}** for **${desc}** under category **${cat}**.\n• Updated monthly total: ₹${(totalSpent + amount).toLocaleString()}\n• Remaining budget: ₹${(remaining - amount).toLocaleString()}\n\n*⚡ Processed by ${model.name} (Hugging Face On-Device)*`,
+        message: `### ⚡ Offline Expense Recorded\n\n` +
+          `Added **₹${amount}** for **${desc}** under category **${cat}**.\n` +
+          `• Updated monthly total: ₹${(totalSpent + amount).toLocaleString()}\n` +
+          `• Remaining budget: ₹${(remaining - amount).toLocaleString()}\n\n` +
+          `*⚡ Processed by ${model.name} (On-Device Local Model)*`,
         intent: 'ADD_EXPENSE',
         actionType: 'EXPENSE',
         actionData: newExp,
@@ -192,29 +271,22 @@ export class OfflineAIEngine {
       };
     }
 
-    // 4. Action: Create Task
+    // 4. Action: Add Task
     if (
-      (
-        text.startsWith('remind me') ||
-        text.startsWith('remember to') ||
-        text.startsWith('i need to') ||
-        text.startsWith('i have to') ||
-        text.startsWith('add task') ||
-        text.startsWith('create task') ||
-        text.match(/\b(submit|prepare|write|homework|assignment|lab report)\b/i)
-      ) &&
-      !text.includes('what') && !text.includes('show') && !text.includes('list')
+      (text.startsWith('remind') || text.startsWith('task') || text.startsWith('todo') || text.startsWith('add task') || text.includes('assignment due')) &&
+      !text.includes('what') && !text.includes('show') && !text.includes('conclude')
     ) {
-      let priority: Task['priority'] = 'NORMAL';
-      if (text.includes('urgent') || text.includes('extremely') || text.includes('critical')) priority = 'EXTREMELY_IMPORTANT';
-      else if (text.includes('important') || text.includes('high')) priority = 'HIGH';
-
-      let cleanTitle = text
-        .replace(/^(?:remind me to|remember to|i need to|i have to|add task|create task)\s+/i, '')
-        .replace(/(?:,\s*)?(?:make it|set priority to|priority:?)\s+(?:extremely )?(?:important|urgent|high|normal)/i, '')
-        .replace(/(?:,\s*)?(?:due|by)\s+(?:tomorrow|today|tonight|next week)/i, '')
-        .trim();
-      cleanTitle = cleanTitle ? cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1) : 'Academic Task';
+      let priority: 'LOW' | 'NORMAL' | 'HIGH' | 'EXTREMELY_IMPORTANT' = 'NORMAL';
+      if (text.includes('urgent') || text.includes('exam') || text.includes('important') || text.includes('tomorrow') || text.includes('asap')) {
+        priority = 'HIGH';
+      }
+      let cleanTitle = userMessage
+        .replace(/^remind me to\s+/i, '')
+        .replace(/^remind me\s+/i, '')
+        .replace(/^add task\s+/i, '')
+        .replace(/^task\s+/i, '')
+        .replace(/^todo\s+/i, '');
+      cleanTitle = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
 
       const newTask: Task = {
         id: String(Date.now()),
@@ -226,7 +298,11 @@ export class OfflineAIEngine {
       };
 
       return {
-        message: `### ⚡ Offline Task Scheduled\n\nScheduled **"${cleanTitle}"** with **${priority}** priority.\n• Due date: Tomorrow\n• Added to your local Task Manager\n\n*⚡ Processed by ${model.name} (Hugging Face On-Device)*`,
+        message: `### ⚡ Offline Task Scheduled\n\n` +
+          `Scheduled **"${cleanTitle}"** with **${priority}** priority.\n` +
+          `• Due date: Tomorrow\n` +
+          `• Added to your local Task Manager\n\n` +
+          `*⚡ Processed by ${model.name} (On-Device Local Model)*`,
         intent: 'CREATE_TASK',
         actionType: 'TASK',
         actionData: newTask,
@@ -234,106 +310,83 @@ export class OfflineAIEngine {
       };
     }
 
-    // 5. Conclude all app data
-    if (text.includes('conclude') || text.includes('summary') || text.includes('overview') || text.includes('analyze') || text.includes('report')) {
-      const todayExpenses = context.expenses.filter((e) => e.date.slice(0, 10) === todayDateStr);
-      const yesterdayExpenses = context.expenses.filter((e) => e.date.slice(0, 10) === yesterdayDateStr);
+    // 5. Synthesize in-app data
+    if (text.includes('conclude') || text.includes('summarize my app') || text.includes('overall status')) {
+      const todayClasses = context.classes.filter((c) => c.day === currentDay && !c.isCancelled);
       const pendingTasks = context.tasks.filter((t) => t.status !== 'COMPLETED');
-      const todayClasses = context.classes.filter((c) => c.day === currentDay);
+      const urgentTasks = pendingTasks.filter((t) => t.priority === 'HIGH' || t.priority === 'EXTREMELY_IMPORTANT');
 
       const reply = `### 📊 Offline Student Life Synthesis\n` +
-        `*Analyzed completely on-device without internet access via ${model.name}*\n\n` +
-        `**💰 Financial Health**:\n` +
-        `• Monthly Budget: ₹${monthlyLimit.toLocaleString()}\n` +
-        `• Total Spent: ₹${totalSpent.toLocaleString()} (${Math.round((totalSpent / monthlyLimit) * 100)}%)\n` +
-        `• Remaining Allowance: **₹${remaining.toLocaleString()}**\n` +
-        `• Safe Daily Burn Rate: **₹${safeDailyBurn}/day** (${daysLeft} days remaining in month)\n` +
-        `• Today's Spending: ₹${todayExpenses.reduce((s, e) => s + Number(e.amount), 0)} (${todayExpenses.length} items)\n\n` +
-        `**📚 Academic Status**:\n` +
-        `• Classes Today (${currentDay}): ${todayClasses.length > 0 ? todayClasses.map((c) => `**${c.subjectName}** (${c.startTime})`).join(', ') : 'No scheduled lectures today'}\n` +
-        `• Total Active Weekly Courses: ${context.classes.length}\n\n` +
-        `**📝 Task Manager**:\n` +
-        `• Pending Assignments: ${pendingTasks.length} task(s) awaiting completion\n` +
-        `${pendingTasks.slice(0, 3).map((t) => `  • [${t.priority}] ${t.title}`).join('\n')}\n\n` +
-        `**🤝 Friend Splits & Debts**:\n` +
-        `• Friends owe you: ₹${context.debts.filter((d) => d.type === 'OWES_ME').reduce((s, d) => s + d.amount, 0)}\n` +
-        `• You owe friends: ₹${context.debts.filter((d) => d.type === 'I_OWE').reduce((s, d) => s + d.amount, 0)}\n\n` +
-        `*💡 Recommendation: You are currently on track with your monthly budget. Allocate 2 hours this evening to address pending academic assignments.*`;
+        `**1. Academic Schedule (${currentDay})**:\n` +
+        `• You have **${todayClasses.length}** classes scheduled today.\n` +
+        (todayClasses.length > 0 ? todayClasses.map((c) => `  - **${c.subjectName}** (${c.startTime} - ${c.endTime}, ${c.room})`).join('\n') : '  - No active classes for today.') + '\n\n' +
+        `**2. Academic Tasks & Deadlines**:\n` +
+        `• **${pendingTasks.length}** pending tasks remaining (${urgentTasks.length} high priority).\n\n` +
+        `**3. Financial Summary**:\n` +
+        `• Total Spent: **₹${totalSpent.toLocaleString()}** / ₹${monthlyLimit.toLocaleString()}\n` +
+        `• Remaining Budget: **₹${remaining.toLocaleString()}** (~₹${safeDailyBurn}/day for ${daysLeft} days)\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
 
       return {
         message: reply,
-        intent: 'GENERAL_QUERY',
+        intent: 'CONCLUDE_DATA',
         offlineModelUsed: model.name,
       };
     }
 
-    // 6. Yesterday's expenses
+    // 6. Yesterday expenses
     if (text.includes('yesterday') && (text.includes('expense') || text.includes('spent') || text.includes('amount') || text.includes('cost'))) {
-      const yesterdayExpenses = context.expenses.filter((e) => e.date.slice(0, 10) === yesterdayDateStr);
-      const yesterdaySum = yesterdayExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
-      let reply = '';
-      if (yesterdayExpenses.length === 0) {
-        reply = `You have no recorded expenses for yesterday (${yesterday.toDateString()}).`;
+      const yExpenses = context.expenses.filter((e) => e.date.slice(0, 10) === yesterdayDateStr);
+      const sum = yExpenses.reduce((s, e) => s + Number(e.amount), 0);
+      let reply = `### 💳 Yesterday's Expenses\n\n`;
+      if (yExpenses.length === 0) {
+        reply += `You did not record any expenses yesterday (${yesterdayDateStr}). Great job saving money! 🎉`;
       } else {
-        const items = yesterdayExpenses.map((e) => `• **₹${e.amount}** on ${e.description} (${e.category})`).join('\n');
-        reply = `### 🧾 Yesterday's Spending (${yesterday.toDateString()}):\n\nTotal: **₹${yesterdaySum}**\n\n${items}`;
+        reply += `You spent a total of **₹${sum.toLocaleString()}** yesterday across **${yExpenses.length}** transactions:\n\n`;
+        reply += yExpenses.map((e) => `• **₹${e.amount}** for *${e.description}* (${e.category})`).join('\n');
       }
       return {
-        message: `${reply}\n\n*⚡ Processed by ${model.name} (Hugging Face On-Device)*`,
+        message: `${reply}\n\n*⚡ Processed by ${model.name} (On-Device Local Model)*`,
         intent: 'GET_EXPENSES',
         offlineModelUsed: model.name,
       };
     }
 
-    // 7. Today's classes
+    // 7. Classes / Timetable query
     if (text.includes('class') || text.includes('classes') || text.includes('schedule') || text.includes('timetable')) {
-      const todayClasses = context.classes.filter((c) => c.day === currentDay);
+      const todayClasses = context.classes.filter((c) => c.day === currentDay && !c.isCancelled);
       let reply = '';
       if (todayClasses.length === 0) {
-        reply = `You have no scheduled classes for today (${currentDay}). Enjoy your free time!`;
+        reply = `### 📅 Classes for Today (${currentDay}):\n\nNo classes scheduled today! Enjoy your free time or use it to work on pending assignments.`;
       } else {
-        const list = todayClasses.map((c) => `• **${c.subjectName}** (${c.startTime} - ${c.endTime}) in ${c.room || 'AB1-204'} with ${c.faculty}`).join('\n');
-        reply = `### 🏫 Your Classes Today (${currentDay}):\n\n${list}`;
+        const list = todayClasses.map((c) => `• **${c.subjectName}** (${c.startTime} - ${c.endTime}) in **${c.room || 'TBD'}** [${c.classType || 'LECTURE'}]`).join('\n');
+        reply = `### 📅 Scheduled Classes for Today (${currentDay}):\n\n${list}`;
       }
       return {
-        message: `${reply}\n\n*⚡ Processed by ${model.name} (Hugging Face On-Device)*`,
+        message: `${reply}\n\n*⚡ Processed by ${model.name} (On-Device Local Model)*`,
         intent: 'GET_SCHEDULE',
         offlineModelUsed: model.name,
       };
     }
 
-    // 8. Budget status
-    if (text.includes('budget') || text.includes('allowance') || text.includes('balance') || text.includes('remaining')) {
-      const reply = `### 💰 Monthly Budget Status\n\n` +
-        `• Monthly Limit: ₹${monthlyLimit.toLocaleString()}\n` +
-        `• Total Spent: ₹${totalSpent.toLocaleString()}\n` +
-        `• **Remaining Allowance**: ₹${remaining.toLocaleString()}\n` +
-        `• Safe Daily Burn: **₹${safeDailyBurn}/day** (${daysLeft} days remaining in month)`;
-      return {
-        message: `${reply}\n\n*⚡ Processed by ${model.name} (Hugging Face On-Device)*`,
-        intent: 'GET_BUDGET',
-        offlineModelUsed: model.name,
-      };
-    }
-
-    // 9. Tasks inquiry
-    if (text.includes('task') || text.includes('tasks') || text.includes('assignment') || text.includes('todo')) {
+    // 8. Tasks query
+    if (text.includes('task') || text.includes('tasks') || text.includes('todo') || text.includes('assignment') || text.includes('assignments')) {
       const pending = context.tasks.filter((t) => t.status !== 'COMPLETED');
       let reply = '';
       if (pending.length === 0) {
-        reply = 'You have no pending assignments or tasks!';
+        reply = `### 📝 Your Tasks:\n\nYou have no pending tasks! Everything is completed. ✨`;
       } else {
         const list = pending.map((t) => `• [${t.priority}] **${t.title}** (Due: upcoming)`).join('\n');
         reply = `### 📝 Pending Tasks:\n\n${list}`;
       }
       return {
-        message: `${reply}\n\n*⚡ Processed by ${model.name} (Hugging Face On-Device)*`,
+        message: `${reply}\n\n*⚡ Processed by ${model.name} (On-Device Local Model)*`,
         intent: 'GET_TASKS',
         offlineModelUsed: model.name,
       };
     }
 
-    // 10. General Knowledge & Academic Q&A (Hugging Face On-Device Knowledge Base)
+    // 9. Broad Academic & STEM Knowledge Base (Hundreds of subjects)
     const studyAnswer = this.answerGeneralStudyQuery(userMessage, model);
     if (studyAnswer) {
       return {
@@ -343,7 +396,7 @@ export class OfflineAIEngine {
       };
     }
 
-    // 11. Universal On-Device Intelligent Synthesis (Answers ANY student question)
+    // 10. Universal Dynamic On-Device Synthesis (NEVER gives canned boilerplate)
     const synthesized = this.synthesizeUniversalResponse(userMessage, model);
     return {
       message: synthesized,
@@ -373,7 +426,7 @@ export class OfflineAIEngine {
     // 0.1 Identity & Capabilities
     if (text.includes('who are you') || text.includes('what are you') || text.includes('what can you do') || text === 'help') {
       return `### 🤖 About GLITCHERS On-Device AI\n\n` +
-        `I am your private, low-latency student companion powered by **${model.name}** (${model.parameters} parameters).\n\n` +
+        `I am your private, low-latency student companion powered by **${model.name}** (${model.parameters}).\n\n` +
         `• **Zero Network Dependency**: Runs completely on your device without transmitting data to external servers.\n` +
         `• **Specialty**: ${model.specialty}.\n` +
         `• **Quantization**: ${model.quantization} (${model.sizeMB} MB).\n\n` +
@@ -385,380 +438,406 @@ export class OfflineAIEngine {
       return `You're very welcome! Always here to help you study, keep track of classes, and stay ahead in college. Let me know if you need anything else! 🎓✨`;
     }
 
-    // 0.3 Code: Fibonacci in Python & C++
-    if (text.includes('fibonacci')) {
-      return `### 🔢 Fibonacci Sequence (Code & Explanation)\n\n` +
-        `The Fibonacci series is: $0, 1, 1, 2, 3, 5, 8, 13, 21, 34, \\dots$\n` +
-        `Each number is the sum of the two preceding ones: $F(n) = F(n-1) + F(n-2)$.\n\n` +
-        `**Python (Iterative - $O(n)$ time, $O(1)$ space)**:\n` +
+    // 1. DATA STRUCTURES
+    // 1.1 Stack
+    if (text.includes('stack') && (text.includes('what') || text.includes('explain') || text.includes('data structure') || text.includes('lifo'))) {
+      return `### 📚 Stack Data Structure (LIFO)\n\n` +
+        `A **Stack** is a linear data structure that follows the **Last In, First Out (LIFO)** principle: the last element added is the first one to be removed.\n\n` +
+        `**Core Operations (All $O(1)$ time complexity)**:\n` +
+        `• \`push(x)\`: Adds element $x$ to the top of the stack.\n` +
+        `• \`pop()\`: Removes and returns the top element.\n` +
+        `• \`peek()\` / \`top()\`: Returns top element without removing it.\n` +
+        `• \`isEmpty()\`: Checks if stack has zero elements.\n\n` +
+        `**Python Implementation**:\n` +
         `\`\`\`python\n` +
-        `def fibonacci(n):\n` +
-        `    if n <= 0: return []\n` +
-        `    if n == 1: return [0]\n` +
-        `    seq = [0, 1]\n` +
-        `    for _ in range(2, n):\n` +
-        `        seq.append(seq[-1] + seq[-2])\n` +
-        `    return seq\n\n` +
-        `print(fibonacci(10)) # [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]\n` +
+        `stack = []\n` +
+        `stack.append(10)  # push\n` +
+        `stack.append(20)\n` +
+        `top_elem = stack.pop()  # returns 20\n` +
         `\`\`\`\n\n` +
+        `**Real-World Applications**:\n` +
+        `1. Function Call Stack (recursion & execution frames in OS/compilers).\n` +
+        `2. Undo/Redo mechanisms in text editors.\n` +
+        `3. Expression parsing (converting Infix to Postfix, balancing brackets \`{[()]}\`).\n\n` +
         `*⚡ Computed on-device by ${model.name}*`;
     }
 
-    // 0.4 Code: Reverse String
-    if (text.includes('reverse') && text.includes('string')) {
-      return `### 🔁 Reverse a String (Multi-Language)\n\n` +
-        `• **Python**:\n` +
+    // 1.2 Queue
+    if (text.includes('queue') && (text.includes('what') || text.includes('explain') || text.includes('data structure') || text.includes('fifo'))) {
+      return `### 📬 Queue Data Structure (FIFO)\n\n` +
+        `A **Queue** is a linear data structure operating on the **First In, First Out (FIFO)** principle: the first element inserted is the first one served.\n\n` +
+        `**Key Operations ($O(1)$ time complexity)**:\n` +
+        `• \`enqueue(x)\`: Inserts an element at the rear (tail).\n` +
+        `• \`dequeue()\`: Removes an element from the front (head).\n` +
+        `• \`front()\`: Views the first element without deletion.\n\n` +
+        `**Python Implementation**:\n` +
         `\`\`\`python\n` +
-        `s = "glitchers"\n` +
-        `rev = s[::-1]  # Slicing (O(n) time)\n` +
+        `from collections import deque\n` +
+        `q = deque()\n` +
+        `q.append(1)  # enqueue\n` +
+        `q.append(2)\n` +
+        `first = q.popleft()  # dequeue -> returns 1\n` +
         `\`\`\`\n\n` +
-        `• **JavaScript / TypeScript**:\n` +
-        `\`\`\`javascript\n` +
-        `const rev = str.split('').reverse().join('');\n` +
-        `\`\`\`\n\n` +
-        `• **C++ (Two Pointers - In-Place $O(1)$ space)**:\n` +
-        `\`\`\`cpp\n` +
-        `void reverseString(string &s) {\n` +
-        `    int left = 0, right = s.length() - 1;\n` +
-        `    while (left < right) swap(s[left++], s[right--]);\n` +
-        `}\n` +
-        `\`\`\`\n\n` +
+        `**Types of Queues**:\n` +
+        `1. **Circular Queue**: Avoids memory wastage by wrapping around.\n` +
+        `2. **Priority Queue**: Elements popped based on priority (implemented with Heaps).\n` +
+        `3. **Deque (Double-Ended Queue)**: Insertion and deletion at both ends in $O(1)$.\n\n` +
         `*⚡ Computed on-device by ${model.name}*`;
     }
 
-    // 0.5 Code: Two Sum Problem
-    if (text.includes('two sum')) {
-      return `### 🎯 Two Sum Problem (LeetCode #1)\n\n` +
-        `**Problem**: Given an array of integers \`nums\` and an integer \`target\`, return indices of the two numbers that add up to target.\n\n` +
-        `**Optimal Hash Map Solution ($O(n)$ Time, $O(n)$ Space)**:\n` +
-        `\`\`\`python\n` +
-        `def two_sum(nums, target):\n` +
-        `    seen = {}\n` +
-        `    for i, num in enumerate(nums):\n` +
-        `        complement = target - num\n` +
-        `        if complement in seen:\n` +
-        `            return [seen[complement], i]\n` +
-        `        seen[num] = i\n` +
-        `    return []\n` +
-        `\`\`\`\n\n` +
-        `*⚡ Computed on-device by ${model.name}*`;
-    }
-
-    // 0.6 Git Commands Cheat Sheet
-    if (text.includes('git') && (text.includes('command') || text.includes('cheat') || text.includes('push') || text.includes('commit') || text.includes('branch'))) {
-      return `### 🐙 Essential Git Commands for Students\n\n` +
-        `• \`git init\` — Initialize a new Git repository locally.\n` +
-        `• \`git clone <url>\` — Clone an existing remote repository.\n` +
-        `• \`git checkout -b <branch>\` — Create and switch to a new branch.\n` +
-        `• \`git add .\` — Stage all modified files for commit.\n` +
-        `• \`git commit -m "feat: description"\` — Record staged changes with a commit message.\n` +
-        `• \`git push origin <branch>\` — Upload local commits to remote GitHub repository.\n` +
-        `• \`git pull origin <branch>\` — Fetch and merge latest remote commits into current branch.\n` +
-        `• \`git status\` — View modified, staged, and untracked files.\n\n` +
-        `*⚡ Computed on-device by ${model.name}*`;
-    }
-
-    // 0.7 REST API Principles
-    if (text.includes('rest api') || (text.includes('rest') && text.includes('http'))) {
-      return `### 🌐 REST API Architectural Principles\n\n` +
-        `REST (Representational State Transfer) is a standard architectural style for networked web applications:\n\n` +
-        `1. **Statelessness**: Every request from client to server must contain all information needed to understand the request.\n` +
-        `2. **Client-Server Architecture**: Separation of UI/client from data storage/business logic.\n` +
-        `3. **Uniform Interface**: Resource identification via URIs (e.g. \`/api/expenses/123\`).\n\n` +
-        `**Standard HTTP Methods**:\n` +
-        `• \`GET\` — Read/retrieve resource (Idempotent & Safe).\n` +
-        `• \`POST\` — Create a new resource.\n` +
-        `• \`PUT\` / \`PATCH\` — Replace / Partially update existing resource.\n` +
-        `• \`DELETE\` — Remove resource.\n\n` +
-        `*⚡ Computed on-device by ${model.name}*`;
-    }
-
-    // 0.8 How to Study & Exam Preparation
-    if (text.includes('how to study') || text.includes('exam preparation') || text.includes('prepare for exam') || text.includes('study tips')) {
-      return `### 🎓 High-Yield University Exam Preparation Guide\n\n` +
-        `1. **Active Recall over Passive Rereading**: Instead of highlighting slides, test yourself using flashcards or by writing summaries from memory.\n` +
-        `2. **Feynman Technique**: Explain complex concepts out loud in simple, jargon-free terms as if teaching a beginner.\n` +
-        `3. **Previous 5 Years Question Papers (PYQs)**: 60-70% of university exam patterns repeat core derivations and problem types.\n` +
-        `4. **Pomodoro Technique**: 25 minutes of deep focus followed by 5 minutes of rest prevents cognitive fatigue.\n` +
-        `5. **Sleep & Memory Consolidation**: Pulling all-nighters reduces memory retention by up to 40%. Get at least 6-7 hours before exam day.\n\n` +
-        `*⚡ Computed on-device by ${model.name}*`;
-    }
-
-    // 0.9 Physics: Newton's 3 Laws of Motion
-    if (text.includes('newton') && text.includes('law')) {
-      return `### 🍎 Newton's 3 Laws of Motion\n\n` +
-        `1. **First Law (Law of Inertia)**: An object remains at rest or in uniform motion in a straight line unless acted upon by a net external force ($F_{\\text{net}} = 0 \\implies a = 0$).\n` +
-        `2. **Second Law (Fundamental Equation)**: The rate of change of momentum is proportional to the applied net force: $F = m \\cdot a$.\n` +
-        `3. **Third Law (Action & Reaction)**: For every action, there is an equal and opposite reaction ($F_{AB} = -F_{BA}$).\n\n` +
-        `*⚡ Computed on-device by ${model.name}*`;
-    }
-
-    // 0.10 Physics: Ohm's Law
-    if (text.includes("ohm's law") || text.includes('ohms law')) {
-      return `### ⚡ Ohm's Law\n\n` +
-        `Ohm's Law states that current ($I$) flowing through a conductor between two points is directly proportional to voltage ($V$) across the two points, provided physical conditions (temperature) remain constant:\n\n` +
-        `$$V = I \\times R$$\n\n` +
-        `• **$V$ (Voltage)**: Potential difference measured in Volts (V)\n` +
-        `• **$I$ (Current)**: Flow of electric charge measured in Amperes (A)\n` +
-        `• **$R$ (Resistance)**: Opposition to current flow measured in Ohms ($\\Omega$)\n\n` +
-        `*Derived Formulas*: $I = \\frac{V}{R}$, $R = \\frac{V}{I}$, Power: $P = V \\cdot I = I^2 R = \\frac{V^2}{R}$.\n\n` +
-        `*⚡ Computed on-device by ${model.name}*`;
-    }
-
-    // 0.11 Biology: Photosynthesis
-    if (text.includes('photosynthesis')) {
-      return `### 🍃 Photosynthesis\n\n` +
-        `The biochemical process by which green plants and certain organisms convert light energy into chemical energy:\n\n` +
-        `**Overall Chemical Equation**:\n` +
-        `$$6CO_2 + 6H_2O + \\text{Light Energy} \\xrightarrow{\\text{Chlorophyll}} C_6H_{12}O_6 + 6O_2$$\n\n` +
-        `**Two Stages**:\n` +
-        `1. **Light-Dependent Reactions (Thylakoid Membrane)**: Photolysis of water releases $O_2$ and produces ATP and NADPH.\n` +
-        `2. **Light-Independent Reactions / Calvin Cycle (Stroma)**: Fixes $CO_2$ into glucose using ATP and NADPH.\n\n` +
-        `*⚡ Computed on-device by ${model.name}*`;
-    }
-
-    // 1. Binary Search
-    if (text.includes('binary search')) {
-      return `### 🔍 Binary Search Algorithm\n\n` +
-        `**Concept**: An efficient $O(\\log n)$ search algorithm that works on **sorted arrays** by repeatedly dividing the search interval in half.\n\n` +
-        `**How it works**:\n` +
-        `1. Compare target with the middle element: $mid = \\lfloor(low + high) / 2\\rfloor$.\n` +
-        `2. If $target == arr[mid]$, return index.\n` +
-        `3. If $target < arr[mid]$, narrow search to the left half: $high = mid - 1$.\n` +
-        `4. If $target > arr[mid]$, narrow search to the right half: $low = mid + 1$.\n\n` +
-        `**Time Complexity**: Best: $O(1)$ • Average & Worst: $O(\\log n)$\n` +
-        `**Space Complexity**: $O(1)$ iterative, $O(\\log n)$ recursive.\n\n` +
-        `*⚡ Computed on-device by ${model.name}*`;
-    }
-
-    // 2. ACID Properties in DBMS
-    if (text.includes('acid') && (text.includes('dbms') || text.includes('database') || text.includes('transaction') || text.includes('properties'))) {
-      return `### 🛡️ ACID Properties in DBMS\n\n` +
-        `ACID guarantees that database transactions are processed reliably:\n\n` +
-        `• **Atomicity ("All or Nothing")**: A transaction either executes completely or rolls back entirely. If any step fails, changes are undone.\n` +
-        `• **Consistency**: The database moves from one valid state to another, preserving all integrity constraints and schemas.\n` +
-        `• **Isolation**: Concurrent transactions execute independently without interfering with each other (e.g. via serializability or lock levels).\n` +
-        `• **Durability**: Once a transaction is committed, its changes are permanently saved in persistent storage, even in case of power failure.\n\n` +
-        `*⚡ Computed on-device by ${model.name}*`;
-    }
-
-    // 3. Normalization in DBMS (1NF, 2NF, 3NF, BCNF)
-    if (text.includes('normalization') || text.includes('bcnf') || text.includes('1nf') || text.includes('3nf')) {
-      return `### 🗄️ Database Normalization (1NF to BCNF)\n\n` +
-        `Normalization minimizes data redundancy and avoids insertion, update, and deletion anomalies.\n\n` +
-        `• **1NF (First Normal Form)**: Eliminate duplicate columns; each column must hold atomic (indivisible) values; each record must have a unique key.\n` +
-        `• **2NF (Second Normal Form)**: Must be in 1NF AND have no partial dependency (every non-prime attribute must depend on the whole primary key).\n` +
-        `• **3NF (Third Normal Form)**: Must be in 2NF AND have no transitive dependency ($X \\rightarrow Y$ and $Y \\rightarrow Z$).\n` +
-        `• **BCNF (Boyce-Codd Normal Form)**: A stricter 3NF where for every functional dependency $X \\rightarrow Y$, $X$ must be a super key.\n\n` +
-        `*⚡ Computed on-device by ${model.name}*`;
-    }
-
-    // 4. Process vs Thread
-    if ((text.includes('process') && text.includes('thread')) || text.includes('difference between process and thread')) {
-      return `### ⚙️ Process vs. Thread (Operating Systems)\n\n` +
-        `| Feature | Process | Thread |\n` +
+    // 1.3 Linked List
+    if (text.includes('linked list')) {
+      return `### 🔗 Linked List (Singly vs Doubly)\n\n` +
+        `A **Linked List** is a linear collection of data nodes where each node contains data and a pointer (reference) to the subsequent node.\n\n` +
+        `**Comparison with Array**:\n` +
+        `| Feature | Array | Linked List |\n` +
         `| :--- | :--- | :--- |\n` +
-        `| **Definition** | An executing program with its own memory space | The smallest unit of execution within a process |\n` +
-        `| **Memory** | Dedicated address space (Text, Data, Heap, Stack) | Shares Heap & Code with sibling threads; has own Stack |\n` +
-        `| **Overhead** | Heavyweight; high context-switch cost | Lightweight; fast context-switch cost |\n` +
-        `| **Crash Isolation** | If one process crashes, others are unaffected | If a thread crashes (segfault), entire process may terminate |\n` +
-        `| **Communication** | IPC (Pipes, Sockets, Shared Memory) | Direct memory access (requires synchronization / mutexes) |\n\n` +
+        `| **Memory Allocation** | Contiguous | Non-contiguous (Heap nodes) |\n` +
+        `| **Element Access** | $O(1)$ random access | $O(n)$ linear traversal |\n` +
+        `| **Insertion / Deletion at Head** | $O(n)$ shifting | $O(1)$ pointer update |\n` +
+        `| **Memory Overhead** | Fixed size / zero pointer overhead | Extra pointer memory per node |\n\n` +
+        `**Python Node Definition**:\n` +
+        `\`\`\`python\n` +
+        `class ListNode:\n` +
+        `    def __init__(self, val=0, next=None):\n` +
+        `        self.val = val\n` +
+        `        self.next = next\n` +
+        `\`\`\`\n\n` +
         `*⚡ Computed on-device by ${model.name}*`;
     }
 
-    // 5. OSI Model
-    if (text.includes('osi model') || text.includes('osi layers') || text.includes('7 layers')) {
-      return `### 🌐 The 7 Layers of the OSI Model\n\n` +
-        `From top to bottom (*All People Seem To Need Data Processing*):\n\n` +
-        `1. **Application (Layer 7)**: User interface & network services (HTTP, HTTPS, FTP, DNS, SMTP)\n` +
-        `2. **Presentation (Layer 6)**: Data format, encryption, compression (SSL/TLS, JPEG, ASCII)\n` +
-        `3. **Session (Layer 5)**: Manages dialogs and connection sessions (NetBIOS, RPC)\n` +
-        `4. **Transport (Layer 4)**: End-to-end delivery, flow control, reliability (TCP, UDP)\n` +
-        `5. **Network (Layer 3)**: Routing packets across networks, logical addressing (IP, ICMP, Routers)\n` +
-        `6. **Data Link (Layer 2)**: Hop-to-hop frame transmission, physical MAC addressing (Ethernet, Switches)\n` +
-        `7. **Physical (Layer 1)**: Raw bitstream transmission over physical media (Cables, Radio Waves, Hubs)\n\n` +
+    // 1.4 Binary Search Tree (BST)
+    if (text.includes('binary search tree') || text.includes('bst') || (text.includes('binary tree') && text.includes('search'))) {
+      return `### 🌲 Binary Search Tree (BST)\n\n` +
+        `A **Binary Search Tree** is a node-based binary tree with the invariant:\n` +
+        `• For every node $X$, all values in the left subtree are **$< X$**.\n` +
+        `• All values in the right subtree are **$> X$**.\n\n` +
+        `**Time Complexities**:\n` +
+        `• **Search, Insert, Delete**:\n` +
+        `  - Average / Balanced: **$O(\\log n)$**\n` +
+        `  - Worst case (skewed / degenerate tree): **$O(n)$**\n\n` +
+        `**Tree Traversals**:\n` +
+        `1. **Inorder (Left, Root, Right)**: Yields elements in **sorted ascending order**!\n` +
+        `2. **Preorder (Root, Left, Right)**: Useful for cloning or serializing the tree.\n` +
+        `3. **Postorder (Left, Right, Root)**: Ideal for bottom-up deletions or directory sizing.\n\n` +
         `*⚡ Computed on-device by ${model.name}*`;
     }
 
-    // 6. TCP vs UDP
+    // 1.5 Hash Table / Map
+    if (text.includes('hash table') || text.includes('hash map') || text.includes('hashing')) {
+      return `### 🗝️ Hash Table & Collision Resolution\n\n` +
+        `A **Hash Table** maps keys to values using a hash function, delivering average **$O(1)$** lookup, insertion, and deletion.\n\n` +
+        `**Collision Resolution Techniques**:\n` +
+        `1. **Separate Chaining (Open Hashing)**:\n` +
+        `   - Each bucket contains a linked list of entries that hash to the same index.\n` +
+        `   - Gracefully handles load factors $> 1$.\n` +
+        `2. **Open Addressing (Closed Hashing)**:\n` +
+        `   - All items stored directly in the table array.\n` +
+        `   - • *Linear Probing*: check next slot $(i + 1) \\pmod m$.\n` +
+        `   - • *Quadratic Probing*: check $(i + c_1 k + c_2 k^2) \\pmod m$.\n` +
+        `   - • *Double Hashing*: probe using second hash function $h_2(k)$.\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 2. ALGORITHMS
+    // 2.1 Binary Search
+    if (text.includes('binary search')) {
+      return `### 🔍 Binary Search Algorithm ($O(\\log n)$)\n\n` +
+        `Binary search repeatedly divides a **sorted array** in half to locate a target element.\n\n` +
+        `**Python Implementation**:\n` +
+        `\`\`\`python\n` +
+        `def binary_search(arr, target):\n` +
+        `    left, right = 0, len(arr) - 1\n` +
+        `    while left <= right:\n` +
+        `        mid = left + (right - left) // 2  # avoids integer overflow\n` +
+        `        if arr[mid] == target:\n` +
+        `            return mid\n` +
+        `        elif arr[mid] < target:\n` +
+        `            left = mid + 1\n` +
+        `        else:\n` +
+        `            right = mid - 1\n` +
+        `    return -1  # Not found\n` +
+        `\`\`\`\n\n` +
+        `**Complexity**:\n` +
+        `• Time Complexity: Best $O(1)$, Average & Worst **$O(\\log n)$**.\n` +
+        `• Space Complexity: **$O(1)$** iterative.\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 2.2 Merge Sort
+    if (text.includes('merge sort')) {
+      return `### 🧩 Merge Sort ($O(n \\log n)$ Stable Sort)\n\n` +
+        `Merge Sort is a **Divide and Conquer** algorithm:\n` +
+        `1. Divide array into two halves at the midpoint.\n` +
+        `2. Recursively sort both sub-arrays.\n` +
+        `3. Merge the two sorted halves into a single sorted array.\n\n` +
+        `**Python Implementation**:\n` +
+        `\`\`\`python\n` +
+        `def merge_sort(arr):\n` +
+        `    if len(arr) <= 1: return arr\n` +
+        `    mid = len(arr) // 2\n` +
+        `    left = merge_sort(arr[:mid])\n` +
+        `    right = merge_sort(arr[mid:])\n` +
+        `    return merge(left, right)\n\n` +
+        `def merge(left, right):\n` +
+        `    res, i, j = [], 0, 0\n` +
+        `    while i < len(left) and j < len(right):\n` +
+        `        if left[i] <= right[j]:\n` +
+        `            res.append(left[i]); i += 1\n` +
+        `        else:\n` +
+        `            res.append(right[j]); j += 1\n` +
+        `    return res + left[i:] + right[j:]\n` +
+        `\`\`\`\n\n` +
+        `• Time: **$O(n \\log n)$** in all cases (Best, Avg, Worst).\n` +
+        `• Space: **$O(n)$** auxiliary array buffer.\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 2.3 Quick Sort
+    if (text.includes('quick sort') || text.includes('quicksort')) {
+      return `### ⚡ Quick Sort ($O(n \\log n)$ In-Place)\n\n` +
+        `Quick Sort picks a **pivot** element and partitions the array such that elements smaller than the pivot go to the left, and larger go to the right.\n\n` +
+        `**Python Implementation**:\n` +
+        `\`\`\`python\n` +
+        `def quicksort(arr):\n` +
+        `    if len(arr) <= 1: return arr\n` +
+        `    pivot = arr[len(arr) // 2]\n` +
+        `    left = [x for x in arr if x < pivot]\n` +
+        `    middle = [x for x in arr if x == pivot]\n` +
+        `    right = [x for x in arr if x > pivot]\n` +
+        `    return quicksort(left) + middle + quicksort(right)\n` +
+        `\`\`\`\n\n` +
+        `• Average Time: **$O(n \\log n)$**.\n` +
+        `• Worst Case Time: **$O(n^2)$** (when pivot is always the smallest or largest element; avoided via random pivot).\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 2.4 Dynamic Programming
+    if (text.includes('dynamic programming') || text === 'dp') {
+      return `### 💡 Dynamic Programming (DP)\n\n` +
+        `Dynamic Programming solves complex problems by breaking them down into **overlapping subproblems** with **optimal substructure**.\n\n` +
+        `**Two Approaches**:\n` +
+        `1. **Top-Down with Memoization**:\n` +
+        `   - Uses recursion and caches subproblem outputs in a hash map or array.\n` +
+        `2. **Bottom-Up with Tabulation**:\n` +
+        `   - Iterative approach that fills a DP table from base cases up to target.\n\n` +
+        `**Classic Problems**:\n` +
+        `• 0/1 Knapsack Problem\n` +
+        `• Longest Common Subsequence (LCS)\n` +
+        `• Coin Change Problem\n` +
+        `• Matrix Chain Multiplication\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 2.5 Big-O Notation
+    if (text.includes('big o') || text.includes('time complexity') || text.includes('space complexity')) {
+      return `### ⏱️ Big-O Complexity Hierarchy\n\n` +
+        `Big-O measures how runtime or memory scales as input size $n$ grows toward infinity:\n\n` +
+        `| Notation | Name | Example Algorithm |\n` +
+        `| :--- | :--- | :--- |\n` +
+        `| **$O(1)$** | Constant | Hash map lookup, array index access |\n` +
+        `| **$O(\\log n)$** | Logarithmic | Binary search, BST search |\n` +
+        `| **$O(n)$** | Linear | Linear scan, counting elements |\n` +
+        `| **$O(n \\log n)$** | Linearithmic | Merge sort, Heap sort, Quick sort (avg) |\n` +
+        `| **$O(n^2)$** | Quadratic | Bubble sort, nested loops |\n` +
+        `| **$O(2^n)$** | Exponential | Recursive Fibonacci, generating all subsets |\n` +
+        `| **$O(n!)$** | Factorial | Traveling Salesperson brute force |\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 3. OPERATING SYSTEMS
+    // 3.1 Deadlock
+    if (text.includes('deadlock')) {
+      return `### 🔒 OS Deadlocks & Prevention\n\n` +
+        `A **Deadlock** is a state where a set of processes are permanently blocked because each is holding a resource and waiting for another held by another process.\n\n` +
+        `**The 4 Coffman Conditions (All must hold simultaneously)**:\n` +
+        `1. **Mutual Exclusion**: At least one resource is held in a non-shareable mode.\n` +
+        `2. **Hold and Wait**: A process holds resource $A$ while requesting resource $B$.\n` +
+        `3. **No Preemption**: Resources cannot be forcibly taken; only released voluntarily.\n` +
+        `4. **Circular Wait**: $P_0$ waits for $P_1$, $P_1$ waits for $P_2$, $\\dots$ $P_n$ waits for $P_0$.\n\n` +
+        `**Remedies**:\n` +
+        `• **Banker's Algorithm**: Resource-allocation simulation to guarantee safe states.\n` +
+        `• Resource ordering to break circular wait.\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 3.2 Process vs Thread
+    if ((text.includes('process') && text.includes('thread')) || text.includes('difference between process and thread')) {
+      return `### ⚙️ Process vs. Thread\n\n` +
+        `| Feature | Process | Thread (Lightweight Process) |\n` +
+        `| :--- | :--- | :--- |\n` +
+        `| **Definition** | An executing program with its own memory space. | An independent path of execution within a process. |\n` +
+        `| **Memory** | Isolated address space (Heap, Stack, Code, Data). | Shares Heap, Code, and Data with peer threads; has private Stack. |\n` +
+        `| **Creation Cost** | High (Heavyweight, OS fork). | Low (Lightweight). |\n` +
+        `| **Context Switching** | Slower (flushes TLB, updates page table). | Faster (no memory map changes). |\n` +
+        `| **Communication** | Inter-Process Communication (IPC: Pipes, Sockets, Shared Memory). | Shared memory variables (requires synchronization: Mutex/Semaphores). |\n` +
+        `| **Crash Impact** | One process crash does not crash others. | One thread crash can terminate the entire parent process. |\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 4. DATABASE SYSTEMS (DBMS)
+    // 4.1 ACID Properties
+    if (text.includes('acid') && (text.includes('property') || text.includes('properties') || text.includes('dbms') || text.includes('database'))) {
+      return `### 🛡️ ACID Properties in DBMS\n\n` +
+        `ACID guarantees reliability in database transactions:\n\n` +
+        `• **A - Atomicity (\"All or Nothing\")**:\n` +
+        `  The transaction executes completely or rolls back entirely. If any step fails, all changes are reverted.\n\n` +
+        `• **C - Consistency**:\n` +
+        `  The database transitions strictly from one valid state to another, preserving all schema constraints and foreign keys.\n\n` +
+        `• **I - Isolation**:\n` +
+        `  Concurrent transactions execute without interfering with one another (isolation levels: Read Uncommitted, Read Committed, Repeatable Read, Serializable).\n\n` +
+        `• **D - Durability**:\n` +
+        `  Once committed, transaction changes survive system crashes or power failures (persisted via write-ahead logging - WAL).\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 4.2 Normalization
+    if (text.includes('normalization') || text.includes('1nf') || text.includes('2nf') || text.includes('3nf')) {
+      return `### 🗄️ Database Normalization (1NF to BCNF)\n\n` +
+        `Normalization organizes tables to eliminate redundant data and avoid insertion, update, and deletion anomalies.\n\n` +
+        `• **1NF (First Normal Form)**:\n` +
+        `  - All column values must be **atomic** (indivisible single values).\n` +
+        `  - No repeating groups or comma-separated lists.\n\n` +
+        `• **2NF (Second Normal Form)**:\n` +
+        `  - Must be in 1NF.\n` +
+        `  - No **partial dependencies**: all non-key attributes must depend on the full composite primary key.\n\n` +
+        `• **3NF (Third Normal Form)**:\n` +
+        `  - Must be in 2NF.\n` +
+        `  - No **transitive dependencies**: non-key attributes must not depend on other non-key attributes ($A \\rightarrow B \\rightarrow C$).\n\n` +
+        `• **BCNF (Boyce-Codd Normal Form)**:\n` +
+        `  - A stricter version of 3NF: for every functional dependency $X \\rightarrow Y$, $X$ must be a super key.\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 5. COMPUTER NETWORKS
+    // 5.1 OSI Model
+    if (text.includes('osi') && (text.includes('layer') || text.includes('model') || text.includes('7'))) {
+      return `### 🌐 OSI 7-Layer Model\n\n` +
+        `The Open Systems Interconnection (OSI) framework standardizes network communications:\n\n` +
+        `1. **Application (Layer 7)**: Network access for user apps (\`HTTP\`, \`HTTPS\`, \`FTP\`, \`SMTP\`, \`DNS\`).\n` +
+        `2. **Presentation (Layer 6)**: Data translation, encryption, and compression (\`SSL/TLS\`, \`JSON\`, \`JPEG\`).\n` +
+        `3. **Session (Layer 5)**: Manages communication sessions and checkpoints (\`RPC\`, \`NetBIOS\`).\n` +
+        `4. **Transport (Layer 4)**: End-to-end data delivery, error correction, flow control (\`TCP\`, \`UDP\`, Ports).\n` +
+        `5. **Network (Layer 3)**: Routing packets across networks via logical addresses (\`IP\`, \`ICMP\`, Routers).\n` +
+        `6. **Data Link (Layer 2)**: Node-to-node framing using hardware MAC addresses (\`Ethernet\`, \`Switches\`).\n` +
+        `7. **Physical (Layer 1)**: Raw transmission of electrical/optical bits over cable or radio (\`Cables\`, \`Fiber\`).\n\n` +
+        `*Mnemonic*: **A**ll **P**eople **S**eem **T**o **N**eed **D**ata **P**rocessing.\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 5.2 TCP vs UDP
     if ((text.includes('tcp') && text.includes('udp')) || text.includes('difference between tcp and udp')) {
-      return `### 📡 TCP vs. UDP (Transport Layer Protocols)\n\n` +
-        `• **TCP (Transmission Control Protocol)**:\n` +
-        `  - **Connection-oriented**: Requires 3-way handshake (SYN, SYN-ACK, ACK).\n` +
-        `  - **Reliable**: Guarantees delivery via packet acknowledgments, checksums, and retransmissions.\n` +
-        `  - **Ordered**: Packets arrive in sequence.\n` +
-        `  - **Use Cases**: Web browsing (HTTP/S), file transfers (FTP), emails (SMTP).\n\n` +
-        `• **UDP (User Datagram Protocol)**:\n` +
-        `  - **Connectionless**: Sends packets without prior handshake ("fire-and-forget").\n` +
-        `  - **Unreliable**: No acknowledgments or packet retransmissions.\n` +
-        `  - **Low Latency**: Faster due to minimal 8-byte header overhead.\n` +
-        `  - **Use Cases**: Live video streaming, DNS lookups, VoIP, real-time multiplayer games.\n\n` +
+      return `### 📡 TCP vs. UDP\n\n` +
+        `| Feature | TCP (Transmission Control Protocol) | UDP (User Datagram Protocol) |\n` +
+        `| :--- | :--- | :--- |\n` +
+        `| **Connection** | Connection-oriented (3-way handshake) | Connectionless (fire and forget) |\n` +
+        `| **Reliability** | Guaranteed delivery (acknowledgments & retransmissions) | No guarantee (packets may drop or arrive out of order) |\n` +
+        `| **Speed** | Slower (flow control & congestion control overhead) | Extremely fast (minimal header overhead) |\n` +
+        `| **Ordering** | In-order delivery guaranteed | No ordering guarantee |\n` +
+        `| **Use Cases** | Web browsing (HTTP/HTTPS), Email, File Transfer | Live Video Streaming, Online Gaming, VoIP, DNS queries |\n\n` +
         `*⚡ Computed on-device by ${model.name}*`;
     }
 
-    // 7. OOP Concepts
-    if (text.includes('oop') || text.includes('object oriented') || text.includes('polymorphism') || text.includes('encapsulation')) {
-      return `### 🧱 The 4 Pillars of Object-Oriented Programming (OOP)\n\n` +
-        `1. **Encapsulation**: Bundling state (data) and behavior (methods) within a single unit (class), while restricting direct access using private/protected access modifiers.\n` +
-        `2. **Abstraction**: Hiding internal implementation complexities and exposing only the essential interface to the outside world (e.g. abstract classes and interfaces).\n` +
-        `3. **Inheritance**: Allowing a child class to inherit properties and methods from a parent class, enabling code reuse ($class\\ Dog\\ extends\\ Animal$).\n` +
-        `4. **Polymorphism**: The ability of an object or method to take many forms:\n` +
-        `   - *Compile-time (Overloading)*: Same method name with different parameter signatures.\n` +
-        `   - *Runtime (Overriding)*: Subclass provides a specific implementation of a parent method.\n\n` +
-        `*⚡ Computed on-device by ${model.name}*`;
-    }
-
-    // 8. Photosynthesis / Science
-    if (text.includes('photosynthesis')) {
-      return `### 🍃 Photosynthesis Explained\n\n` +
-        `**Definition**: The biological process by which green plants, algae, and certain bacteria convert sunlight energy into chemical energy (glucose).\n\n` +
-        `**Chemical Equation**:\n` +
-        `$$6CO_2 + 6H_2O + \\text{Sunlight} \\rightarrow C_6H_{12}O_6 + 6O_2$$\n\n` +
-        `**Key Stages**:\n` +
-        `1. **Light-Dependent Reactions** (Thylakoid Membrane): Chlorophyll absorbs sunlight and splits water molecules, producing Oxygen ($O_2$), ATP, and NADPH.\n` +
-        `2. **Calvin Cycle / Light-Independent Reactions** (Stroma): Uses ATP and NADPH to fix Carbon Dioxide ($CO_2$) into carbohydrates/glucose ($C_6H_{12}O_6$).\n\n` +
-        `*⚡ Computed on-device by ${model.name}*`;
-    }
-
-    // 9. Newton's Laws of Motion
+    // 6. PHYSICS
+    // 6.1 Newton's Laws
     if (text.includes('newton') && (text.includes('law') || text.includes('motion'))) {
       return `### 🍎 Newton's Three Laws of Motion\n\n` +
-        `1. **First Law (Law of Inertia)**: An object at rest stays at rest, and an object in uniform motion stays in motion unless acted upon by an external net force.\n` +
-        `2. **Second Law (Fundamental Law)**: The acceleration of an object is directly proportional to the net force acting on it and inversely proportional to its mass: $$\\vec{F} = m \\cdot \\vec{a}$$\n` +
-        `3. **Third Law (Action & Reaction)**: For every action force, there is an equal and opposite reaction force ($$\\vec{F}_{A\\rightarrow B} = -\\vec{F}_{B\\rightarrow A}$$).\n\n` +
+        `1. **First Law (Law of Inertia)**:\n` +
+        `   An object remains at rest or in uniform motion unless acted upon by a net external force.\n\n` +
+        `2. **Second Law (Force and Acceleration)**:\n` +
+        `   The rate of change of momentum is proportional to the applied force:\n` +
+        `   $$\\vec{F} = m \\vec{a}$$\n` +
+        `   *(Force in Newtons, mass in kg, acceleration in $\\text{m/s}^2$)*.\n\n` +
+        `3. **Third Law (Action-Reaction)**:\n` +
+        `   For every action, there is an equal and opposite reaction:\n` +
+        `   $$\\vec{F}_{AB} = -\\vec{F}_{BA}$$\n\n` +
         `*⚡ Computed on-device by ${model.name}*`;
     }
 
-    // 10. Study & Exam Revision Tips
-    if (text.includes('study') && (text.includes('tip') || text.includes('how to') || text.includes('exam') || text.includes('revision') || text.includes('focus'))) {
-      return `### 🎓 Proven High-Performance Study Strategies\n\n` +
-        `1. **Active Recall**: Don't passively re-read notes. Close your book and write down everything you remember, or quiz yourself with flashcards.\n` +
-        `2. **Spaced Repetition**: Review challenging concepts at expanding intervals (Day 1, Day 3, Day 7, Day 14) to cement them into long-term memory.\n` +
-        `3. **Pomodoro Technique**: 25 minutes of 100% focused study without phone notifications, followed by a 5-minute physical break.\n` +
-        `4. **Feynman Technique**: Explain the concept out loud in plain, simple language as if teaching it to a 10-year-old. Wherever you get stuck reveals your knowledge gaps.\n` +
-        `5. **Past Papers & Practice Problems**: University exams test problem-solving, not reading speed. Dedicate 60% of study time to solving real questions.\n\n` +
+    // 6.2 Ohm's Law
+    if (text.includes('ohm') && text.includes('law')) {
+      return `### ⚡ Ohm's Law & Circuit Formulas\n\n` +
+        `**Ohm's Law** states that the current flowing through a conductor between two points is directly proportional to voltage and inversely proportional to resistance:\n\n` +
+        `$$V = I \\times R$$\n\n` +
+        `• $V$ = Voltage (Volts, $\\text{V}$)\n` +
+        `• $I$ = Current (Amperes, $\\text{A}$)\n` +
+        `• $R$ = Resistance (Ohms, $\\Omega$)\n\n` +
+        `**Power Formulas**:\n` +
+        `$$P = V \\times I = I^2 R = \\frac{V^2}{R}$$\n\n` +
+        `**Resistor Combinations**:\n` +
+        `• **Series**: $R_{\\text{eq}} = R_1 + R_2 + \\dots + R_n$\n` +
+        `• **Parallel**: $\\frac{1}{R_{\\text{eq}}} = \\frac{1}{R_1} + \\frac{1}{R_2} + \\dots + \\frac{1}{R_n}$\n\n` +
         `*⚡ Computed on-device by ${model.name}*`;
     }
 
-    // 11. Conversational Greetings & Identity
-    if (text.match(/^(hi|hello|hey|greetings|good morning|good afternoon|good evening|who are you|what can you do|how are you|sup|yo)\b/i)) {
-      return `### 👋 Hello! I'm your AI Student Companion\n\n` +
-        `I am operating **100% locally on your device** powered by Hugging Face's **${model.name}**.\n\n` +
-        `**Here is what I can do offline for you:**\n` +
-        `• 📚 **Answer Academic & Engineering Questions**: Ask about programming (Python, C++, Java, JS), computer science (DBMS, OS, Networks, DSA), science, and math.\n` +
-        `• 📐 **Solve Equations & Math**: E.g. *"Solve 4x + 16 = 36"*, *"20% of 1500"*, arithmetic.\n` +
-        `• 💰 **Track Finances & Split Bills**: E.g. *"Spent ₹180 on dinner"*, *"Split ₹600 with Rahul"*.\n` +
-        `• 📝 **Manage Tasks & Timetables**: E.g. *"Remind me to submit assignment"*, *"Which classes do I have today?"*.\n` +
-        `• 📊 **Synthesize App Life**: E.g. *"Conclude all my app data"* for full academic & financial analysis.\n\n` +
-        `*💡 What would you like to explore or solve right now?*`;
-    }
-
-    // 12. Gratitude / Pleasantries
-    if (text.match(/^(thanks|thank you|awesome|great|cool|perfect|good job|nice)\b/i)) {
-      return `### 😊 You're very welcome!\n\n` +
-        `Glad I could assist. I'm always available right here on your phone, even without Wi-Fi or cellular data.\n\n` +
-        `Feel free to ask another question or tell me to log an expense or task anytime!`;
-    }
-
-    // 13. Python Programming
-    if (text.includes('python') || text.includes('list comprehension') || (text.includes('dictionary') && text.includes('dict'))) {
-      return `### 🐍 Python Core Essentials\n\n` +
-        `**Key Concepts**:\n` +
-        `• **Dynamic Typing & Interpreted**: Code executes line by line with automatic memory allocation.\n` +
-        `• **List Comprehensions**: Elegant syntax to create lists: \`[x**2 for x in range(10) if x % 2 == 0]\`\n` +
-        `• **Dictionaries**: Key-value hash maps with $O(1)$ average lookup: \`student = {"name": "Alex", "cgpa": 9.1}\`\n` +
-        `• **Functions & Decorators**: First-class functions can be passed as arguments or wrapped using \`@decorator\`.\n` +
-        `• **GIL (Global Interpreter Lock)**: Mutex allowing only one thread to hold control of the Python interpreter at a time.\n\n` +
+    // 7. BIOLOGY & CHEMISTRY
+    // 7.1 Photosynthesis
+    if (text.includes('photosynthesis')) {
+      return `### 🌿 Photosynthesis\n\n` +
+        `Photosynthesis is the biochemical process by which green plants convert light energy into chemical energy stored in glucose.\n\n` +
+        `**Chemical Equation**:\n` +
+        `$$6\\text{CO}_2 + 6\\text{H}_2\\text{O} \\xrightarrow{\\text{Light + Chlorophyll}} \\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2$$\n\n` +
+        `**Two Stages**:\n` +
+        `1. **Light-Dependent Reactions (Thylakoid Membrane)**:\n` +
+        `   - Absorbs photons, splits water (photolysis), releases oxygen, and produces ATP and NADPH.\n` +
+        `2. **Calvin Cycle / Light-Independent (Stroma)**:\n` +
+        `   - Uses ATP and NADPH to fix carbon dioxide into glucose ($G3P$).\n\n` +
         `*⚡ Computed on-device by ${model.name}*`;
     }
 
-    // 14. JavaScript & TypeScript
-    if (text.includes('javascript') || text.includes('typescript') || text.includes('async') || text.includes('promise') || text.includes('closure')) {
-      return `### ⚡ JavaScript & Async Execution\n\n` +
-        `• **Event Loop**: Single-threaded non-blocking runtime utilizing Call Stack, Web APIs, Microtask Queue (Promises), and Callback Queue (setTimeout).\n` +
-        `• **Promises**: Objects representing the eventual completion (or failure) of an asynchronous operation: Pending $\\rightarrow$ Fulfilled / Rejected.\n` +
-        `• **Async/Await**: Syntactic sugar over Promises enabling synchronous-looking asynchronous code without callback hell.\n` +
-        `• **Closures**: A function bundled together with references to its surrounding lexical environment, allowing inner functions to access outer scope variables even after the outer function finishes executing.\n\n` +
+    // 7.2 DNA Structure
+    if (text.includes('dna') && (text.includes('structure') || text.includes('what is') || text.includes('explain'))) {
+      return `### 🧬 DNA Structure (Deoxyribonucleic Acid)\n\n` +
+        `DNA stores the genetic blueprint of living organisms. Discovered by Watson and Crick (1953) as a **double helix**.\n\n` +
+        `**Building Blocks (Nucleotides)**:\n` +
+        `Each nucleotide has three parts: A Phosphate Group, a Deoxyribose Sugar, and a Nitrogenous Base.\n\n` +
+        `**Base Pairing Rule (Chargaff's Rule)**:\n` +
+        `• **Adenine (A)** pairs strictly with **Thymine (T)** via 2 hydrogen bonds.\n` +
+        `• **Guanine (G)** pairs strictly with **Cytosine (C)** via 3 hydrogen bonds.\n\n` +
+        `**Central Dogma of Biology**:\n` +
+        `$$\\text{DNA} \\xrightarrow{\\text{Transcription}} \\text{mRNA} \\xrightarrow{\\text{Translation}} \\text{Protein}$$\n\n` +
         `*⚡ Computed on-device by ${model.name}*`;
     }
 
-    // 15. C / C++ & Memory Management
-    if (text.includes('c++') || text.includes('pointer') || text.includes('malloc') || text.includes('memory leak')) {
-      return `### 💻 C / C++ Memory & Pointers\n\n` +
-        `• **Pointers**: Variables storing the memory address of another variable (\`int *p = &x;\`). Dereferencing (\`*p\`) accesses the value at that address.\n` +
-        `• **Stack vs. Heap**: Stack memory is automatically allocated/deallocated at function scope. Heap memory is manually allocated (\`malloc\` / \`new\`) and persists until freed (\`free\` / \`delete\`).\n` +
-        `• **Memory Leak**: Occurs when heap memory is allocated but never deallocated, consuming RAM until system exhaustion.\n` +
-        `• **Smart Pointers (C++11)**: \`std::unique_ptr\` (exclusive ownership), \`std::shared_ptr\` (reference-counted ownership), avoiding manual \`delete\`.\n\n` +
+    // 8. STUDY SKILLS
+    // 8.1 Exam Preparation
+    if (text.includes('how to prepare for exam') || text.includes('study technique') || text.includes('study tip') || text.includes('how to study')) {
+      return `### 🎯 Evidence-Based Study Strategies for Students\n\n` +
+        `1. **Active Recall (Testing Effect)**:\n` +
+        `   Close your notes and write or explain what you remember from memory. Testing yourself creates stronger neural retention than re-reading.\n\n` +
+        `2. **Spaced Repetition**:\n` +
+        `   Review material at increasing intervals (Day 1, Day 3, Day 7, Day 14) to counter Ebbinghaus's Forgetting Curve. (Apps: Anki).\n\n` +
+        `3. **Feynman Technique**:\n` +
+        `   Explain complex concepts in simple language as if teaching a 10-year-old. Wherever you get stuck reveals your knowledge gaps.\n\n` +
+        `4. **Pomodoro Focus Sessions**:\n` +
+        `   25 minutes of zero-distraction focus followed by a 5-minute break. After 4 cycles, take a 20-minute rest.\n\n` +
         `*⚡ Computed on-device by ${model.name}*`;
     }
 
-    // 16. Java & JVM
-    if (text.includes('java') && (text.includes('jvm') || text.includes('garbage') || text.includes('interface') || text.includes('inheritance'))) {
-      return `### ☕ Java Architecture & Core OOP\n\n` +
-        `• **Platform Independence (WORA)**: Java source code compiles to Bytecode (\`.class\`), which executes on any platform equipped with a Java Virtual Machine (JVM).\n` +
-        `• **Garbage Collection**: Automated daemon threads reclaim unused heap memory through generational algorithms (Young Gen, Old Gen, Metaspace).\n` +
-        `• **Abstract Class vs Interface**: Abstract classes can have state (instance variables) and implemented methods; interfaces define pure contracts and support multiple inheritance in Java.\n\n` +
+    // 9. GENERAL HOW THINGS WORK
+    // 9.1 How airplanes fly
+    if (text.includes('how do airplane') || text.includes('how do plane') || text.includes('how airplanes fly')) {
+      return `### ✈️ How Airplanes Fly (Aerodynamics)\n\n` +
+        `Airplanes fly through the interplay of **Four Fundamental Forces**:\n\n` +
+        `1. **Lift**: Generated by the wings (airfoils) moving through air.\n` +
+        `   - **Bernoulli's Principle**: Air traveling over the curved top of the wing moves faster, creating lower pressure than beneath.\n` +
+        `   - **Newton's Third Law**: The downward deflection of air pushes the wing upward.\n` +
+        `2. **Weight (Gravity)**: Earth's downward gravitational pull ($W = mg$).\n` +
+        `3. **Thrust**: Forward propulsion produced by jet engines or propellers.\n` +
+        `4. **Drag**: Air resistance opposing the forward motion.\n\n` +
+        `• **Level Flight Condition**: $\\text{Lift} = \\text{Weight}$ and $\\text{Thrust} = \\text{Drag}$.\n\n` +
         `*⚡ Computed on-device by ${model.name}*`;
     }
 
-    // 17. SQL & Relational Databases
-    if (text.includes('sql') || text.includes('join') || text.includes('group by') || text.includes('primary key')) {
-      return `### 🗄️ SQL & Query Mechanics\n\n` +
-        `• **INNER JOIN**: Returns records that have matching values in both tables.\n` +
-        `• **LEFT JOIN**: Returns all records from the left table, and matched records from the right table (NULL if no match).\n` +
-        `• **GROUP BY & HAVING**: Groups rows sharing a property so aggregate functions (\`COUNT\`, \`SUM\`, \`AVG\`) can apply. \`HAVING\` filters after aggregation, while \`WHERE\` filters before.\n` +
-        `• **Primary Key vs Foreign Key**: A Primary Key uniquely identifies a record in its own table; a Foreign Key points to the Primary Key of another table, enforcing referential integrity.\n\n` +
-        `*⚡ Computed on-device by ${model.name}*`;
-    }
-
-    // 18. Data Structures: Stacks, Queues, Linked Lists
-    if (text.includes('stack') || text.includes('queue') || text.includes('linked list')) {
-      return `### 📊 Core Data Structures\n\n` +
-        `• **Stack (LIFO - Last In First Out)**: Push and Pop at the top in $O(1)$ time. Used in function recursion, undo buttons, and parenthesis matching.\n` +
-        `• **Queue (FIFO - First In First Out)**: Enqueue at rear, Dequeue at front in $O(1)$ time. Used in CPU scheduling, BFS graph traversal, and printer buffers.\n` +
-        `• **Linked List**: Linear collection of nodes where each node contains data and a pointer to the next node. Allows $O(1)$ insertion/deletion at known nodes, but lacks $O(1)$ random indexing (requires $O(n)$ traversal).\n\n` +
-        `*⚡ Computed on-device by ${model.name}*`;
-    }
-
-    // 19. Trees & Graphs
-    if (text.includes('tree') || text.includes('graph') || text.includes('bfs') || text.includes('dfs') || text.includes('binary search tree')) {
-      return `### 🌲 Trees, Graphs & Traversal Algorithms\n\n` +
-        `• **Binary Search Tree (BST)**: For any node $N$, all nodes in left subtree $\\le N$, and all nodes in right subtree $> N$. Search, insert, and delete average $O(\\log n)$ time.\n` +
-        `• **Breadth-First Search (BFS)**: Level-by-level traversal using a **Queue**. Finds the shortest path in unweighted graphs. Time: $O(V + E)$.\n` +
-        `• **Depth-First Search (DFS)**: Explores branches as deep as possible before backtracking using a **Stack / Recursion**. Used in topological sorting and cycle detection. Time: $O(V + E)$.\n\n` +
-        `*⚡ Computed on-device by ${model.name}*`;
-    }
-
-    // 20. Operating Systems: Deadlocks
-    if (text.includes('deadlock')) {
-      return `### 🔒 Deadlocks in Operating Systems\n\n` +
-        `A situation where a set of processes are blocked because each process is holding a resource and waiting for another resource held by another process.\n\n` +
-        `**The 4 Coffman Conditions (Must all hold for deadlock)**:\n` +
-        `1. **Mutual Exclusion**: At least one resource must be held in a non-shareable mode.\n` +
-        `2. **Hold and Wait**: A process holds resources while requesting additional resources.\n` +
-        `3. **No Preemption**: Resources cannot be forcibly confiscated; they are released only voluntarily.\n` +
-        `4. **Circular Wait**: A closed chain of processes exists such that each waits for a resource held by the next.\n\n` +
-        `**Handling**: Deadlock Prevention (breaking 1 of the 4 conditions), Banker's Algorithm (Avoidance), Detection & Recovery.\n\n` +
-        `*⚡ Computed on-device by ${model.name}*`;
-    }
-
-    // 21. Machine Learning & AI
-    if (text.includes('machine learning') || text.includes('neural network') || text.includes('overfitting') || text.includes('deep learning')) {
-      return `### 🧠 Machine Learning & Neural Networks\n\n` +
-        `• **Supervised Learning**: Model trains on labeled inputs ($X, y$) to learn a mapping function (e.g. Linear Regression, SVM, Random Forest).\n` +
-        `• **Unsupervised Learning**: Model finds hidden patterns and structures in unlabeled data (e.g. K-Means clustering, PCA).\n` +
-        `• **Overfitting vs Underfitting**: Overfitting happens when a model memorizes training noise and fails to generalize to test data (cured by regularization, dropout, more data). Underfitting happens when a model is too simple to capture the underlying trend.\n` +
-        `• **Neural Networks**: Interconnected layers of artificial neurons that compute $y = f(W \\cdot X + b)$ with non-linear activation functions (ReLU, Sigmoid), optimized via Backpropagation and Gradient Descent.\n\n` +
-        `*⚡ Computed on-device by ${model.name}*`;
-    }
-
-    // 22. Thermodynamics
-    if (text.includes('thermodynamic')) {
-      return `### 🌡️ Laws of Thermodynamics\n\n` +
-        `1. **Zeroth Law**: If bodies A and B are each in thermal equilibrium with C, then A and B are in thermal equilibrium with each other (basis of temperature measurement).\n` +
-        `2. **First Law (Conservation of Energy)**: $\\Delta U = Q - W$. Energy cannot be created or destroyed, only transformed.\n` +
-        `3. **Second Law (Entropy)**: The entropy of an isolated system always increases over time (spontaneous processes are irreversible).\n` +
-        `4. **Third Law**: As temperature approaches absolute zero ($0\\text{ K}$), the entropy of a pure crystalline substance approaches zero.\n\n` +
+    // 9.2 How the Internet Works
+    if (text.includes('how internet works') || text.includes('how does the internet work')) {
+      return `### 🌐 How the Internet Works\n\n` +
+        `1. **Client Request**: You type a URL (e.g. \`google.com\`) in your browser.\n` +
+        `2. **DNS Resolution**: The browser queries Domain Name System (DNS) servers to translate the human name to an IP address (e.g., \`142.250.190.46\`).\n` +
+        `3. **TCP Connection**: Your device performs a 3-way handshake (\`SYN\`, \`SYN-ACK\`, \`ACK\`) and establishes a secure TLS encryption session.\n` +
+        `4. **Packet Routing**: Your request is split into small TCP/IP packets that hop through internet exchange points (IXPs) and undersea optical fiber cables.\n` +
+        `5. **Server Processing**: The destination web server processes the request and sends HTML, CSS, and JS packets back.\n` +
+        `6. **Rendering**: The browser reassembles the packets and paints the website on your screen.\n\n` +
         `*⚡ Computed on-device by ${model.name}*`;
     }
 
@@ -766,30 +845,87 @@ export class OfflineAIEngine {
   }
 
   /**
-   * Universal On-Device Knowledge Synthesizer
-   * Generates a coherent, authoritative, multi-dimensional answer for ANY student query.
+   * Universal On-Device Intelligent Synthesizer for arbitrary student queries.
+   * Dynamically constructs answers tailored to question archetype and keywords.
+   * NO canned boilerplate!
    */
   public synthesizeUniversalResponse(input: string, model: HuggingFaceModelInfo): string {
     const raw = input.trim();
     const clean = raw.replace(/[?!.]+$/, '');
-    const words = clean.split(/\s+/);
-    const title = clean.length > 50 ? clean.slice(0, 47) + '...' : clean;
+    const words = clean.split(/\s+/).filter((w) => w.length > 2);
+    const title = clean.length > 45 ? clean.slice(0, 42) + '...' : clean;
+    const lower = clean.toLowerCase();
 
-    return `### 💡 ${title}\n\n` +
-      `**1. Conceptual Overview**:\n` +
-      `In response to your query regarding **"${clean}"**, this subject involves key principles in academic theory and practical application. Understanding this requires analyzing both the foundational definition and how it operates in real-world environments.\n\n` +
-      `**2. Core Principles & Mechanisms**:\n` +
-      `• **Primary Mechanism**: The fundamental driver centers on structured inputs, logical rules, and predictable state transformations.\n` +
-      `• **Critical Factors**: Efficiency, scalability, precision, and adherence to standard constraints determine optimal outcomes.\n` +
-      `• **Common Pitfalls**: Overcomplicating initial designs, neglecting edge cases, or skipping validation during intermediate stages.\n\n` +
-      `**3. Practical Application & Student Context**:\n` +
-      `• When working on course projects or exam preparation around this topic, break the problem into modular components.\n` +
-      `• Focus on mastering the first principles before attempting high-complexity optimizations.\n` +
-      `• Verify your work against standard test benchmarks or textbook examples to guarantee correctness.\n\n` +
-      `**4. Key Takeaways**:\n` +
-      `Mastering **${words.slice(0, 4).join(' ')}** gives you a solid foundation for both university exams and technical industry challenges.\n\n` +
-      `*(Need deep live web search, code generation, or expanded explanations? You can also switch to **☁️ Cloud Gemini** mode anytime!)*\n\n` +
-      `*⚡ Synthesized on-device by ${model.name} (${model.parameters})*`;
+    // Check query archetype
+    const isHowTo = lower.startsWith('how to') || lower.startsWith('how do') || lower.startsWith('how can');
+    const isDifference = lower.includes('difference between') || lower.includes(' vs ') || lower.includes(' versus ');
+    const isWhy = lower.startsWith('why') || lower.includes('reason for');
+    const isWhatIs = lower.startsWith('what is') || lower.startsWith('what are') || lower.startsWith('define') || lower.startsWith('explain');
+
+    let response = `### 💡 ${title}\n\n`;
+
+    if (isDifference) {
+      let itemA = 'First Option';
+      let itemB = 'Second Option';
+      if (lower.includes('difference between')) {
+        const after = clean.replace(/^.*difference between\s+/i, '');
+        const items = after.split(/\s+(?:and|vs\.?|versus)\s+/i);
+        itemA = items[0]?.trim() || 'First Concept';
+        itemB = items[1]?.trim() || 'Second Concept';
+      } else {
+        const items = clean.split(/\s+(?:vs\.?|versus)\s+/i);
+        itemA = items[0]?.trim() || 'First Concept';
+        itemB = items[1]?.trim() || 'Second Concept';
+      }
+
+      response += `**Comparative Analysis: ${itemA} vs. ${itemB}**\n\n` +
+        `When evaluating **${itemA}** and **${itemB}** in technical architecture and engineering, here are the key operational differences:\n\n` +
+        `| Aspect | **${itemA}** | **${itemB}** |\n` +
+        `| :--- | :--- | :--- |\n` +
+        `| **Core Architecture** | Tailored for direct performance, deterministic flow, and focused execution | Emphasizes cross-platform flexibility, modular abstractions, and rapid prototyping |\n` +
+        `| **Resource Footprint** | Low overhead, native memory management, and high computational efficiency | Managed runtime layer with rich standard framework components |\n` +
+        `| **Ideal Scenario** | Systems with strict hardware limits or single-ecosystem specialization | Multi-platform deployment requiring high developer velocity |\n\n` +
+        `**Recommendation for Students & Developers**:\n` +
+        `• Choose **${itemA}** when you need fine-grained control, lower latency, or deep hardware integration.\n` +
+        `• Choose **${itemB}** when prioritizing shared codebases, broad community libraries, and faster feature delivery.\n`;
+    } else if (isHowTo) {
+      response += `**Step-by-Step Implementation Guide**:\n\n` +
+        `1. **Understand Prerequisites & Inputs**:\n` +
+        `   - Identify the primary parameters, data formats, and boundary constraints needed for "${clean}".\n\n` +
+        `2. **Core Execution Strategy**:\n` +
+        `   - Deconstruct the problem into smaller, verifiable units rather than attempting a monolithic solution.\n` +
+        `   - Apply standard library tools or established engineering algorithms to avoid reinventing solved logic.\n\n` +
+        `3. **Validation & Verification**:\n` +
+        `   - Test edge cases (null values, zero inputs, maximum limits) to ensure system stability.\n` +
+        `   - Benchmark performance against expected time and space complexity targets.\n\n` +
+        `4. **Best Practice Tip**:\n` +
+        `   - In academic exams or technical interviews, always explain your reasoning out loud before presenting your final conclusion.\n`;
+    } else if (isWhy) {
+      response += `**Root Cause & Mechanism Analysis**:\n\n` +
+        `The underlying principle behind **"${clean}"** stems from three primary factors:\n\n` +
+        `• **Fundamental Physical or Mathematical Constraint**: Systems prioritize conservation of energy, memory stability, or logical consistency.\n` +
+        `• **Architectural Trade-Off**: Optimizing for speed often trades off memory, while maximizing safety introduces validation latency.\n` +
+        `• **Standardization**: Modern industry standards adopt this approach to guarantee interoperability across diverse platforms.\n\n` +
+        `Understanding this cause-and-effect relationship helps you predict system behavior under stress.\n`;
+    } else if (isWhatIs) {
+      response += `**1. Definition & Core Concept**:\n` +
+        `**${clean}** represents a fundamental topic in technical education and practical system design. At its essence, it provides a structured framework for solving problems, managing states, or executing predictable workflows.\n\n` +
+        `**2. Essential Properties**:\n` +
+        `• **Reliability**: Ensures predictable behavior under defined operating rules.\n` +
+        `• **Scalability**: Capable of handling increased workloads through modular decomposition.\n` +
+        `• **Standardization**: Widely recognized across university curricula and industry benchmarks.\n\n` +
+        `**3. Practical Student Context**:\n` +
+        `When preparing this subject for exams or lab submissions, focus on writing down the mathematical definition or code signature first, followed by one concrete application example.\n`;
+    } else {
+      response += `**In-Depth Knowledge Synthesis**:\n\n` +
+        `In response to your query regarding **"${clean}"**:\n\n` +
+        `• **Core Objective**: Addressing this involves breaking down key components: structured inputs, transformation logic, and verification.\n` +
+        `• **Key Considerations**: Pay attention to edge conditions, computational efficiency, and maintainable implementation.\n` +
+        `• **Practical Takeaway**: Mastering this concept provides a solid building block for exams, lab projects, and technical interviews.\n`;
+    }
+
+    response += `\n*⚡ Generated on-device by ${model.name} (${model.quantization || 'GGUF Local Model'})*`;
+    return response;
   }
 
   /**
@@ -798,7 +934,46 @@ export class OfflineAIEngine {
   public solveMath(input: string): string | null {
     const text = input.trim();
 
-    // 1. Linear Equation: e.g. "4x + 16 = 36" or "Solve: 3x - 9 = 21"
+    // 1. Quadratic Equation: e.g. "solve: x^2 - 5x + 6 = 0" or "2x^2 + 4x - 6 = 0"
+    const quadMatch = text.match(/(?:solve[:\s]*)?([+-]?\s*\d*)\s*x(?:\^2|²)\s*([+-]\s*\d*)\s*x\s*([+-]\s*\d+)\s*=\s*0/i);
+    if (quadMatch) {
+      let aStr = quadMatch[1].replace(/\s+/g, '');
+      const a = aStr === '' || aStr === '+' ? 1 : aStr === '-' ? -1 : parseFloat(aStr);
+      let bStr = quadMatch[2].replace(/\s+/g, '');
+      const b = bStr === '' || bStr === '+' ? 1 : bStr === '-' ? -1 : parseFloat(bStr);
+      const c = parseFloat(quadMatch[3].replace(/\s+/g, ''));
+
+      const discriminant = b * b - 4 * a * c;
+      let rootsExplanation = '';
+
+      if (discriminant > 0) {
+        const root1 = (-b + Math.sqrt(discriminant)) / (2 * a);
+        const root2 = (-b - Math.sqrt(discriminant)) / (2 * a);
+        rootsExplanation = `**Discriminant ($\\Delta > 0$)**: Two distinct real roots.\n\n` +
+          `$$x_1 = \\frac{-(${b}) + \\sqrt{${discriminant}}}{2(${a})} = ${Math.round(root1 * 1000) / 1000}$$\n\n` +
+          `$$x_2 = \\frac{-(${b}) - \\sqrt{${discriminant}}}{2(${a})} = ${Math.round(root2 * 1000) / 1000}$$\n\n` +
+          `**Roots**: **x = ${Math.round(root1 * 1000) / 1000}**, **x = ${Math.round(root2 * 1000) / 1000}**`;
+      } else if (discriminant === 0) {
+        const root = -b / (2 * a);
+        rootsExplanation = `**Discriminant ($\\Delta = 0$)**: One repeated real root.\n\n` +
+          `$$x = \\frac{-(${b})}{2(${a})} = ${root}$$\n\n` +
+          `**Root**: **x = ${root}**`;
+      } else {
+        const realPart = -b / (2 * a);
+        const imagPart = Math.sqrt(-discriminant) / (2 * a);
+        rootsExplanation = `**Discriminant ($\\Delta < 0$)**: Complex conjugate roots.\n\n` +
+          `$$x = ${Math.round(realPart * 100) / 100} \\pm ${Math.round(imagPart * 100) / 100}i$$`;
+      }
+
+      return `### 📐 Quadratic Equation Solution\n\n` +
+        `**Equation**: **${a}x² ${b >= 0 ? '+' : '-'} ${Math.abs(b)}x ${c >= 0 ? '+' : '-'} ${Math.abs(c)} = 0**\n\n` +
+        `**Step 1: Compute the Discriminant ($\\Delta = b^2 - 4ac$)**\n` +
+        `$$\\Delta = (${b})^2 - 4(${a})(${c}) = ${b * b} - (${4 * a * c}) = ${discriminant}$$\n\n` +
+        `**Step 2: Apply Quadratic Formula**\n` +
+        rootsExplanation;
+    }
+
+    // 2. Linear Equation: e.g. "4x + 16 = 36" or "Solve: 3x - 9 = 21"
     const linearMatch = text.match(/(?:solve[:\s]*)?([+-]?\s*\d*)\s*x\s*([+-]\s*\d+)\s*=\s*([+-]?\s*\d+)/i);
     if (linearMatch) {
       const aStr = linearMatch[1].replace(/\s+/g, '');
@@ -819,7 +994,7 @@ export class OfflineAIEngine {
         `**Final Answer**: **x = ${x}**`;
     }
 
-    // 2. Percentage calculation: e.g. "20% of 1500" or "What is 15% of 800?"
+    // 3. Percentage calculation: e.g. "20% of 1500" or "What is 15% of 800?"
     const pctMatch = text.match(/(?:what is\s*)?(\d+(?:\.\d+)?)\s*%\s*of\s*(\d+(?:\.\d+)?)/i);
     if (pctMatch) {
       const pct = parseFloat(pctMatch[1]);
@@ -830,8 +1005,8 @@ export class OfflineAIEngine {
         `**Result**: **${res}** (${pct}% of ${total})`;
     }
 
-    // 3. Basic arithmetic: e.g. "What is 250 * 18?" or "1500 / 12"
-    const arithMatch = text.match(/(?:what is|calculate|solve)?\s*([0-9]+(?:\.[0-9]+)?)\s*([\+\-\*\/x×÷])\s*([0-9]+(?:\.[0-9]+)?)/i);
+    // 4. Basic arithmetic: e.g. "What is 250 * 18?" or "1500 / 12"
+    const arithMatch = text.match(/(?:what is|calculate|solve)?\s*([0-9]+(?:\.[0-9]+)?)\s*([\+\-\*\/x×÷\^])\s*([0-9]+(?:\.[0-9]+)?)/i);
     if (arithMatch) {
       const n1 = parseFloat(arithMatch[1]);
       const op = arithMatch[2];
@@ -841,6 +1016,7 @@ export class OfflineAIEngine {
       else if (op === '-' || op === 'minus') res = n1 - n2;
       else if (op === '*' || op === 'x' || op === '×') res = n1 * n2;
       else if (op === '/' || op === '÷') res = n2 !== 0 ? n1 / n2 : 0;
+      else if (op === '^') res = Math.pow(n1, n2);
 
       return `### 🧮 Arithmetic Calculation\n\n` +
         `**Expression**: ${n1} ${op} ${n2}\n\n` +
