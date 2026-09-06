@@ -236,6 +236,11 @@ export const LoginScreen: React.FC = () => {
           >
             <Text style={styles.privacyLinkText}>Privacy & Security details</Text>
           </TouchableOpacity>
+
+          {/* Ideation Credit */}
+          <View style={styles.creditContainer}>
+            <Text style={styles.creditText}>Ideated by Kartiki More</Text>
+          </View>
         </View>
 
         {/* Privacy Details Modal */}
@@ -525,5 +530,16 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '700',
     fontSize: 15,
+  },
+  creditContainer: {
+    marginTop: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  creditText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: '#706D66',
+    letterSpacing: 0.5,
   },
 });

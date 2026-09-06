@@ -375,6 +375,11 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
           </GlassCard>
         </View>
 
+        {/* Ideation Credit */}
+        <View style={styles.creditContainer}>
+          <Text style={styles.creditText}>Ideated by Kartiki More</Text>
+        </View>
+
         {/* Space at bottom for navigation and floating gem */}
         <View style={{ height: 80 }} />
         </ScrollView>
@@ -695,5 +700,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: designTokens.colors.primaryDark,
+  },
+  creditContainer: {
+    marginTop: 20,
+    marginBottom: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  creditText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: designTokens.colors.textSecondary,
+    letterSpacing: 0.5,
   },
 });
