@@ -9,7 +9,8 @@
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
     "test": "jest --detectOpenHandles --forceExit",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "wipe-db": "node scripts/wipeAllData.js"
   },
   "engines": {
     "node": ">=22.0.0"
