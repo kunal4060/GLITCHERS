@@ -9,30 +9,7 @@ export const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.get('/', async (req) => {
     const userId = req.userId!;
-    const assignments = inMemoryStore.assignments.get(userId) || [
-      {
-        id: 'as_1',
-        userId,
-        title: 'Machine Learning Project Proposal',
-        subject: 'Artificial Intelligence',
-        description: 'Submit 3-page problem formulation and dataset selection.',
-        deadline: new Date(Date.now() + 86400000 * 3).toISOString(),
-        submissionPlatform: 'Moodle Portal',
-        priority: 'HIGH',
-        status: 'PENDING',
-      },
-      {
-        id: 'as_2',
-        userId,
-        title: 'DBMS Normalization & BCNF Query Sheet',
-        subject: 'Database Management Systems',
-        description: 'Decompose schemas into 3NF and BCNF with functional dependencies.',
-        deadline: new Date(Date.now() + 86400000 * 5).toISOString(),
-        submissionPlatform: 'Google Classroom',
-        priority: 'HIGH',
-        status: 'PENDING',
-      },
-    ];
+    const assignments = inMemoryStore.assignments.get(userId) || [];
     return { assignments };
   });
 

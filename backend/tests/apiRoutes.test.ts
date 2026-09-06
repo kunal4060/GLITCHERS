@@ -245,19 +245,35 @@ describe('Fastify Modular API Routes Integration Tests', () => {
   });
 
   test('GET /api/emails and PATCH /api/emails/:id/dismiss manages notices', async () => {
-    const listRes = await app.inject({
+    // 1. Initially student has 0 emails without fake defaults
+    const initialRes = await app.inject({
       method: 'GET',
       url: '/api/emails',
     });
-    expect(listRes.statusCode).toBe(200);
-    const listBody = JSON.parse(listRes.body);
-    expect(Array.isArray(listBody.emails)).toBe(true);
-    expect(listBody.emails.length).toBeGreaterThan(0);
+    expect(initialRes.statusCode).toBe(200);
+    const initialBody = JSON.parse(initialRes.body);
+    expect(Array.isArray(initialBody.emails)).toBe(true);
 
-    const firstNotice = listBody.emails[0];
+    // 2. Sync a test email notice
+    const syncRes = await app.inject({
+      method: 'POST',
+      url: '/api/emails/sync',
+      payload: {
+        sender: 'prof@university.edu',
+        subject: 'Math Class Rescheduled',
+        body: 'Math lecture tomorrow moved to 2 PM.',
+      },
+    });
+    expect(syncRes.statusCode).toBe(200);
+    const syncBody = JSON.parse(syncRes.body);
+    expect(syncBody.emailSummary).toBeDefined();
+
+    const noticeId = syncBody.emailSummary.id;
+
+    // 3. Dismiss notice
     const dismissRes = await app.inject({
       method: 'PATCH',
-      url: `/api/emails/${firstNotice.id}/dismiss`,
+      url: `/api/emails/${noticeId}/dismiss`,
       payload: { dismissed: true },
     });
     expect(dismissRes.statusCode).toBe(200);
@@ -265,10 +281,10 @@ describe('Fastify Modular API Routes Integration Tests', () => {
     expect(dismissBody.success).toBe(true);
     expect(dismissBody.isDismissed).toBe(true);
 
-    // Restore notice
+    // 4. Restore notice
     const restoreRes = await app.inject({
       method: 'PATCH',
-      url: `/api/emails/${firstNotice.id}/dismiss`,
+      url: `/api/emails/${noticeId}/dismiss`,
       payload: { dismissed: false },
     });
     expect(restoreRes.statusCode).toBe(200);

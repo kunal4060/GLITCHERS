@@ -8,53 +8,8 @@ export const ExamsAndAssignmentsScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'EXAMS' | 'ASSIGNMENTS'>('EXAMS');
   const currentUserId = useAuthStore.getState().user?.id || 'offline-user';
 
-  const [exams, setExams] = useState<Exam[]>([
-    {
-      id: 'ex_1',
-      userId: currentUserId,
-      subject: 'Database Management Systems (DBMS)',
-      date: '2026-09-15',
-      time: '10:00 AM',
-      room: 'Exam Hall 3 (Block A)',
-      syllabus: 'Modules 1-4: Relational Algebra, SQL, Normalization, Transactions',
-      importance: 'CRITICAL',
-    },
-    {
-      id: 'ex_2',
-      userId: currentUserId,
-      subject: 'Operating Systems',
-      date: '2026-09-18',
-      time: '02:00 PM',
-      room: 'Exam Hall 1 (Block B)',
-      syllabus: 'Processes, CPU Scheduling, Deadlocks, Memory Management',
-      importance: 'CRITICAL',
-    },
-  ]);
-
-  const [assignments, setAssignments] = useState<Assignment[]>([
-    {
-      id: 'as_1',
-      userId: currentUserId,
-      title: 'Machine Learning Project Proposal',
-      subject: 'Artificial Intelligence',
-      description: 'Submit 3-page problem formulation and dataset selection.',
-      deadline: '2026-09-08',
-      submissionPlatform: 'Moodle Portal',
-      priority: 'HIGH',
-      status: 'PENDING',
-    },
-    {
-      id: 'as_2',
-      userId: currentUserId,
-      title: 'DBMS Normalization & BCNF Query Sheet',
-      subject: 'Database Systems',
-      description: 'Decompose schemas into 3NF and BCNF with functional dependencies.',
-      deadline: '2026-09-10',
-      submissionPlatform: 'Google Classroom',
-      priority: 'HIGH',
-      status: 'SUBMITTED',
-    },
-  ]);
+  const [exams, setExams] = useState<Exam[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
 
   const [newSubject, setNewSubject] = useState('');
   const [newTitle, setNewTitle] = useState('');

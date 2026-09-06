@@ -236,7 +236,7 @@ export const useDashboardStore = create<DashboardState>()(
       },
       debts: [],
       emails: [],
-      emailBullets: [],
+      emailBullets: ['All university circulars and notices have been acknowledged & cleared! 🎉'],
       dismissedNoticeIds: [],
       chatMessages: [],
       isLoading: false,
@@ -514,7 +514,16 @@ export const useDashboardStore = create<DashboardState>()(
 
           // 6. Emails / University Circulars: merge & honor dismissed status
           if (emailRes.status === 'fulfilled' && emailRes.value?.emails) {
-            const incomingEmails: EmailSummary[] = emailRes.value.emails;
+            const rawList: EmailSummary[] = emailRes.value.emails || [];
+            const incomingEmails: EmailSummary[] = rawList.filter(
+              (e: EmailSummary) =>
+                !e.subject?.includes('Semester End Examination') &&
+                !e.subject?.includes('Continuous Internal Assessment') &&
+                !e.subject?.includes('Annual University Hackathon') &&
+                e.sender !== 'dean.academics@university.edu' &&
+                e.sender !== 'department.head@university.edu' &&
+                e.sender !== 'events@university.edu'
+            );
             const dismissedSet = new Set(get().dismissedNoticeIds);
             incomingEmails.forEach((e) => {
               if (e.isDismissed || (e as any).processed) {
@@ -525,18 +534,19 @@ export const useDashboardStore = create<DashboardState>()(
               ...e,
               isDismissed: dismissedSet.has(e.id),
             }));
-            if (mergedEmails.length > 0) {
-              const hasPredefinedBullets = get().emailBullets.some((b) =>
-                b.includes('Semester End Examination') ||
-                b.includes('Continuous Internal Assessment') ||
-                b.includes('Annual University Hackathon')
-              );
-              set({
-                emails: mergedEmails,
-                dismissedNoticeIds: Array.from(dismissedSet),
-                ...(hasPredefinedBullets ? { emailBullets: [] } : {}),
-              });
-            }
+            const activeList = mergedEmails.filter((e) => !e.isDismissed);
+            const hasPredefinedBullets = get().emailBullets.some((b) =>
+              b.includes('Semester End Examination') ||
+              b.includes('Continuous Internal Assessment') ||
+              b.includes('Annual University Hackathon')
+            );
+            set({
+              emails: mergedEmails,
+              dismissedNoticeIds: Array.from(dismissedSet),
+              ...(hasPredefinedBullets || activeList.length === 0
+                ? { emailBullets: ['All university circulars and notices have been acknowledged & cleared! 🎉'] }
+                : {}),
+            });
           }
 
           // 7. Chat messages: keep recent messages intact

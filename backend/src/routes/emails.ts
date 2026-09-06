@@ -12,55 +12,6 @@ import { randomUUID } from 'crypto';
 import { env } from '../config/env.js';
 import { googleService } from '../services/google/googleService.js';
 
-function getDefaultUniversityCirculars(userId: string): EmailSummary[] {
-  return [
-    {
-      id: randomUUID(),
-      userId,
-      providerMessageId: `uni_circ_${Date.now()}_1`,
-      sender: 'dean.academics@university.edu',
-      subject: '🔴 Semester End Examination Schedule & Hall Ticket Issuance',
-      receivedAt: new Date(Date.now() - 3600000 * 4).toISOString(),
-      isUniversityRelated: true,
-      importance: 'CRITICAL',
-      summary: 'Semester End Exams commence from the 22nd. Verify your registered elective courses and download hall tickets before the deadline.',
-      actionRequired: true,
-      actionItem: 'Download hall ticket and verify course codes',
-      isProcessed: false,
-      isDismissed: false,
-    },
-    {
-      id: randomUUID(),
-      userId,
-      providerMessageId: `uni_circ_${Date.now()}_2`,
-      sender: 'department.head@university.edu',
-      subject: '⚠️ Continuous Internal Assessment & OS Lab Submission Due',
-      receivedAt: new Date(Date.now() - 3600000 * 20).toISOString(),
-      isUniversityRelated: true,
-      importance: 'HIGH',
-      summary: 'All students must push their Operating Systems lab projects and assignment reports to the university portal by Friday 5:00 PM.',
-      actionRequired: true,
-      actionItem: 'Submit lab code and report',
-      isProcessed: false,
-      isDismissed: false,
-    },
-    {
-      id: randomUUID(),
-      userId,
-      providerMessageId: `uni_circ_${Date.now()}_3`,
-      sender: 'events@university.edu',
-      subject: '📢 Annual University Hackathon & Innovation Showcase',
-      receivedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-      isUniversityRelated: true,
-      importance: 'NORMAL',
-      summary: 'Registrations are open for the annual 36-hour inter-college hackathon. Cash prizes and internship fast-tracks for top 3 teams.',
-      actionRequired: false,
-      isProcessed: false,
-      isDismissed: false,
-    },
-  ];
-}
-
 export const emailRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', authMiddleware);
 
@@ -104,15 +55,7 @@ export const emailRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/', async (req) => {
     const userId = req.userId!;
     await syncGmailIfAvailable(userId);
-    let emails = await supabaseStore.getEmails(userId);
-
-    // If student has no emails yet, initialize default circulars in Supabase
-    if (emails.length === 0) {
-      const defaults = getDefaultUniversityCirculars(userId);
-      await supabaseStore.saveEmails(userId, defaults);
-      emails = defaults;
-    }
-
+    const emails = await supabaseStore.getEmails(userId);
     return { emails };
   });
 
@@ -189,12 +132,6 @@ export const emailRoutes: FastifyPluginAsync = async (fastify) => {
     } else {
       await syncGmailIfAvailable(userId);
       allEmails = await supabaseStore.getEmails(userId);
-
-      if (allEmails.length === 0) {
-        const defaults = getDefaultUniversityCirculars(userId);
-        await supabaseStore.saveEmails(userId, defaults);
-        allEmails = defaults;
-      }
     }
 
     // Only summarize active (non-dismissed) notices

@@ -42,16 +42,24 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
   const lastActiveHashRef = useRef<string>('');
 
   const handleSummarizeEmails = async () => {
+    if (activeEmails.length === 0) {
+      setEmailBullets(['All university circulars and notices have been acknowledged & cleared! 🎉']);
+      return;
+    }
     setIsSummarizingEmails(true);
     try {
-      if (activeEmails.length === 0) {
-        setEmailBullets(['All university circulars and notices have been acknowledged & cleared! 🎉']);
-        return;
-      }
       const res = await apiClient.summarizeEmails(activeEmails);
       if (res?.bullets && res.bullets.length > 0) {
-        setEmailBullets(res.bullets);
-        return;
+        const cleanBullets = res.bullets.filter(
+          (b) =>
+            !b.includes('Semester End Examination') &&
+            !b.includes('Continuous Internal Assessment') &&
+            !b.includes('Annual University Hackathon')
+        );
+        if (cleanBullets.length > 0) {
+          setEmailBullets(cleanBullets);
+          return;
+        }
       }
     } catch (err) {
       console.warn('Email summarize error:', err);
@@ -60,12 +68,22 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
     }
 
     if (activeEmails.length > 0) {
-      setEmailBullets(
-        activeEmails.slice(0, 4).map((e) => {
-          const imp = e.importance === 'HIGH' || e.importance === 'CRITICAL' ? `[${e.importance}] ` : '';
-          return `• ${imp}${e.subject}: ${e.summary}`;
-        })
+      const cleanActive = activeEmails.filter(
+        (e) =>
+          !e.subject.includes('Semester End Examination') &&
+          !e.subject.includes('Continuous Internal Assessment') &&
+          !e.subject.includes('Annual University Hackathon')
       );
+      if (cleanActive.length > 0) {
+        setEmailBullets(
+          cleanActive.slice(0, 4).map((e) => {
+            const imp = e.importance === 'HIGH' || e.importance === 'CRITICAL' ? `[${e.importance}] ` : '';
+            return `• ${imp}${e.subject}: ${e.summary}`;
+          })
+        );
+      } else {
+        setEmailBullets(['All university circulars and notices have been acknowledged & cleared! 🎉']);
+      }
     } else {
       setEmailBullets(['All university circulars and notices have been acknowledged & cleared! 🎉']);
     }
@@ -73,29 +91,22 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
 
   useEffect(() => {
     syncWithBackend().then(() => {
-      const hasPredefined = emailBullets.some((b) =>
-        b.includes('Semester End Examination') ||
-        b.includes('Continuous Internal Assessment') ||
-        b.includes('Annual University Hackathon')
-      );
-      if (hasPredefined || emailBullets.length === 0) {
+      if (activeEmails.length > 0) {
         handleSummarizeEmails();
+      } else {
+        setEmailBullets(['All university circulars and notices have been acknowledged & cleared! 🎉']);
       }
     });
   }, []);
 
   useEffect(() => {
     const activeHash = activeEmails.map((e) => e.id).sort().join(',');
-    const hasPredefined = emailBullets.some((b) =>
-      b.includes('Semester End Examination') ||
-      b.includes('Continuous Internal Assessment') ||
-      b.includes('Annual University Hackathon')
-    );
-
-    if (activeEmails.length > 0 && (lastActiveHashRef.current !== activeHash || hasPredefined)) {
-      lastActiveHashRef.current = activeHash;
-      handleSummarizeEmails();
-    } else if (activeEmails.length === 0 && emailBullets.length > 0 && !emailBullets[0].includes('acknowledged & cleared')) {
+    if (activeEmails.length > 0) {
+      if (lastActiveHashRef.current !== activeHash) {
+        lastActiveHashRef.current = activeHash;
+        handleSummarizeEmails();
+      }
+    } else {
       lastActiveHashRef.current = '';
       setEmailBullets(['All university circulars and notices have been acknowledged & cleared! 🎉']);
     }

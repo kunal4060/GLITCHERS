@@ -9,28 +9,7 @@ export const examRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.get('/', async (req) => {
     const userId = req.userId!;
-    const exams = inMemoryStore.exams.get(userId) || [
-      {
-        id: 'ex_1',
-        userId,
-        subject: 'Database Management Systems (DBMS)',
-        date: '2026-09-15',
-        time: '10:00',
-        room: 'Exam Hall 3 (Block A)',
-        syllabus: 'Modules 1-4: Relational Algebra, SQL, Normalization, Transactions',
-        importance: 'CRITICAL',
-      },
-      {
-        id: 'ex_2',
-        userId,
-        subject: 'Operating Systems',
-        date: '2026-09-18',
-        time: '14:00',
-        room: 'Exam Hall 1 (Block B)',
-        syllabus: 'Processes, CPU Scheduling, Synchronization, Memory Management',
-        importance: 'CRITICAL',
-      },
-    ];
+    const exams = inMemoryStore.exams.get(userId) || [];
     return { exams };
   });
 
