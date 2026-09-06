@@ -8,11 +8,9 @@ import { randomUUID } from 'crypto';
 export class GeminiAssistant {
   private genAI: GoogleGenerativeAI | null = null;
   private candidateModels = [
+    'gemini-3.6-flash',
     'gemini-flash-lite-latest',
     'gemini-flash-latest',
-    'gemini-2.0-flash',
-    'gemini-1.5-flash',
-    'gemini-1.5-pro',
   ];
 
   constructor() {
@@ -595,7 +593,7 @@ Analyze the provided image carefully:
 Format your answer with clean, beautiful Markdown (clear headings with ###, bullet points, bold keywords, math formulas in $...$, and code blocks). Keep your tone encouraging, professional, and directly useful.`;
 
     if (this.genAI) {
-      for (const modelName of ['gemini-flash-lite-latest', 'gemini-flash-latest', 'gemini-2.0-flash', 'gemini-1.5-flash']) {
+      for (const modelName of ['gemini-3.6-flash', 'gemini-flash-lite-latest', 'gemini-flash-latest']) {
         try {
           const model = this.genAI.getGenerativeModel({ model: modelName });
           const result = await model.generateContent([
@@ -712,8 +710,8 @@ RULES:
       const cleanBase64 = base64Data.replace(/^data:[^;]+;base64,/, '').trim();
       const cleanMime = mimeType?.startsWith('image/') ? mimeType : 'image/jpeg';
 
-      // Prioritize fast, reliable multimodal vision models across Google Gemini 2.0 and 1.5
-      for (const modelName of ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-flash-latest', 'gemini-flash-lite-latest']) {
+      // Prioritize active, high-speed multimodal vision models (Gemini 3.6 Flash & Flash Lite)
+      for (const modelName of ['gemini-3.6-flash', 'gemini-flash-lite-latest', 'gemini-flash-latest']) {
         try {
           const model = this.genAI.getGenerativeModel({ model: modelName }, { timeout: 35000 });
           const result = await model.generateContent([
