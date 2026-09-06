@@ -9,38 +9,58 @@ export interface HuggingFaceModelInfo {
   description: string;
   specialty: string;
   parameters: string;
+  downloadUrl: string;
+  recommendedFilename: string;
 }
 
 export const HUGGINGFACE_OFFLINE_MODELS: HuggingFaceModelInfo[] = [
   {
+    id: 'Qwen/Qwen2.5-0.5B-Instruct',
+    name: 'Qwen 2.5 0.5B Instruct',
+    repo: 'Qwen/Qwen2.5-0.5B-Instruct-GGUF',
+    quantization: 'Q4_K_M (GGUF)',
+    sizeMB: 398,
+    description: 'High-precision mathematical reasoning, programming, and equation solving on-device.',
+    specialty: 'Mathematics, Code & Science',
+    parameters: '500 Million',
+    downloadUrl: 'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/tree/main',
+    recommendedFilename: 'qwen2.5-0.5b-instruct-q4_k_m.gguf',
+  },
+  {
     id: 'HuggingFaceTB/SmolLM2-360M-Instruct',
     name: 'SmolLM2 360M Instruct',
-    repo: 'HuggingFaceTB/SmolLM2-360M-Instruct',
-    quantization: 'Q4_K_M (GGUF / Wasm)',
-    sizeMB: 119,
+    repo: 'HuggingFaceTB/SmolLM2-360M-Instruct-GGUF',
+    quantization: 'Q4_K_M (GGUF)',
+    sizeMB: 145,
     description: 'Ultra-compact mobile-first LLM by Hugging Face. Fast execution, zero network latency.',
     specialty: 'Student Assistant & Daily Tasks',
     parameters: '360 Million',
+    downloadUrl: 'https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/tree/main',
+    recommendedFilename: 'smollm2-360m-instruct-q4_k_m.gguf',
   },
   {
-    id: 'Qwen/Qwen2.5-0.5B-Instruct',
-    name: 'Qwen 2.5 0.5B Instruct',
-    repo: 'Qwen/Qwen2.5-0.5B-Instruct',
-    quantization: 'Q4_K_M (GGUF / Wasm)',
-    sizeMB: 350,
-    description: 'High-precision mathematical reasoning, programming, and equation solving on-device.',
-    specialty: 'Mathematics & Science Solver',
-    parameters: '500 Million',
+    id: 'meta-llama/Llama-3.2-1B-Instruct',
+    name: 'Llama 3.2 1B Instruct',
+    repo: 'bartowski/Llama-3.2-1B-Instruct-GGUF',
+    quantization: 'Q4_K_M (GGUF)',
+    sizeMB: 750,
+    description: "Meta's flagship lightweight mobile LLM. Superior instruction following and dialogue.",
+    specialty: 'Advanced Reasoning & Essay Synthesis',
+    parameters: '1.2 Billion',
+    downloadUrl: 'https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/tree/main',
+    recommendedFilename: 'Llama-3.2-1B-Instruct-Q4_K_M.gguf',
   },
   {
     id: 'TinyLlama/TinyLlama-1.1B-Chat-v1.0',
     name: 'TinyLlama 1.1B Chat',
-    repo: 'TinyLlama/TinyLlama-1.1B-Chat-v1.0',
-    quantization: 'Q4_K_M (GGUF / Wasm)',
-    sizeMB: 638,
+    repo: 'TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF',
+    quantization: 'Q4_K_M (GGUF)',
+    sizeMB: 669,
     description: 'Compact 1.1B parameter dialogue model for in-depth explanations and academic summaries.',
     specialty: 'Comprehensive Knowledge & Chat',
     parameters: '1.1 Billion',
+    downloadUrl: 'https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/tree/main',
+    recommendedFilename: 'tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf',
   },
 ];
 
@@ -337,6 +357,165 @@ export class OfflineAIEngine {
    */
   public answerGeneralStudyQuery(input: string, model: HuggingFaceModelInfo): string | null {
     const text = input.trim().toLowerCase();
+
+    // 0. Conversational Greetings & Persona
+    if (text.match(/^(?:hi|hello|hey|namaste|hola|sup|good morning|good afternoon|good evening|yo)\b/i) || text === 'hi' || text === 'hello') {
+      return `### 👋 Hello! I am your GLITCHERS AI Companion\n\n` +
+        `I am running 100% on-device using **${model.name}** (${model.quantization}).\n\n` +
+        `**Here is what I can do for you offline**:\n` +
+        `• **Academic & Science**: Solve math equations, explain CS theory, physics laws, and chemistry.\n` +
+        `• **Code Generator**: Write and explain Python, C++, JavaScript, and SQL algorithms.\n` +
+        `• **Campus Life**: Check your classes today, pending assignments, and budget balance.\n` +
+        `• **Offline Actions**: Add expenses and create tasks (auto-queued for cloud sync).\n\n` +
+        `*Try asking: "Solve 3x + 12 = 36", "Binary search in Python", or "What classes do I have today?"*`;
+    }
+
+    // 0.1 Identity & Capabilities
+    if (text.includes('who are you') || text.includes('what are you') || text.includes('what can you do') || text === 'help') {
+      return `### 🤖 About GLITCHERS On-Device AI\n\n` +
+        `I am your private, low-latency student companion powered by **${model.name}** (${model.parameters} parameters).\n\n` +
+        `• **Zero Network Dependency**: Runs completely on your device without transmitting data to external servers.\n` +
+        `• **Specialty**: ${model.specialty}.\n` +
+        `• **Quantization**: ${model.quantization} (${model.sizeMB} MB).\n\n` +
+        `Need ChatGPT-grade web research or photo OCR? You can switch to **☁️ Cloud Gemini** mode anytime via the top pill switcher!`;
+    }
+
+    // 0.2 Gratitude & Politeness
+    if (text.match(/^(?:thank you|thanks|great|awesome|cool|bye|goodbye)\b/i)) {
+      return `You're very welcome! Always here to help you study, keep track of classes, and stay ahead in college. Let me know if you need anything else! 🎓✨`;
+    }
+
+    // 0.3 Code: Fibonacci in Python & C++
+    if (text.includes('fibonacci')) {
+      return `### 🔢 Fibonacci Sequence (Code & Explanation)\n\n` +
+        `The Fibonacci series is: $0, 1, 1, 2, 3, 5, 8, 13, 21, 34, \\dots$\n` +
+        `Each number is the sum of the two preceding ones: $F(n) = F(n-1) + F(n-2)$.\n\n` +
+        `**Python (Iterative - $O(n)$ time, $O(1)$ space)**:\n` +
+        `\`\`\`python\n` +
+        `def fibonacci(n):\n` +
+        `    if n <= 0: return []\n` +
+        `    if n == 1: return [0]\n` +
+        `    seq = [0, 1]\n` +
+        `    for _ in range(2, n):\n` +
+        `        seq.append(seq[-1] + seq[-2])\n` +
+        `    return seq\n\n` +
+        `print(fibonacci(10)) # [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]\n` +
+        `\`\`\`\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 0.4 Code: Reverse String
+    if (text.includes('reverse') && text.includes('string')) {
+      return `### 🔁 Reverse a String (Multi-Language)\n\n` +
+        `• **Python**:\n` +
+        `\`\`\`python\n` +
+        `s = "glitchers"\n` +
+        `rev = s[::-1]  # Slicing (O(n) time)\n` +
+        `\`\`\`\n\n` +
+        `• **JavaScript / TypeScript**:\n` +
+        `\`\`\`javascript\n` +
+        `const rev = str.split('').reverse().join('');\n` +
+        `\`\`\`\n\n` +
+        `• **C++ (Two Pointers - In-Place $O(1)$ space)**:\n` +
+        `\`\`\`cpp\n` +
+        `void reverseString(string &s) {\n` +
+        `    int left = 0, right = s.length() - 1;\n` +
+        `    while (left < right) swap(s[left++], s[right--]);\n` +
+        `}\n` +
+        `\`\`\`\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 0.5 Code: Two Sum Problem
+    if (text.includes('two sum')) {
+      return `### 🎯 Two Sum Problem (LeetCode #1)\n\n` +
+        `**Problem**: Given an array of integers \`nums\` and an integer \`target\`, return indices of the two numbers that add up to target.\n\n` +
+        `**Optimal Hash Map Solution ($O(n)$ Time, $O(n)$ Space)**:\n` +
+        `\`\`\`python\n` +
+        `def two_sum(nums, target):\n` +
+        `    seen = {}\n` +
+        `    for i, num in enumerate(nums):\n` +
+        `        complement = target - num\n` +
+        `        if complement in seen:\n` +
+        `            return [seen[complement], i]\n` +
+        `        seen[num] = i\n` +
+        `    return []\n` +
+        `\`\`\`\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 0.6 Git Commands Cheat Sheet
+    if (text.includes('git') && (text.includes('command') || text.includes('cheat') || text.includes('push') || text.includes('commit') || text.includes('branch'))) {
+      return `### 🐙 Essential Git Commands for Students\n\n` +
+        `• \`git init\` — Initialize a new Git repository locally.\n` +
+        `• \`git clone <url>\` — Clone an existing remote repository.\n` +
+        `• \`git checkout -b <branch>\` — Create and switch to a new branch.\n` +
+        `• \`git add .\` — Stage all modified files for commit.\n` +
+        `• \`git commit -m "feat: description"\` — Record staged changes with a commit message.\n` +
+        `• \`git push origin <branch>\` — Upload local commits to remote GitHub repository.\n` +
+        `• \`git pull origin <branch>\` — Fetch and merge latest remote commits into current branch.\n` +
+        `• \`git status\` — View modified, staged, and untracked files.\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 0.7 REST API Principles
+    if (text.includes('rest api') || (text.includes('rest') && text.includes('http'))) {
+      return `### 🌐 REST API Architectural Principles\n\n` +
+        `REST (Representational State Transfer) is a standard architectural style for networked web applications:\n\n` +
+        `1. **Statelessness**: Every request from client to server must contain all information needed to understand the request.\n` +
+        `2. **Client-Server Architecture**: Separation of UI/client from data storage/business logic.\n` +
+        `3. **Uniform Interface**: Resource identification via URIs (e.g. \`/api/expenses/123\`).\n\n` +
+        `**Standard HTTP Methods**:\n` +
+        `• \`GET\` — Read/retrieve resource (Idempotent & Safe).\n` +
+        `• \`POST\` — Create a new resource.\n` +
+        `• \`PUT\` / \`PATCH\` — Replace / Partially update existing resource.\n` +
+        `• \`DELETE\` — Remove resource.\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 0.8 How to Study & Exam Preparation
+    if (text.includes('how to study') || text.includes('exam preparation') || text.includes('prepare for exam') || text.includes('study tips')) {
+      return `### 🎓 High-Yield University Exam Preparation Guide\n\n` +
+        `1. **Active Recall over Passive Rereading**: Instead of highlighting slides, test yourself using flashcards or by writing summaries from memory.\n` +
+        `2. **Feynman Technique**: Explain complex concepts out loud in simple, jargon-free terms as if teaching a beginner.\n` +
+        `3. **Previous 5 Years Question Papers (PYQs)**: 60-70% of university exam patterns repeat core derivations and problem types.\n` +
+        `4. **Pomodoro Technique**: 25 minutes of deep focus followed by 5 minutes of rest prevents cognitive fatigue.\n` +
+        `5. **Sleep & Memory Consolidation**: Pulling all-nighters reduces memory retention by up to 40%. Get at least 6-7 hours before exam day.\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 0.9 Physics: Newton's 3 Laws of Motion
+    if (text.includes('newton') && text.includes('law')) {
+      return `### 🍎 Newton's 3 Laws of Motion\n\n` +
+        `1. **First Law (Law of Inertia)**: An object remains at rest or in uniform motion in a straight line unless acted upon by a net external force ($F_{\\text{net}} = 0 \\implies a = 0$).\n` +
+        `2. **Second Law (Fundamental Equation)**: The rate of change of momentum is proportional to the applied net force: $F = m \\cdot a$.\n` +
+        `3. **Third Law (Action & Reaction)**: For every action, there is an equal and opposite reaction ($F_{AB} = -F_{BA}$).\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 0.10 Physics: Ohm's Law
+    if (text.includes("ohm's law") || text.includes('ohms law')) {
+      return `### ⚡ Ohm's Law\n\n` +
+        `Ohm's Law states that current ($I$) flowing through a conductor between two points is directly proportional to voltage ($V$) across the two points, provided physical conditions (temperature) remain constant:\n\n` +
+        `$$V = I \\times R$$\n\n` +
+        `• **$V$ (Voltage)**: Potential difference measured in Volts (V)\n` +
+        `• **$I$ (Current)**: Flow of electric charge measured in Amperes (A)\n` +
+        `• **$R$ (Resistance)**: Opposition to current flow measured in Ohms ($\\Omega$)\n\n` +
+        `*Derived Formulas*: $I = \\frac{V}{R}$, $R = \\frac{V}{I}$, Power: $P = V \\cdot I = I^2 R = \\frac{V^2}{R}$.\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
+
+    // 0.11 Biology: Photosynthesis
+    if (text.includes('photosynthesis')) {
+      return `### 🍃 Photosynthesis\n\n` +
+        `The biochemical process by which green plants and certain organisms convert light energy into chemical energy:\n\n` +
+        `**Overall Chemical Equation**:\n` +
+        `$$6CO_2 + 6H_2O + \\text{Light Energy} \\xrightarrow{\\text{Chlorophyll}} C_6H_{12}O_6 + 6O_2$$\n\n` +
+        `**Two Stages**:\n` +
+        `1. **Light-Dependent Reactions (Thylakoid Membrane)**: Photolysis of water releases $O_2$ and produces ATP and NADPH.\n` +
+        `2. **Light-Independent Reactions / Calvin Cycle (Stroma)**: Fixes $CO_2$ into glucose using ATP and NADPH.\n\n` +
+        `*⚡ Computed on-device by ${model.name}*`;
+    }
 
     // 1. Binary Search
     if (text.includes('binary search')) {

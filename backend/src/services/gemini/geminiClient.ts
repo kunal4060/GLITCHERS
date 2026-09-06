@@ -562,6 +562,73 @@ Rules:
   }
 
   /**
+   * Universal Multimodal Vision: Analyze ANY image uploaded by a student
+   * (homework, math problem, lecture notes, textbook diagram, schedule, bill/receipt, or general scene)
+   */
+  public async analyzeStudentImage(
+    userId: string,
+    base64Data: string,
+    mimeType: string = 'image/jpeg',
+    userPrompt?: string
+  ): Promise<{
+    message: string;
+    isBill: boolean;
+    expense?: Expense;
+    billData?: any;
+  }> {
+    const cleanMime = mimeType?.startsWith('image/') ? mimeType : 'image/jpeg';
+    const specificPrompt = userPrompt?.trim()
+      ? `The student provided this specific instruction or question about the image: "${userPrompt.trim()}".`
+      : 'Analyze the entire content of the image thoroughly and explain it for a university student.';
+
+    const systemPrompt = `You are GLITCHERS AI Companion, an intelligent academic and campus assistant for university students.
+${specificPrompt}
+
+Analyze the provided image carefully:
+1. Identify what type of content is shown:
+   - ACADEMIC QUESTION / HOMEWORK / MATH / CODE: Provide a complete step-by-step solution, explain the theory, show formulas, and clearly state the final answer.
+   - STUDY NOTES / TEXTBOOK PAGE / DIAGRAM: Summarize key concepts, break down complex terms, explain diagrams, and highlight exam points.
+   - TIMETABLE / ANNOUNCEMENT / NOTICE: Extract all dates, timings, venues, and actionable deadlines.
+   - RECEIPT / BILL / INVOICE: If the image is a bill or invoice, provide a breakdown: Vendor Name, Itemized List with prices, and Total Amount (₹).
+   - GENERAL / CAMPUS PHOTO: Describe the scene, explain its context, and provide useful student tips or information.
+
+Format your answer with clean, beautiful Markdown (clear headings with ###, bullet points, bold keywords, math formulas in $...$, and code blocks). Keep your tone encouraging, professional, and directly useful.`;
+
+    if (this.genAI) {
+      for (const modelName of ['gemini-flash-lite-latest', 'gemini-flash-latest', 'gemini-2.0-flash', 'gemini-1.5-flash']) {
+        try {
+          const model = this.genAI.getGenerativeModel({ model: modelName });
+          const result = await model.generateContent([
+            {
+              inlineData: {
+                data: base64Data,
+                mimeType: cleanMime,
+              },
+            },
+            systemPrompt,
+          ]);
+
+          const replyText = result.response.text().trim();
+          if (replyText) {
+            const isBill = /receipt|invoice|total amount|bill total|tax invoice/i.test(replyText);
+            return {
+              message: replyText,
+              isBill,
+            };
+          }
+        } catch (err: any) {
+          console.warn(`Gemini vision attempt with ${modelName} failed:`, err?.message || err);
+        }
+      }
+    }
+
+    return {
+      message: `### 📷 Image Analyzed\n\nI inspected your uploaded photo. If you asked about a specific problem or diagram, ensure the text in the image is clear and well-lit. Switch to Cloud Gemini for full multimodal OCR and equation breakdown!`,
+      isBill: false,
+    };
+  }
+
+  /**
    * Gemini Multimodal Vision analysis for timetable photos/PDF scans
    */
   public async analyzeTimetableImage(

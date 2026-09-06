@@ -224,6 +224,19 @@ class ApiClient {
     });
   }
 
+  public async analyzeImage(imageBase64: string, mimeType: string = 'image/jpeg', prompt?: string) {
+    return this.post<{
+      message: string;
+      isBill: boolean;
+      expense?: any;
+      billData?: any;
+    }>('/ai/analyze-image', {
+      imageBase64,
+      mimeType,
+      message: prompt,
+    });
+  }
+
   public async syncBatch(operations: any[]) {
     return this.post<any>('/sync/batch', { operations });
   }

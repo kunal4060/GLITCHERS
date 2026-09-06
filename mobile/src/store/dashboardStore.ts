@@ -8,8 +8,18 @@ export interface ChatMessage {
   id: string;
   sender: 'user' | 'assistant';
   text: string;
+  imageUri?: string;
   actionCard?: any;
   timestamp: string;
+}
+
+export interface LoadedModelFileInfo {
+  name: string;
+  size: number;
+  uri: string;
+  mimeType?: string;
+  loadedAt: string;
+  modelId?: string;
 }
 
 interface DashboardState {
@@ -58,8 +68,10 @@ interface DashboardState {
   activeOfflineModel: string;
   downloadedModels: string[];
   downloadProgress: Record<string, number>;
+  loadedModelFile: LoadedModelFileInfo | null;
   setAiMode: (mode: 'AUTO' | 'OFFLINE' | 'CLOUD') => void;
   setActiveOfflineModel: (modelId: string) => void;
+  setLoadedModelFile: (file: LoadedModelFileInfo | null) => void;
   downloadOfflineModel: (modelId: string) => Promise<void>;
 
   offlineSyncQueue: Array<{
@@ -92,8 +104,18 @@ export const useDashboardStore = create<DashboardState>()(
       activeOfflineModel: '',
       downloadedModels: [],
       downloadProgress: {},
+      loadedModelFile: null,
       setAiMode: (aiMode) => set({ aiMode }),
       setActiveOfflineModel: (activeOfflineModel) => set({ activeOfflineModel }),
+      setLoadedModelFile: (loadedModelFile) =>
+        set((s) => ({
+          loadedModelFile,
+          aiMode: loadedModelFile ? 'OFFLINE' : s.aiMode,
+          activeOfflineModel: loadedModelFile ? (loadedModelFile.modelId || loadedModelFile.name) : s.activeOfflineModel,
+          downloadedModels: loadedModelFile
+            ? Array.from(new Set([...s.downloadedModels, loadedModelFile.modelId || loadedModelFile.name]))
+            : s.downloadedModels,
+        })),
       downloadOfflineModel: async (modelId: string) => {
         set((s) => ({
           downloadProgress: { ...s.downloadProgress, [modelId]: 15 },

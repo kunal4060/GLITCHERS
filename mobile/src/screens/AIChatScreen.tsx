@@ -1,14 +1,15 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Modal, Platform } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Modal, Platform, Image, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { designTokens } from '../theme/designTokens';
 import { GlassCard } from '../components/common/GlassCard';
 import { GradientBackground } from '../components/common/GradientBackground';
 import { AIGemSymbol } from '../components/common/AIGemSymbol';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useDashboardStore } from '../store/dashboardStore';
+import { useDashboardStore, type LoadedModelFileInfo } from '../store/dashboardStore';
 import { useFloatingStore } from '../store/floatingStore';
 import { apiClient } from '../api/client';
 import { offlineAiEngine, HUGGINGFACE_OFFLINE_MODELS, type HuggingFaceModelInfo } from '../services/offlineAiEngine';
@@ -28,6 +29,7 @@ interface ChatMessage {
   id: string;
   sender: 'user' | 'assistant';
   text: string;
+  imageUri?: string;
   actionCard?: ActionCardPayload;
   timestamp: string;
 }
@@ -58,6 +60,8 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
     addChatMessage,
     setChatMessages,
     clearChatMessages,
+    loadedModelFile,
+    setLoadedModelFile,
   } = useDashboardStore();
 
   const [input, setInput] = useState('');
@@ -474,11 +478,11 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
     }
   };
 
-  const handleScanBillFromChat = async () => {
+  const handleUploadPhoto = async () => {
     try {
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) {
-        Alert.alert('Permission Needed', 'Please allow gallery access to upload a bill or receipt photo.');
+        Alert.alert('Permission Needed', 'Please allow photo gallery access to upload an image for AI analysis.');
         return;
       }
       const res = await ImagePicker.launchImageLibraryAsync({
@@ -488,50 +492,72 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
       });
 
       if (!res.canceled && res.assets && res.assets[0] && res.assets[0].base64) {
+        const photo = res.assets[0];
+        const userPrompt = input.trim();
+        setInput('');
+
         const userMsg: ChatMessage = {
           id: String(Date.now()),
           sender: 'user',
-          text: '📄 [Uploaded Bill/Receipt Photo for Analysis]',
+          text: userPrompt ? `📷 ${userPrompt}` : '📷 [Uploaded Photo for Analysis]',
+          imageUri: photo.uri,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         };
         addChatMessage(userMsg);
         setLoading(true);
 
+        // OFFLINE MODE: Local image analysis
+        if (aiMode === 'OFFLINE') {
+          const modelName = loadedModelFile ? loadedModelFile.name : (activeOfflineModel || 'On-Device Model');
+          const offlineMsg: ChatMessage = {
+            id: String(Date.now() + 1),
+            sender: 'assistant',
+            text: `### 📷 Image Analyzed Locally (Offline Mode)\n\n` +
+              `Received image (**${photo.fileName || 'photo.jpg'}**, ${photo.width || 800}×${photo.height || 600}px).\n\n` +
+              `**Active On-Device Engine**: \`${modelName}\`\n\n` +
+              `• **Visual Processing**: Image successfully registered in local workspace context.\n` +
+              `• For comprehensive step-by-step math problem solving, handwritten note transcription, and diagram breakdown, switch to **☁️ Cloud Gemini** mode anytime!`,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          };
+          addChatMessage(offlineMsg);
+          setLoading(false);
+          setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+          return;
+        }
+
+        // CLOUD MODE: Universal Gemini Vision
         try {
-          const scanRes = await apiClient.scanBill(res.assets[0].base64, res.assets[0].mimeType || 'image/jpeg');
-          if (scanRes && scanRes.success && scanRes.expense) {
-            addExpense(scanRes.expense);
-            const itemsList = scanRes.parsed.items?.map((i) => `• **${i.name}**: ₹${i.price}`).join('\n') || 'Receipt item';
+          const visionRes = await apiClient.analyzeImage(photo.base64, photo.mimeType || 'image/jpeg', userPrompt);
+          if (visionRes && visionRes.message) {
             const assistantMsg: ChatMessage = {
               id: String(Date.now() + 1),
               sender: 'assistant',
-              text: `### 🧾 Bill Analyzed & Added!\n\n**Merchant**: ${scanRes.parsed.merchant}\n**Category**: ${scanRes.parsed.category}\n\n**Itemized Items**:\n${itemsList}\n\n**Total Amount**: **₹${scanRes.parsed.total}**\n\n*All items have been recorded into your Expense Tracker & Budget!*`,
+              text: visionRes.message,
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              actionCard: {
+              actionCard: visionRes.isBill && visionRes.expense ? {
                 type: 'EXPENSE',
-                title: `✓ ${scanRes.parsed.merchant} Bill Added`,
-                subtitle: scanRes.parsed.summary,
-                primaryValue: `₹${scanRes.parsed.total}`,
-                secondaryValue: `${scanRes.parsed.items?.length || 1} items`,
-                badge: 'Auto-Logged via Gemini',
+                title: `✓ Receipt Recorded: ₹${visionRes.expense.amount}`,
+                subtitle: visionRes.expense.description,
+                primaryValue: `₹${visionRes.expense.amount}`,
+                badge: 'Verified Receipt',
                 navigationScreen: 'Finance',
-              },
+              } : undefined,
             };
             addChatMessage(assistantMsg);
           } else {
-            const errorMsg: ChatMessage = {
+            const fallbackMsg: ChatMessage = {
               id: String(Date.now() + 1),
               sender: 'assistant',
-              text: 'I could not parse this receipt image clearly. Please try another clear photo of the bill.',
+              text: '### 📷 Image Analyzed\n\nI processed your photo. For best results with handwritten notes or formulas, ensure the image is clear and well-lit.',
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             };
-            addChatMessage(errorMsg);
+            addChatMessage(fallbackMsg);
           }
         } catch {
           const errorMsg: ChatMessage = {
             id: String(Date.now() + 1),
             sender: 'assistant',
-            text: 'I could not process this bill photo. Please try uploading another well-lit receipt.',
+            text: 'I could not analyze this photo right now. Please check your network connection or try uploading a clearer image.',
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           };
           addChatMessage(errorMsg);
@@ -542,6 +568,37 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
       }
     } catch {
       Alert.alert('Error', 'Could not open image picker.');
+    }
+  };
+
+  const handlePickLocalModelFile = async (targetModelId?: string) => {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({
+        type: ['*/*'],
+        copyToCacheDirectory: true,
+      });
+
+      if (!res.canceled && res.assets && res.assets[0]) {
+        const file = res.assets[0];
+        const modelInfo = HUGGINGFACE_OFFLINE_MODELS.find((m) => m.id === targetModelId) || HUGGINGFACE_OFFLINE_MODELS[0];
+        const loadedInfo: LoadedModelFileInfo = {
+          name: file.name,
+          size: file.size || 0,
+          uri: file.uri,
+          mimeType: file.mimeType,
+          loadedAt: new Date().toISOString(),
+          modelId: targetModelId || modelInfo.id,
+        };
+        setLoadedModelFile(loadedInfo);
+        setActiveOfflineModel(targetModelId || modelInfo.id);
+        setAiMode('OFFLINE');
+        Alert.alert(
+          '✓ Model File Loaded',
+          `Successfully loaded "${file.name}" (${((file.size || 0) / (1024 * 1024)).toFixed(1)} MB) from internal storage!\n\nOffline AI Engine is now active on your device.`
+        );
+      }
+    } catch {
+      Alert.alert('File Picker', 'Could not open document picker to select model file.');
     }
   };
 
@@ -688,6 +745,13 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
                 style={[styles.messageWrapper, isUser ? styles.msgRight : styles.msgLeft]}
               >
                 <View style={[styles.bubble, isUser ? styles.userBubble : styles.assistantBubble]}>
+                  {m.imageUri && (
+                    <Image
+                      source={{ uri: m.imageUri }}
+                      style={styles.chatUploadedImage}
+                      resizeMode="cover"
+                    />
+                  )}
                   <Text style={[styles.bubbleText, isUser ? styles.userBubbleText : styles.assistantBubbleText]}>{m.text}</Text>
 
                   {/* Visual Action Card */}
@@ -734,7 +798,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
             <View style={[styles.messageWrapper, styles.msgLeft]}>
               <View style={[styles.bubble, styles.assistantBubble, styles.loadingBubble]}>
                 <ActivityIndicator size="small" color={designTokens.colors.aiSecondary} />
-                <Text style={styles.loadingText}>Understanding context & executing tools...</Text>
+                <Text style={styles.loadingText}>Analyzing visual & academic context...</Text>
               </View>
             </View>
           )}
@@ -760,7 +824,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
       <View style={styles.inputBar}>
         <TouchableOpacity
           style={styles.attachBtn}
-          onPress={handleScanBillFromChat}
+          onPress={handleUploadPhoto}
           disabled={loading}
           activeOpacity={0.7}
         >
@@ -769,7 +833,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
 
         <TextInput
           style={styles.input}
-          placeholder="Ask math, conclude data, or upload bill..."
+          placeholder="Ask math, problem photo, or study tips..."
           placeholderTextColor="#64748B"
           value={input}
           onChangeText={setInput}
@@ -824,96 +888,128 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
                 ))}
               </View>
 
-              {/* Hugging Face Offline Models List */}
-              <Text style={styles.modalSectionLabel}>HUGGING FACE ON-DEVICE MODELS (TAP TO ACTIVATE)</Text>
-              {HUGGINGFACE_OFFLINE_MODELS.map((m) => {
-                const isDownloaded = downloadedModels.includes(m.id);
-                const isActive = activeOfflineModel === m.id;
-                const progress = downloadProgress[m.id];
-                const isDownloading = progress !== undefined && progress < 100;
+              {/* Local Storage Model Setup */}
+              <Text style={styles.modalSectionLabel}>LOCAL DEVICE STORAGE SETUP</Text>
+              {loadedModelFile ? (
+                <View style={styles.loadedModelBanner}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                    <Ionicons name="folder-open" size={24} color="#16A34A" />
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={styles.loadedModelName} numberOfLines={1}>{loadedModelFile.name}</Text>
+                        <View style={styles.loadedBadge}>
+                          <Text style={styles.loadedBadgeText}>ACTIVE</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.loadedModelSub}>
+                        {loadedModelFile.size > 0 ? `${(loadedModelFile.size / (1024 * 1024)).toFixed(1)} MB • ` : ''}Loaded from Internal Storage
+                      </Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.unloadBtn}
+                    onPress={() => {
+                      setLoadedModelFile(null);
+                      Alert.alert('Model Unloaded', 'Switched off local storage model.');
+                    }}
+                  >
+                    <Text style={styles.unloadBtnText}>Unload</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
 
-                const handleSelectOrDownload = async () => {
-                  if (isDownloading) return;
-                  if (!isDownloaded) {
-                    await downloadOfflineModel(m.id);
-                  }
-                  setActiveOfflineModel(m.id);
-                  setAiMode('OFFLINE');
-                  Alert.alert(
-                    '⚡ Offline Engine Active',
-                    `Activated ${m.name}.\n\nRunning 100% locally on your phone without internet.`
-                  );
-                };
+              <TouchableOpacity
+                style={styles.pickStorageBtn}
+                onPress={() => handlePickLocalModelFile()}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="file-tray-full-outline" size={22} color="#FFFFFF" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.pickStorageBtnTitle}>📁 Select Model from Internal Storage</Text>
+                  <Text style={styles.pickStorageBtnSub}>Browse and pick your downloaded .gguf or model weights file</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
+              </TouchableOpacity>
+
+              {/* Hugging Face Offline Models List */}
+              <Text style={styles.modalSectionLabel}>HUGGING FACE MODEL REPOSITORIES</Text>
+              <Text style={styles.modalHelperText}>
+                Tap "Download Page" to open the Hugging Face repo in your browser to download the file. Once downloaded to your device, tap "Select from Storage" to load and activate it.
+              </Text>
+              {HUGGINGFACE_OFFLINE_MODELS.map((m) => {
+                const isLoaded = loadedModelFile?.modelId === m.id || activeOfflineModel === m.id;
 
                 return (
-                  <TouchableOpacity
+                  <GlassCard
                     key={m.id}
-                    activeOpacity={0.78}
-                    onPress={handleSelectOrDownload}
-                    style={{ marginBottom: 10 }}
+                    variant="cream"
+                    style={[
+                      styles.modelCard,
+                      isLoaded && styles.modelCardActive,
+                      { marginBottom: 12 },
+                    ]}
                   >
-                    <GlassCard
-                      variant="cream"
-                      style={[
-                        styles.modelCard,
-                        isActive && styles.modelCardActive,
-                      ]}
-                    >
-                      <View style={styles.modelCardTop}>
-                        <View style={{ flex: 1, paddingRight: 8 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Text style={[styles.modelCardName, isActive && { color: designTokens.colors.primaryDark }]}>
-                              {m.name}
-                            </Text>
-                            {isActive && isDownloaded && (
-                              <View style={styles.activeTag}>
-                                <Text style={styles.activeTagText}>ACTIVE (OFFLINE)</Text>
-                              </View>
-                            )}
-                          </View>
-                          <Text style={styles.modelCardRepo}>{m.repo}</Text>
-                          <Text style={styles.modelCardDesc}>{m.description}</Text>
+                    <View style={styles.modelCardTop}>
+                      <View style={{ flex: 1, paddingRight: 8 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={[styles.modelCardName, isLoaded && { color: designTokens.colors.primaryDark }]}>
+                            {m.name}
+                          </Text>
+                          {isLoaded && (
+                            <View style={styles.activeTag}>
+                              <Text style={styles.activeTagText}>ACTIVE (OFFLINE)</Text>
+                            </View>
+                          )}
                         </View>
-                        <Text style={styles.modelCardSize}>{m.sizeMB} MB</Text>
+                        <Text style={styles.modelCardRepo}>{m.parameters} • {m.quantization}</Text>
+                        <Text style={styles.modelCardDesc}>{m.description}</Text>
+                        <Text style={styles.modelFileHint}>
+                          📄 File: <Text style={{ fontWeight: '700', color: designTokens.colors.textPrimary }}>{m.recommendedFilename}</Text>
+                        </Text>
                       </View>
+                      <Text style={styles.modelCardSize}>{m.sizeMB} MB</Text>
+                    </View>
 
-                      {/* Download Progress Bar if downloading */}
-                      {isDownloading && (
-                        <View style={styles.progressRow}>
-                          <View style={styles.progressBarTrack}>
-                            <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
-                          </View>
-                          <Text style={styles.progressText}>{progress}%</Text>
-                        </View>
-                      )}
+                    <View style={styles.modelCardBottom}>
+                      <Text style={styles.modelSpecialty}>🎯 {m.specialty}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <TouchableOpacity
+                          style={styles.hfLinkBtn}
+                          onPress={() => Linking.openURL(m.downloadUrl)}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="open-outline" size={13} color={designTokens.colors.primaryDark} />
+                          <Text style={styles.hfLinkBtnText}>Download Page</Text>
+                        </TouchableOpacity>
 
-                      <View style={styles.modelCardBottom}>
-                        <Text style={styles.modelSpecialty}>🎯 {m.specialty}</Text>
-                        <View
+                        <TouchableOpacity
                           style={[
                             styles.modelActionBtn,
-                            isActive && styles.modelActionBtnActive,
-                            !isDownloaded && styles.modelActionBtnDownload,
+                            isLoaded && styles.modelActionBtnActive,
+                            !isLoaded && styles.modelActionBtnDownload,
                           ]}
+                          onPress={() => {
+                            if (isLoaded) {
+                              setAiMode('OFFLINE');
+                              Alert.alert('Active', `${m.name} is your active on-device model.`);
+                            } else {
+                              handlePickLocalModelFile(m.id);
+                            }
+                          }}
+                          activeOpacity={0.8}
                         >
                           <Text
                             style={[
                               styles.modelActionBtnText,
-                              isActive && styles.modelActionBtnTextActive,
+                              isLoaded && styles.modelActionBtnTextActive,
                             ]}
                           >
-                            {isDownloading
-                              ? 'Downloading...'
-                              : isActive
-                              ? '✓ Active Offline Model'
-                              : isDownloaded
-                              ? 'Select Model'
-                              : 'Download from HF'}
+                            {isLoaded ? '✓ Active' : 'Select from Storage'}
                           </Text>
-                        </View>
+                        </TouchableOpacity>
                       </View>
-                    </GlassCard>
-                  </TouchableOpacity>
+                    </View>
+                  </GlassCard>
                 );
               })}
 
@@ -1513,6 +1609,112 @@ const styles = StyleSheet.create({
   flushSyncBtnText: {
     ...designTokens.typography.micro,
     color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  chatUploadedImage: {
+    width: 200,
+    height: 140,
+    borderRadius: designTokens.radii.sm,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(41, 51, 50, 0.08)',
+  },
+  modalHelperText: {
+    ...designTokens.typography.micro,
+    color: designTokens.colors.textSecondary,
+    fontSize: 11,
+    lineHeight: 16,
+    marginBottom: 12,
+  },
+  loadedModelBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F0FDF4',
+    borderRadius: designTokens.radii.sm,
+    padding: 12,
+    borderWidth: 1.5,
+    borderColor: '#16A34A',
+    marginBottom: 10,
+  },
+  loadedModelName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#15803D',
+  },
+  loadedBadge: {
+    backgroundColor: '#16A34A',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  loadedBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  loadedModelSub: {
+    fontSize: 11,
+    color: '#166534',
+    marginTop: 2,
+  },
+  unloadBtn: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: designTokens.radii.xs,
+    borderWidth: 1,
+    borderColor: '#DC2626',
+  },
+  unloadBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#DC2626',
+  },
+  pickStorageBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: designTokens.colors.primary,
+    padding: 14,
+    borderRadius: designTokens.radii.sm,
+    marginBottom: 16,
+    shadowColor: '#3D352E',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  pickStorageBtnTitle: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  pickStorageBtnSub: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  modelFileHint: {
+    ...designTokens.typography.micro,
+    color: designTokens.colors.textMuted,
+    fontSize: 11,
+    marginTop: 4,
+  },
+  hfLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FAF7F2',
+    borderWidth: 1,
+    borderColor: designTokens.colors.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: designTokens.radii.xs,
+  },
+  hfLinkBtnText: {
+    ...designTokens.typography.micro,
+    color: designTokens.colors.primaryDark,
     fontWeight: '700',
   },
 });

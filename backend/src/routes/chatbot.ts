@@ -36,6 +36,36 @@ export const chatbotRoutes: FastifyPluginAsync = async (fastify) => {
     return response;
   });
 
+  fastify.post<{ Body: { imageBase64: string; mimeType?: string; message?: string } }>('/analyze-image', async (req, reply) => {
+    const userId = req.userId!;
+    const { imageBase64, mimeType = 'image/jpeg', message = '' } = req.body || {};
+
+    if (!imageBase64) {
+      return reply.status(400).send({ error: 'imageBase64 string is required' });
+    }
+
+    const cleanBase64 = imageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
+
+    // Persist user query with photo indicator
+    await supabaseStore.saveChatMessage(
+      userId,
+      'user',
+      message ? `📷 [Photo]: ${message}` : '📷 [Uploaded Image for Analysis]'
+    );
+
+    const response = await geminiAssistant.analyzeStudentImage(userId, cleanBase64, mimeType, message);
+
+    // Persist assistant reply
+    await supabaseStore.saveChatMessage(
+      userId,
+      'assistant',
+      response.message,
+      response.expense ? { type: 'EXPENSE', data: response.expense } : undefined
+    );
+
+    return response;
+  });
+
   fastify.delete('/history', async (req) => {
     const userId = req.userId!;
     await supabaseStore.clearChatHistory(userId);
