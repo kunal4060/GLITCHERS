@@ -36,6 +36,16 @@ export class SyncService {
             }
             break;
           }
+          case 'timetable': {
+            if (record.operation === 'INSERT' || record.operation === 'UPDATE') {
+              const existing = await supabaseStore.getClasses(userId);
+              const updated = [record.payload, ...existing.filter((c) => c.id !== record.payload.id)];
+              await supabaseStore.saveClasses(userId, updated);
+            } else if (record.operation === 'DELETE') {
+              await supabaseStore.deleteClass(userId, record.payload.id);
+            }
+            break;
+          }
         }
         processedRecordIds.push(record.id);
       } catch (err: any) {

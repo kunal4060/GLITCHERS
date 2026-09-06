@@ -7,6 +7,7 @@ import { StatCard } from '../components/common/StatCard';
 import { GradientBackground } from '../components/common/GradientBackground';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useDashboardStore } from '../store/dashboardStore';
+import { useAuthStore } from '../store/authStore';
 import { apiClient } from '../api/client';
 import type { Expense, Debt } from '@glitchers/shared';
 
@@ -113,9 +114,10 @@ export const FinanceScreen: React.FC = () => {
 
   const handleConfirmQuickExpense = () => {
     if (!previewExpense) return;
+    const currentUserId = useAuthStore.getState().user?.id || 'offline-user';
     const newExp: Expense = {
       id: String(Date.now()),
-      userId: 'u1',
+      userId: currentUserId,
       amount: previewExpense.amount,
       category: previewExpense.category,
       description: previewExpense.description,

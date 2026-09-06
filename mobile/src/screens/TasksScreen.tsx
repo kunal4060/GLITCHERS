@@ -6,6 +6,7 @@ import { StatusBadge } from '../components/common/StatusBadge';
 import { GradientBackground } from '../components/common/GradientBackground';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useDashboardStore } from '../store/dashboardStore';
+import { useAuthStore } from '../store/authStore';
 import type { Task } from '@glitchers/shared';
 
 const FILTERS = ['All', 'Important', 'Today', 'Upcoming', 'Completed'];
@@ -18,14 +19,24 @@ export const TasksScreen: React.FC = () => {
   const [newPriority, setNewPriority] = useState<Task['priority']>('NORMAL');
   const [newDue, setNewDue] = useState('Tomorrow');
 
+  const todayDateStr = new Date().toISOString().slice(0, 10);
+
   // Filtering
   const filteredTasks = tasks.filter((t) => {
     if (selectedFilter === 'Completed') return t.status === 'COMPLETED';
     if (selectedFilter === 'Important') {
       return t.status === 'TODO' && (t.priority === 'EXTREMELY_IMPORTANT' || t.priority === 'HIGH');
     }
-    if (selectedFilter === 'Today') return t.status === 'TODO';
-    if (selectedFilter === 'Upcoming') return t.status === 'TODO';
+    if (selectedFilter === 'Today') {
+      if (t.status !== 'TODO') return false;
+      if (!t.dueDate) return false;
+      return t.dueDate.slice(0, 10) === todayDateStr;
+    }
+    if (selectedFilter === 'Upcoming') {
+      if (t.status !== 'TODO') return false;
+      if (!t.dueDate) return true;
+      return t.dueDate.slice(0, 10) > todayDateStr;
+    }
     return true; // All
   });
 
@@ -34,9 +45,10 @@ export const TasksScreen: React.FC = () => {
       Alert.alert('Error', 'Please enter a task title');
       return;
     }
+    const currentUserId = useAuthStore.getState().user?.id || 'offline-user';
     const newTask: Task = {
       id: String(Date.now()),
-      userId: 'u1',
+      userId: currentUserId,
       title: newTitle.trim(),
       priority: newPriority,
       status: 'TODO',

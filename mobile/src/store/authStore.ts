@@ -219,6 +219,8 @@ export const useAuthStore = create<AuthState>()(
           gmailConnected: false,
           calendarConnected: false,
         });
+        useDashboardStore.getState().reset();
+        apiClient.clearToken();
         AsyncStorage.removeItem('glitchers-auth-storage').catch(() => null);
         AsyncStorage.removeItem('glitchers-auth-token').catch(() => null);
       },

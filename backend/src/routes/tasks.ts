@@ -77,8 +77,8 @@ export const taskRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get<{ Params: { id: string } }>('/:id/reminders', async (req, reply) => {
     const userId = req.userId!;
     const { id } = req.params;
-    const tasks = inMemoryStore.tasks.get(userId) || [];
-    const task = tasks.find((t) => t.id === id);
+    const tasks = await supabaseStore.getTasks(userId);
+    const task = tasks.find((t) => t.id === id) || (inMemoryStore.tasks.get(userId) || []).find((t) => t.id === id);
 
     if (!task) return reply.status(404).send({ error: 'Task not found' });
 

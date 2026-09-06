@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -39,11 +39,16 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
 
   const activeEmails = emails.filter((e) => !e.isDismissed && !dismissedNoticeIds.includes(e.id));
   const urgentEmail = activeEmails.find((e) => e.importance === 'CRITICAL' || e.importance === 'HIGH');
+  const lastActiveHashRef = useRef<string>('');
 
   const handleSummarizeEmails = async () => {
     setIsSummarizingEmails(true);
     try {
-      const res = await apiClient.summarizeEmails();
+      if (activeEmails.length === 0) {
+        setEmailBullets(['All university circulars and notices have been acknowledged & cleared! 🎉']);
+        return;
+      }
+      const res = await apiClient.summarizeEmails(activeEmails);
       if (res?.bullets && res.bullets.length > 0) {
         setEmailBullets(res.bullets);
         return;
@@ -54,24 +59,47 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
       setIsSummarizingEmails(false);
     }
 
-    if (activeEmails.length > 0 && emailBullets.length === 0) {
-      setEmailBullets(activeEmails.map((e) => `• [${e.importance}] ${e.subject}: ${e.summary}`));
+    if (activeEmails.length > 0) {
+      setEmailBullets(
+        activeEmails.slice(0, 4).map((e) => {
+          const imp = e.importance === 'HIGH' || e.importance === 'CRITICAL' ? `[${e.importance}] ` : '';
+          return `• ${imp}${e.subject}: ${e.summary}`;
+        })
+      );
+    } else {
+      setEmailBullets(['All university circulars and notices have been acknowledged & cleared! 🎉']);
     }
   };
 
   useEffect(() => {
     syncWithBackend().then(() => {
-      if (emailBullets.length === 0) {
+      const hasPredefined = emailBullets.some((b) =>
+        b.includes('Semester End Examination') ||
+        b.includes('Continuous Internal Assessment') ||
+        b.includes('Annual University Hackathon')
+      );
+      if (hasPredefined || emailBullets.length === 0) {
         handleSummarizeEmails();
       }
     });
   }, []);
 
   useEffect(() => {
-    if (activeEmails.length > 0 && emailBullets.length === 0) {
+    const activeHash = activeEmails.map((e) => e.id).sort().join(',');
+    const hasPredefined = emailBullets.some((b) =>
+      b.includes('Semester End Examination') ||
+      b.includes('Continuous Internal Assessment') ||
+      b.includes('Annual University Hackathon')
+    );
+
+    if (activeEmails.length > 0 && (lastActiveHashRef.current !== activeHash || hasPredefined)) {
+      lastActiveHashRef.current = activeHash;
       handleSummarizeEmails();
+    } else if (activeEmails.length === 0 && emailBullets.length > 0 && !emailBullets[0].includes('acknowledged & cleared')) {
+      lastActiveHashRef.current = '';
+      setEmailBullets(['All university circulars and notices have been acknowledged & cleared! 🎉']);
     }
-  }, [activeEmails.length]);
+  }, [activeEmails.length, activeEmails.map((e) => e.id).join(',')]);
 
   const pendingTasks = tasks.filter((t) => t.status === 'TODO');
 
@@ -85,7 +113,7 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
   const nextClassInfo = getNextUpcomingClass(classes, now);
   const nextClass = nextClassInfo.nextClass || {
     id: 'placeholder',
-    userId: 'u1',
+    userId: user?.id || 'offline-user',
     subjectName: 'No Classes Scheduled',
     day: 'MONDAY' as const,
     startTime: '--:--',
@@ -385,7 +413,7 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
                     {emailBullets.map((bullet, idx) => (
                       <View key={idx} style={styles.bulletItem}>
                         <Text style={styles.bulletDot}>•</Text>
-                        <Text style={styles.bulletText}>{bullet.replace(/^[•\-\*]\s*/, '')}</Text>
+                        <Text style={styles.bulletText}>{bullet.replace(/^[•\-\*]\s*/, '').replace(/\*\*/g, '')}</Text>
                       </View>
                     ))}
                   </View>

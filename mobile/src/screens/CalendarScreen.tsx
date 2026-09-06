@@ -9,6 +9,13 @@ export const CalendarScreen: React.FC = () => {
   const { classes, tasks } = useDashboardStore();
   const [filter, setFilter] = useState<'TODAY' | 'WEEK' | 'MONTH'>('TODAY');
 
+  const now = new Date();
+  const dayNames = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+  const todayDay = dayNames[now.getDay()];
+  const todayDateStr = now.toISOString().slice(0, 10);
+  const weekLater = new Date(now.getTime() + 7 * 86400000);
+  const monthLater = new Date(now.getTime() + 30 * 86400000);
+
   const events = [
     ...classes.map((c) => ({
       id: `c_${c.id}`,
@@ -16,6 +23,8 @@ export const CalendarScreen: React.FC = () => {
       time: `${c.day} • ${c.startTime} - ${c.endTime}`,
       location: `Room ${c.room || 'AB1-204'}`,
       type: 'CLASS' as const,
+      day: c.day.toUpperCase(),
+      dueDate: null as string | null,
     })),
     ...tasks.map((t) => ({
       id: `t_${t.id}`,
@@ -23,8 +32,34 @@ export const CalendarScreen: React.FC = () => {
       time: t.dueDate ? new Date(t.dueDate).toLocaleDateString() : 'Upcoming',
       location: 'University Portal',
       type: 'TASK' as const,
+      day: null as string | null,
+      dueDate: t.dueDate,
     })),
   ];
+
+  const filteredEvents = events.filter((ev) => {
+    if (filter === 'TODAY') {
+      if (ev.type === 'CLASS') return ev.day === todayDay;
+      if (ev.type === 'TASK') return ev.dueDate ? ev.dueDate.slice(0, 10) === todayDateStr : false;
+    }
+    if (filter === 'WEEK') {
+      if (ev.type === 'CLASS') return true;
+      if (ev.type === 'TASK') {
+        if (!ev.dueDate) return true;
+        const d = new Date(ev.dueDate);
+        return d >= now && d <= weekLater;
+      }
+    }
+    if (filter === 'MONTH') {
+      if (ev.type === 'CLASS') return true;
+      if (ev.type === 'TASK') {
+        if (!ev.dueDate) return true;
+        const d = new Date(ev.dueDate);
+        return d >= now && d <= monthLater;
+      }
+    }
+    return true;
+  });
 
   const handleSyncGoogleCalendar = () => {
     Alert.alert('Google Calendar Synced', 'All recurring classes and assignment deadlines synchronized with your Google Calendar.');
@@ -60,23 +95,32 @@ export const CalendarScreen: React.FC = () => {
 
         {/* Event Schedule Feed */}
         <ScrollView style={styles.content} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
-          {events.map((ev) => (
-            <View key={ev.id} style={styles.eventCard}>
-              <View style={styles.eventLeft}>
-                <View style={[styles.eventPill, ev.type === 'CLASS' ? styles.pillClass : styles.pillTask]}>
-                  <Text style={[styles.pillText, ev.type === 'CLASS' ? styles.pillTextClass : styles.pillTextTask]}>
-                    {ev.type}
-                  </Text>
-                </View>
-                <Text style={styles.eventTitle}>{ev.title}</Text>
-                <Text style={styles.eventTime}>{ev.time}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                  <Ionicons name="location-outline" size={12} color={designTokens.colors.primaryDark} />
-                  <Text style={styles.eventLoc}>{ev.location}</Text>
+          {filteredEvents.length === 0 ? (
+            <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+              <Ionicons name="calendar-outline" size={40} color={designTokens.colors.textMuted} />
+              <Text style={{ color: designTokens.colors.textSecondary, marginTop: 12, fontSize: 15, fontWeight: '600' }}>
+                No events found for {filter.toLowerCase()}
+              </Text>
+            </View>
+          ) : (
+            filteredEvents.map((ev) => (
+              <View key={ev.id} style={styles.eventCard}>
+                <View style={styles.eventLeft}>
+                  <View style={[styles.eventPill, ev.type === 'CLASS' ? styles.pillClass : styles.pillTask]}>
+                    <Text style={[styles.pillText, ev.type === 'CLASS' ? styles.pillTextClass : styles.pillTextTask]}>
+                      {ev.type}
+                    </Text>
+                  </View>
+                  <Text style={styles.eventTitle}>{ev.title}</Text>
+                  <Text style={styles.eventTime}>{ev.time}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                    <Ionicons name="location-outline" size={12} color={designTokens.colors.primaryDark} />
+                    <Text style={styles.eventLoc}>{ev.location}</Text>
+                  </View>
                 </View>
               </View>
-            </View>
-          ))}
+            ))
+          )}
         </ScrollView>
       </View>
     </GradientBackground>

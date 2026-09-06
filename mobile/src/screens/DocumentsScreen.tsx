@@ -4,6 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { designTokens } from '../theme/designTokens';
 import { GradientBackground } from '../components/common/GradientBackground';
 import { useDashboardStore } from '../store/dashboardStore';
+import { useAuthStore } from '../store/authStore';
 
 export const DocumentsScreen: React.FC = () => {
   const { addTask } = useDashboardStore();
@@ -35,9 +36,10 @@ export const DocumentsScreen: React.FC = () => {
         {
           text: 'Add Extracted Task',
           onPress: () => {
+            const currentUserId = useAuthStore.getState().user?.id || 'offline-user';
             addTask({
               id: String(Date.now()),
-              userId: 'u1',
+              userId: currentUserId,
               title: 'Complete DBMS Assignment from Circular',
               priority: 'HIGH',
               status: 'TODO',
@@ -84,7 +86,7 @@ export const DocumentsScreen: React.FC = () => {
                 onPress={() =>
                   addTask({
                     id: String(Date.now()),
-                    userId: 'u1',
+                    userId: useAuthStore.getState().user?.id || 'offline-user',
                     title: doc.actionItem,
                     priority: 'HIGH',
                     status: 'TODO',

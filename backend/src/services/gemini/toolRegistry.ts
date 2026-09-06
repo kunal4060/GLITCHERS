@@ -1,4 +1,5 @@
 import { inMemoryStore } from '../../repositories/inMemoryStore.js';
+import { supabaseStore } from '../../repositories/supabaseStore.js';
 import { calculateBudgetStatus, calculateDebtTotals } from '../finance/calculator.js';
 import type { Task, Expense, Debt } from '@glitchers/shared';
 import { randomUUID } from 'crypto';
@@ -28,7 +29,8 @@ export const toolRegistry = {
   get_today_schedule: async (userId: string): Promise<ToolExecutionResult> => {
     const days = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
     const currentDay = days[new Date().getDay()];
-    const classes = inMemoryStore.classes.get(userId) || [];
+    const dbClasses = await supabaseStore.getClasses(userId).catch(() => []);
+    const classes = dbClasses.length ? dbClasses : (inMemoryStore.classes.get(userId) || []);
     const todayClasses = classes.filter((c) => c.day === currentDay && !c.isCancelled);
 
     return {
@@ -45,7 +47,8 @@ export const toolRegistry = {
   get_tomorrow_schedule: async (userId: string): Promise<ToolExecutionResult> => {
     const days = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
     const tomorrowDay = days[(new Date().getDay() + 1) % 7];
-    const classes = inMemoryStore.classes.get(userId) || [];
+    const dbClasses = await supabaseStore.getClasses(userId).catch(() => []);
+    const classes = dbClasses.length ? dbClasses : (inMemoryStore.classes.get(userId) || []);
     const tomorrowClasses = classes.filter((c) => c.day === tomorrowDay && !c.isCancelled);
 
     return {
@@ -60,7 +63,8 @@ export const toolRegistry = {
   },
 
   get_tasks: async (userId: string, filter?: { status?: string }): Promise<ToolExecutionResult> => {
-    const tasks = inMemoryStore.tasks.get(userId) || [];
+    const dbTasks = await supabaseStore.getTasks(userId).catch(() => []);
+    const tasks = dbTasks.length ? dbTasks : (inMemoryStore.tasks.get(userId) || []);
     const filtered = filter?.status ? tasks.filter((t) => t.status === filter.status) : tasks;
     return {
       toolName: 'get_tasks',
@@ -86,6 +90,7 @@ export const toolRegistry = {
     };
     userTasks.push(newTask);
     inMemoryStore.tasks.set(userId, userTasks);
+    await supabaseStore.createTask(userId, newTask).catch(() => null);
 
     return {
       toolName: 'create_task',
@@ -99,7 +104,8 @@ export const toolRegistry = {
     userId: string,
     payload: { titleMatch?: string; priority: Task['priority'] }
   ): Promise<ToolExecutionResult> => {
-    const userTasks = inMemoryStore.tasks.get(userId) || [];
+    const dbTasks = await supabaseStore.getTasks(userId).catch(() => []);
+    const userTasks = dbTasks.length ? dbTasks : (inMemoryStore.tasks.get(userId) || []);
     const task = payload.titleMatch
       ? userTasks.find((t) => t.title.toLowerCase().includes(payload.titleMatch!.toLowerCase()))
       : userTasks[userTasks.length - 1]; // defaults to most recent task
@@ -108,6 +114,7 @@ export const toolRegistry = {
       return { toolName: 'update_task_priority', success: false, result: null, message: 'No matching task found to update priority.' };
     }
     task.priority = payload.priority;
+    if (task.id) await supabaseStore.updateTask(userId, task.id, { priority: payload.priority }).catch(() => null);
 
     return {
       toolName: 'update_task_priority',
@@ -118,7 +125,8 @@ export const toolRegistry = {
   },
 
   complete_task: async (userId: string, taskIdOrTitle: string): Promise<ToolExecutionResult> => {
-    const userTasks = inMemoryStore.tasks.get(userId) || [];
+    const dbTasks = await supabaseStore.getTasks(userId).catch(() => []);
+    const userTasks = dbTasks.length ? dbTasks : (inMemoryStore.tasks.get(userId) || []);
     const task = userTasks.find(
       (t) => t.id === taskIdOrTitle || t.title.toLowerCase().includes(taskIdOrTitle.toLowerCase())
     );
@@ -127,6 +135,7 @@ export const toolRegistry = {
     }
     task.status = 'COMPLETED';
     task.completedAt = new Date().toISOString();
+    if (task.id) await supabaseStore.updateTask(userId, task.id, { status: 'COMPLETED', completedAt: task.completedAt }).catch(() => null);
 
     return {
       toolName: 'complete_task',
@@ -137,7 +146,8 @@ export const toolRegistry = {
   },
 
   delete_task: async (userId: string, taskIdOrTitle: string): Promise<ToolExecutionResult> => {
-    const userTasks = inMemoryStore.tasks.get(userId) || [];
+    const dbTasks = await supabaseStore.getTasks(userId).catch(() => []);
+    const userTasks = dbTasks.length ? dbTasks : (inMemoryStore.tasks.get(userId) || []);
     const index = userTasks.findIndex(
       (t) => t.id === taskIdOrTitle || t.title.toLowerCase().includes(taskIdOrTitle.toLowerCase())
     );
@@ -146,6 +156,7 @@ export const toolRegistry = {
     }
     const [deleted] = userTasks.splice(index, 1);
     inMemoryStore.tasks.set(userId, userTasks);
+    if (deleted.id) await supabaseStore.deleteTask(userId, deleted.id).catch(() => null);
 
     return {
       toolName: 'delete_task',
@@ -156,7 +167,8 @@ export const toolRegistry = {
   },
 
   get_expenses: async (userId: string): Promise<ToolExecutionResult> => {
-    const expenses = inMemoryStore.expenses.get(userId) || [];
+    const dbExpenses = await supabaseStore.getExpenses(userId).catch(() => []);
+    const expenses = dbExpenses.length ? dbExpenses : (inMemoryStore.expenses.get(userId) || []);
     return {
       toolName: 'get_expenses',
       success: true,
@@ -181,6 +193,7 @@ export const toolRegistry = {
     };
     expenses.unshift(newExpense);
     inMemoryStore.expenses.set(userId, expenses);
+    await supabaseStore.createExpense(userId, newExpense).catch(() => null);
 
     return {
       toolName: 'add_expense',
@@ -191,7 +204,8 @@ export const toolRegistry = {
   },
 
   delete_expense: async (userId: string, expenseIdOrDesc: string): Promise<ToolExecutionResult> => {
-    const expenses = inMemoryStore.expenses.get(userId) || [];
+    const dbExpenses = await supabaseStore.getExpenses(userId).catch(() => []);
+    const expenses = dbExpenses.length ? dbExpenses : (inMemoryStore.expenses.get(userId) || []);
     const index = expenses.findIndex(
       (e) => e.id === expenseIdOrDesc || e.description.toLowerCase().includes(expenseIdOrDesc.toLowerCase())
     );
@@ -200,6 +214,7 @@ export const toolRegistry = {
     }
     const [deleted] = expenses.splice(index, 1);
     inMemoryStore.expenses.set(userId, expenses);
+    if (deleted.id) await supabaseStore.deleteExpense(userId, deleted.id).catch(() => null);
 
     return {
       toolName: 'delete_expense',
@@ -229,6 +244,7 @@ export const toolRegistry = {
     };
     expenses.unshift(newExpense);
     inMemoryStore.expenses.set(userId, expenses);
+    await supabaseStore.createExpense(userId, newExpense).catch(() => null);
 
     // 2. Record Debt: Person owes user half
     const debts = inMemoryStore.debts.get(userId) || [];
@@ -245,6 +261,7 @@ export const toolRegistry = {
     };
     debts.unshift(newDebt);
     inMemoryStore.debts.set(userId, debts);
+    await supabaseStore.createDebt(userId, newDebt).catch(() => null);
 
     return {
       toolName: 'split_expense',
@@ -255,8 +272,9 @@ export const toolRegistry = {
   },
 
   get_budget: async (userId: string): Promise<ToolExecutionResult> => {
-    const budget = inMemoryStore.budgets.get(userId);
-    const expenses = inMemoryStore.expenses.get(userId) || [];
+    const budget = (await supabaseStore.getBudget(userId).catch(() => null)) || inMemoryStore.budgets.get(userId);
+    const dbExpenses = await supabaseStore.getExpenses(userId).catch(() => []);
+    const expenses = dbExpenses.length ? dbExpenses : (inMemoryStore.expenses.get(userId) || []);
     if (!budget) {
       return { toolName: 'get_budget', success: false, result: null, message: 'No budget configured' };
     }
@@ -269,7 +287,8 @@ export const toolRegistry = {
   },
 
   get_debts: async (userId: string): Promise<ToolExecutionResult> => {
-    const debts = inMemoryStore.debts.get(userId) || [];
+    const dbDebts = await supabaseStore.getDebts(userId).catch(() => []);
+    const debts = dbDebts.length ? dbDebts : (inMemoryStore.debts.get(userId) || []);
     const totals = calculateDebtTotals(debts);
     return {
       toolName: 'get_debts',
@@ -299,6 +318,7 @@ export const toolRegistry = {
     };
     debts.unshift(newDebt);
     inMemoryStore.debts.set(userId, debts);
+    await supabaseStore.createDebt(userId, newDebt).catch(() => null);
 
     const rel = newDebt.type === 'OWES_ME' ? 'owes you' : 'you owe';
     return {
@@ -310,7 +330,8 @@ export const toolRegistry = {
   },
 
   mark_debt_paid: async (userId: string, personOrDebtId: string): Promise<ToolExecutionResult> => {
-    const debts = inMemoryStore.debts.get(userId) || [];
+    const dbDebts = await supabaseStore.getDebts(userId).catch(() => []);
+    const debts = dbDebts.length ? dbDebts : (inMemoryStore.debts.get(userId) || []);
     const debt = debts.find(
       (d) => d.id === personOrDebtId || d.person.toLowerCase().includes(personOrDebtId.toLowerCase())
     );
@@ -319,6 +340,7 @@ export const toolRegistry = {
     }
     debt.status = 'PAID';
     debt.paidAmount = debt.amount;
+    if (debt.id) await supabaseStore.updateDebt(userId, debt.id, { status: 'PAID', paidAmount: debt.amount }).catch(() => null);
 
     return {
       toolName: 'mark_debt_paid',
@@ -329,8 +351,9 @@ export const toolRegistry = {
   },
 
   get_important_emails: async (userId: string): Promise<ToolExecutionResult> => {
-    const emails = inMemoryStore.emails.get(userId) || [];
-    const important = emails.filter((e) => e.importance === 'HIGH' || e.importance === 'CRITICAL');
+    const dbEmails = await supabaseStore.getEmails(userId).catch(() => []);
+    const emails = dbEmails.length ? dbEmails : (inMemoryStore.emails.get(userId) || []);
+    const important = emails.filter((e) => !e.isDismissed && (e.importance === 'HIGH' || e.importance === 'CRITICAL'));
     return {
       toolName: 'get_important_emails',
       success: true,

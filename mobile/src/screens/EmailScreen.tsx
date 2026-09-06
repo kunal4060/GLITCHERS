@@ -30,7 +30,7 @@ export const EmailScreen: React.FC = () => {
   const handleCreateTaskFromEmail = (subject: string, summary: string) => {
     const newTask: Task = {
       id: String(Date.now()),
-      userId: 'u1',
+      userId: useAuthStore.getState().user?.id || 'offline-user',
       title: `Action: ${subject.replace(/🔴|⚠️|📢/g, '').trim()}`,
       description: summary,
       priority: 'HIGH',

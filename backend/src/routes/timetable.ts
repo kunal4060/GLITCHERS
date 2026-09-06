@@ -126,4 +126,11 @@ export const timetableRoutes: FastifyPluginAsync = async (fastify) => {
     const conflicts = detectScheduleConflicts(classes);
     return { conflicts };
   });
+
+  fastify.delete<{ Params: { id: string } }>('/classes/:id', async (req) => {
+    const userId = req.userId!;
+    const { id } = req.params;
+    await supabaseStore.deleteClass(userId, id);
+    return { success: true, id };
+  });
 };

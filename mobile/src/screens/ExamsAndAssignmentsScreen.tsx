@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { theme } from '../theme/theme';
+import { useAuthStore } from '../store/authStore';
 import type { Exam, Assignment } from '@glitchers/shared';
 
 export const ExamsAndAssignmentsScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'EXAMS' | 'ASSIGNMENTS'>('EXAMS');
+  const currentUserId = useAuthStore.getState().user?.id || 'offline-user';
 
   const [exams, setExams] = useState<Exam[]>([
     {
       id: 'ex_1',
-      userId: 'u1',
+      userId: currentUserId,
       subject: 'Database Management Systems (DBMS)',
       date: '2026-09-15',
       time: '10:00 AM',
@@ -19,7 +21,7 @@ export const ExamsAndAssignmentsScreen: React.FC = () => {
     },
     {
       id: 'ex_2',
-      userId: 'u1',
+      userId: currentUserId,
       subject: 'Operating Systems',
       date: '2026-09-18',
       time: '02:00 PM',
@@ -32,7 +34,7 @@ export const ExamsAndAssignmentsScreen: React.FC = () => {
   const [assignments, setAssignments] = useState<Assignment[]>([
     {
       id: 'as_1',
-      userId: 'u1',
+      userId: currentUserId,
       title: 'Machine Learning Project Proposal',
       subject: 'Artificial Intelligence',
       description: 'Submit 3-page problem formulation and dataset selection.',
@@ -43,7 +45,7 @@ export const ExamsAndAssignmentsScreen: React.FC = () => {
     },
     {
       id: 'as_2',
-      userId: 'u1',
+      userId: currentUserId,
       title: 'DBMS Normalization & BCNF Query Sheet',
       subject: 'Database Systems',
       description: 'Decompose schemas into 3NF and BCNF with functional dependencies.',
@@ -61,7 +63,7 @@ export const ExamsAndAssignmentsScreen: React.FC = () => {
     if (!newSubject.trim()) return;
     const newExam: Exam = {
       id: String(Date.now()),
-      userId: 'u1',
+      userId: currentUserId,
       subject: newSubject.trim(),
       date: '2026-09-25',
       time: '10:00 AM',
@@ -78,7 +80,7 @@ export const ExamsAndAssignmentsScreen: React.FC = () => {
     if (!newTitle.trim()) return;
     const newAsg: Assignment = {
       id: String(Date.now()),
-      userId: 'u1',
+      userId: currentUserId,
       title: newTitle.trim(),
       subject: 'Computer Science',
       deadline: '2026-09-14',

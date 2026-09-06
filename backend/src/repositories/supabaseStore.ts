@@ -562,6 +562,22 @@ export class SupabaseStore {
     return prepared;
   }
 
+  public async deleteClass(userId: string, classId: string): Promise<boolean> {
+    const classes = inMemoryStore.classes.get(userId) || [];
+    inMemoryStore.classes.set(userId, classes.filter((c) => c.id !== classId));
+
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        await supabase.from('classes').delete().eq('id', classId).eq('user_id', userId);
+        return true;
+      } catch (err) {
+        console.warn('SupabaseStore.deleteClass warning:', err);
+      }
+    }
+    return true;
+  }
+
   // ==========================================
   // DEBTS
   // ==========================================

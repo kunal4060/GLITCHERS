@@ -1,5 +1,14 @@
 import type { Task, Expense, Debt } from '@glitchers/shared';
 
+const getUserId = () => {
+  try {
+    const { useAuthStore } = require('../store/authStore');
+    return useAuthStore?.getState?.()?.user?.id || 'offline-user';
+  } catch {
+    return 'offline-user';
+  }
+};
+
 export interface HuggingFaceModelInfo {
   id: string;
   name: string;
@@ -195,9 +204,10 @@ export class OfflineAIEngine {
         person = withMatch[1].charAt(0).toUpperCase() + withMatch[1].slice(1);
       }
       const myShare = Math.round(totalAmount / 2);
+      const activeId = getUserId();
       const newExp: Expense = {
         id: String(Date.now()),
-        userId: 'u1',
+        userId: activeId,
         amount: myShare,
         category: 'FOOD',
         description: `Split Bill with ${person}`,
@@ -206,7 +216,7 @@ export class OfflineAIEngine {
       };
       const newDebt: Debt = {
         id: String(Date.now() + 1),
-        userId: 'u1',
+        userId: activeId,
         person,
         amount: totalAmount - myShare,
         type: 'OWES_ME',
@@ -250,7 +260,7 @@ export class OfflineAIEngine {
 
       const newExp: Expense = {
         id: String(Date.now()),
-        userId: 'u1',
+        userId: getUserId(),
         amount,
         category: cat,
         description: desc.charAt(0).toUpperCase() + desc.slice(1),
@@ -290,7 +300,7 @@ export class OfflineAIEngine {
 
       const newTask: Task = {
         id: String(Date.now()),
-        userId: 'u1',
+        userId: getUserId(),
         title: cleanTitle,
         priority,
         status: 'TODO',

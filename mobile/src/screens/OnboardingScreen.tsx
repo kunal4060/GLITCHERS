@@ -280,7 +280,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
     updateAcademics(cgpa, Number(creditsCompleted) || 0);
     setBudget({
       id: 'b1',
-      userId: user?.id || 'u1',
+      userId: user?.id || 'offline-user',
       monthlyLimit: Number(monthlyBudget) || 10000,
       currentSpending: 0,
       month: new Date().toISOString().slice(0, 7),

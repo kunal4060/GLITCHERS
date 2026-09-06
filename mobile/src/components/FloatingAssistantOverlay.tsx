@@ -87,7 +87,7 @@ export const FloatingAssistantOverlay: React.FC = () => {
         if (taskData) {
           addTask({
             id: taskData.id || String(Date.now()),
-            userId: 'u1',
+            userId: useAuthStore.getState().user?.id || 'offline-user',
             title: taskData.title || prompt,
             priority: taskData.priority || 'NORMAL',
             status: 'TODO',
@@ -101,7 +101,7 @@ export const FloatingAssistantOverlay: React.FC = () => {
         } else if (resAny.data) {
           addExpense({
             id: resAny.data.id || String(Date.now()),
-            userId: 'u1',
+            userId: useAuthStore.getState().user?.id || 'offline-user',
             amount: Number(resAny.data.amount) || 100,
             category: resAny.data.category || 'FOOD',
             description: resAny.data.description || prompt,
@@ -201,7 +201,7 @@ export const FloatingAssistantOverlay: React.FC = () => {
 
                     const newExp: Expense = {
                       id: String(Date.now()),
-                      userId: 'u1',
+                      userId: useAuthStore.getState().user?.id || 'offline-user',
                       amount,
                       category,
                       description: desc.charAt(0).toUpperCase() + desc.slice(1),
@@ -252,7 +252,7 @@ export const FloatingAssistantOverlay: React.FC = () => {
 
                     const newTask: Task = {
                       id: String(Date.now()),
-                      userId: 'u1',
+                      userId: useAuthStore.getState().user?.id || 'offline-user',
                       title: cleanTitle ? cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1) : 'Academic Task',
                       priority,
                       status: 'TODO',

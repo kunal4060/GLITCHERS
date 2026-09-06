@@ -11,6 +11,7 @@ import { AIGemSymbol } from '../components/common/AIGemSymbol';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useDashboardStore, type LoadedModelFileInfo } from '../store/dashboardStore';
 import { useFloatingStore } from '../store/floatingStore';
+import { useAuthStore } from '../store/authStore';
 import { apiClient } from '../api/client';
 import { offlineAiEngine, HUGGINGFACE_OFFLINE_MODELS, type HuggingFaceModelInfo } from '../services/offlineAiEngine';
 import type { Task, Expense, Debt } from '@glitchers/shared';
@@ -206,6 +207,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
     }
 
     try {
+      const currentUserId = useAuthStore.getState().user?.id || 'offline-user';
       // 1. Call real backend Fastify API
       const response = await apiClient.sendAIChat(textToSend);
       const resAny = response as any;
@@ -234,7 +236,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
         if (expData) {
           const newExp: Expense = {
             id: expData.id || String(Date.now()),
-            userId: 'u1',
+            userId: currentUserId,
             amount: Number(expData.amount) || 100,
             category: expData.category || 'FOOD',
             description: expData.description || textToSend,
@@ -259,7 +261,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
         if (taskData) {
           const newTask: Task = {
             id: taskData.id || String(Date.now()),
-            userId: 'u1',
+            userId: currentUserId,
             title: taskData.title || textToSend,
             priority: taskData.priority || 'NORMAL',
             status: 'TODO',
@@ -298,7 +300,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
         if (debtData) {
           const newDebt: Debt = {
             id: debtData.id || String(Date.now()),
-            userId: 'u1',
+            userId: currentUserId,
             person: debtData.person,
             type: debtData.type,
             amount: Number(debtData.amount),
@@ -352,7 +354,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
 
           const newExp: Expense = {
             id: String(Date.now()),
-            userId: 'u1',
+            userId: currentUserId,
             amount: amt,
             category: cat,
             description: desc,
@@ -382,7 +384,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
 
           const newTask: Task = {
             id: String(Date.now()),
-            userId: 'u1',
+            userId: currentUserId,
             title: cleanTitle ? cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1) : 'Academic Task',
             priority:
               lower.includes('urgent') || lower.includes('extremely')

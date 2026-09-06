@@ -8,6 +8,7 @@ import { StatusBadge } from '../components/common/StatusBadge';
 import { GradientBackground } from '../components/common/GradientBackground';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useDashboardStore } from '../store/dashboardStore';
+import { useAuthStore } from '../store/authStore';
 import type { ClassSession } from '@glitchers/shared';
 import { getClassStatus } from '../utils/timetableTimeUtils';
 import { apiClient } from '../api/client';
@@ -69,10 +70,11 @@ export const TimetableScreen: React.FC = () => {
       setIsScanning(false);
 
       if (result && result.classes && result.classes.length > 0) {
+        const currentUserId = useAuthStore.getState().user?.id || 'offline-user';
         const incoming = result.classes.map((c: any, idx: number) => ({
           ...c,
           id: String(Date.now() + idx),
-          userId: 'u1',
+          userId: currentUserId,
           isCancelled: false,
         }));
 
@@ -149,9 +151,10 @@ export const TimetableScreen: React.FC = () => {
       return;
     }
     const [start = '14:00', end = '15:00'] = newTime.split('-').map((s) => s.trim());
+    const currentUserId = useAuthStore.getState().user?.id || 'offline-user';
     const newSession: ClassSession = {
       id: String(Date.now()),
-      userId: 'u1',
+      userId: currentUserId,
       subjectName: newSubject.trim(),
       day: dayUpper as any,
       startTime: start,
@@ -175,7 +178,10 @@ export const TimetableScreen: React.FC = () => {
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: () => setClasses(classes.filter((c) => c.id !== id)),
+        onPress: () => {
+          setClasses(classes.filter((c) => c.id !== id));
+          apiClient.deleteClass(id).catch(() => null);
+        },
       },
     ]);
   };

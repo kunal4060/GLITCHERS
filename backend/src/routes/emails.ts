@@ -180,13 +180,21 @@ export const emailRoutes: FastifyPluginAsync = async (fastify) => {
 
   const handleSummarize = async (req: any) => {
     const userId = req.userId!;
-    await syncGmailIfAvailable(userId);
-    let allEmails = await supabaseStore.getEmails(userId);
+    const clientEmails: EmailSummary[] | undefined = req.body?.emails;
 
-    if (allEmails.length === 0) {
-      const defaults = getDefaultUniversityCirculars(userId);
-      await supabaseStore.saveEmails(userId, defaults);
-      allEmails = defaults;
+    let allEmails: EmailSummary[];
+    if (clientEmails && Array.isArray(clientEmails) && clientEmails.length > 0) {
+      allEmails = clientEmails;
+      await supabaseStore.saveEmails(userId, clientEmails).catch(() => null);
+    } else {
+      await syncGmailIfAvailable(userId);
+      allEmails = await supabaseStore.getEmails(userId);
+
+      if (allEmails.length === 0) {
+        const defaults = getDefaultUniversityCirculars(userId);
+        await supabaseStore.saveEmails(userId, defaults);
+        allEmails = defaults;
+      }
     }
 
     // Only summarize active (non-dismissed) notices
@@ -200,14 +208,21 @@ export const emailRoutes: FastifyPluginAsync = async (fastify) => {
       };
     }
 
-    // Try summarizing using Gemini 3.6 Flash with 15-second timeout
+    // Try summarizing using Gemini with candidate models fallback
     if (env.GEMINI_API_KEY && !env.GEMINI_API_KEY.startsWith('dev-')) {
+      const CANDIDATE_MODELS = [
+        'gemini-3.6-flash',
+        'gemini-flash-latest',
+        'gemini-2.5-flash',
+        'gemini-2.0-flash',
+        'gemini-1.5-flash',
+      ];
       try {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
 
         const emailText = emails
-          .map((e, idx) => `[Email ${idx + 1}] Subject: ${e.subject}\nSender: ${e.sender}\nUrgency: ${e.importance}\nContent: ${e.summary}`)
+          .map((e, idx) => `[Notice ${idx + 1}] Subject: ${e.subject}\nSender: ${e.sender}\nUrgency: ${e.importance}\nContent: ${e.summary}`)
           .join('\n\n');
 
         const prompt = `You are an AI university email summarizer for a college student.
@@ -222,28 +237,34 @@ Each bullet point MUST start with "• " and clearly highlight:
 - Any specific deadline, dates, time, or location
 - Urgency level if critical/high
 
-Do not include greetings or markdown headers, just the list of bullet points.`;
+Do not include markdown bold asterisks (no **), greetings, or markdown headers, just the list of bullet points starting with "• ".`;
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-flash-lite-latest' });
-        const generatePromise = model.generateContent(prompt).then((res) => res.response.text());
-        const timeoutPromise = new Promise<string>((_, reject) =>
-          setTimeout(() => reject(new Error('Gemini summarization timeout')), 15000)
-        );
+        for (const modelName of CANDIDATE_MODELS) {
+          try {
+            const model = genAI.getGenerativeModel({ model: modelName });
+            const generatePromise = model.generateContent(prompt).then((res) => res.response.text());
+            const timeoutPromise = new Promise<string>((_, reject) =>
+              setTimeout(() => reject(new Error('Gemini summarization timeout')), 10000)
+            );
 
-        const reply = await Promise.race([generatePromise, timeoutPromise]);
-        if (reply && reply.trim()) {
-          const lines = reply
-            .split('\n')
-            .map((l) => l.trim())
-            .filter((l) => l.startsWith('•') || l.startsWith('-') || l.startsWith('*'))
-            .map((l) => '• ' + l.replace(/^[-*•]\s*/, '').trim());
+            const reply = await Promise.race([generatePromise, timeoutPromise]);
+            if (reply && reply.trim()) {
+              const lines = reply
+                .split('\n')
+                .map((l) => l.trim())
+                .filter((l) => l.startsWith('•') || l.startsWith('-') || l.startsWith('*'))
+                .map((l) => '• ' + l.replace(/^[-*•]\s*/, '').replace(/\*\*/g, '').trim());
 
-          if (lines.length > 0) {
-            return {
-              bullets: lines,
-              summary: reply,
-              count: emails.length,
-            };
+              if (lines.length > 0) {
+                return {
+                  bullets: lines,
+                  summary: reply,
+                  count: emails.length,
+                };
+              }
+            }
+          } catch (modelErr: any) {
+            console.warn(`Gemini email summarizer ${modelName} failed (${modelErr.message}), trying next...`);
           }
         }
       } catch (err: any) {
@@ -251,10 +272,10 @@ Do not include greetings or markdown headers, just the list of bullet points.`;
       }
     }
 
-    // Deterministic fallback
-    const bullets = emails.map((e) => {
+    // Deterministic fallback using the actual active circulars
+    const bullets = emails.slice(0, 4).map((e) => {
       const imp = e.importance === 'HIGH' || e.importance === 'CRITICAL' ? `[${e.importance}] ` : '';
-      return `• ${imp}**${e.subject}**: ${e.summary}`;
+      return `• ${imp}${e.subject}: ${e.summary}`;
     });
 
     return {

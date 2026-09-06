@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { env } from '../../config/env.js';
 import { toolRegistry, type ToolExecutionResult } from './toolRegistry.js';
 import { inMemoryStore } from '../../repositories/inMemoryStore.js';
+import { supabaseStore } from '../../repositories/supabaseStore.js';
 import type { AIChatResponse, RouterIntentType, Expense } from '@glitchers/shared';
 import { randomUUID } from 'crypto';
 
@@ -23,9 +24,9 @@ export class GeminiAssistant {
   }
 
   /**
-   * Builds rich live student context from inMemoryStore for Gemini reasoning
+   * Builds rich live student context from Supabase and inMemoryStore for Gemini reasoning
    */
-  public buildStudentContext(userId: string) {
+  public async buildStudentContext(userId: string) {
     const now = new Date();
     const days = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
     const currentDay = days[now.getDay()];
@@ -35,13 +36,23 @@ export class GeminiAssistant {
     const yesterdayDateStr = yesterday.toISOString().slice(0, 10);
     const todayDateStr = now.toISOString().slice(0, 10);
 
-    const profile = inMemoryStore.profiles.get(userId);
-    const classes = inMemoryStore.classes.get(userId) || [];
-    const expenses = inMemoryStore.expenses.get(userId) || [];
-    const tasks = inMemoryStore.tasks.get(userId) || [];
-    const budget = inMemoryStore.budgets.get(userId);
-    const debts = inMemoryStore.debts.get(userId) || [];
-    const emails = inMemoryStore.emails.get(userId) || [];
+    const [dbProfile, dbClasses, dbExpenses, dbTasks, dbBudget, dbDebts, dbEmails] = await Promise.all([
+      supabaseStore.getProfile(userId).catch(() => null),
+      supabaseStore.getClasses(userId).catch(() => []),
+      supabaseStore.getExpenses(userId).catch(() => []),
+      supabaseStore.getTasks(userId).catch(() => []),
+      supabaseStore.getBudget(userId).catch(() => null),
+      supabaseStore.getDebts(userId).catch(() => []),
+      supabaseStore.getEmails(userId).catch(() => []),
+    ]);
+
+    const profile = dbProfile || inMemoryStore.profiles.get(userId);
+    const classes = dbClasses.length ? dbClasses : (inMemoryStore.classes.get(userId) || []);
+    const expenses = dbExpenses.length ? dbExpenses : (inMemoryStore.expenses.get(userId) || []);
+    const tasks = dbTasks.length ? dbTasks : (inMemoryStore.tasks.get(userId) || []);
+    const budget = dbBudget || inMemoryStore.budgets.get(userId);
+    const debts = dbDebts.length ? dbDebts : (inMemoryStore.debts.get(userId) || []);
+    const emails = dbEmails.length ? dbEmails : (inMemoryStore.emails.get(userId) || []);
 
     const todayExpenses = expenses.filter((e) => e.date.slice(0, 10) === todayDateStr);
     const yesterdayExpenses = expenses.filter((e) => e.date.slice(0, 10) === yesterdayDateStr);
@@ -258,7 +269,7 @@ export class GeminiAssistant {
     // -------------------------------------------------------------
     // PART 2: CHATGPT-GRADE REASONING + LIVE STUDENT CONTEXT + MATH
     // -------------------------------------------------------------
-    const context = this.buildStudentContext(userId);
+    const context = await this.buildStudentContext(userId);
 
     // Call Google Gemini API with cascade
     if (this.genAI) {
@@ -554,6 +565,7 @@ Rules:
     const userExpenses = inMemoryStore.expenses.get(userId) || [];
     userExpenses.unshift(newExpense);
     inMemoryStore.expenses.set(userId, userExpenses);
+    await supabaseStore.createExpense(userId, newExpense).catch(() => null);
 
     return {
       success: true,

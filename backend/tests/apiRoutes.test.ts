@@ -40,6 +40,35 @@ describe('Fastify Modular API Routes Integration Tests', () => {
     expect(body.classes.length).toBeGreaterThan(0);
   });
 
+  test('DELETE /api/timetable/classes/:id removes class', async () => {
+    const tempClass = {
+      id: 'temp_test_del_1',
+      userId: 'u1',
+      subjectName: 'Test Subject To Delete',
+      day: 'FRIDAY',
+      startTime: '07:00',
+      endTime: '08:00',
+      room: 'Room 999',
+      faculty: 'Dr. Tester',
+      classType: 'LECTURE',
+      isCancelled: false,
+    };
+    await app.inject({
+      method: 'POST',
+      url: '/api/timetable/manual',
+      payload: tempClass,
+    });
+
+    const delRes = await app.inject({
+      method: 'DELETE',
+      url: `/api/timetable/classes/${tempClass.id}`,
+    });
+    expect(delRes.statusCode).toBe(200);
+    const delBody = JSON.parse(delRes.body);
+    expect(delBody.success).toBe(true);
+    expect(delBody.id).toBe(tempClass.id);
+  });
+
   test('POST /api/tasks creates a task from natural text', async () => {
     const res = await app.inject({
       method: 'POST',

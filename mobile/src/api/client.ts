@@ -48,6 +48,11 @@ class ApiClient {
     return this.token;
   }
 
+  public clearToken() {
+    this.token = 'dev-token';
+    AsyncStorage.removeItem('glitchers-auth-token').catch(() => null);
+  }
+
   public async initializeToken(): Promise<string> {
     try {
       const stored = await AsyncStorage.getItem('glitchers-auth-token');
@@ -127,6 +132,10 @@ class ApiClient {
     return this.get<{ classes: any[] }>('/timetable/classes');
   }
 
+  public async deleteClass(classId: string) {
+    return this.delete<{ success: boolean; id: string }>(`/timetable/classes/${classId}`);
+  }
+
   public async fetchTasks() {
     return this.get<{ tasks: any[] }>('/tasks');
   }
@@ -195,8 +204,8 @@ class ApiClient {
     return this.patch<{ success: boolean }>(`/emails/${id}/dismiss`, { dismissed: false });
   }
 
-  public async summarizeEmails() {
-    return this.post<{ bullets: string[]; summary: string; count: number }>('/emails/summarize', {});
+  public async summarizeEmails(emails?: any[]) {
+    return this.post<{ bullets: string[]; summary: string; count: number }>('/emails/summarize', { emails });
   }
 
   public async syncEmails() {

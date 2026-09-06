@@ -4,6 +4,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ClassSession, Task, Expense, Budget, Debt, EmailSummary } from '@glitchers/shared';
 import { apiClient } from '../api/client';
 
+const getActiveUserId = () => {
+  try {
+    const { useAuthStore } = require('./authStore');
+    return useAuthStore?.getState?.()?.user?.id || 'offline-user';
+  } catch {
+    return 'offline-user';
+  }
+};
+
 export interface ChatMessage {
   id: string;
   sender: 'user' | 'assistant';
@@ -92,11 +101,26 @@ interface DashboardState {
   flushOfflineQueue: () => Promise<{ syncedCount: number }>;
 
   syncWithBackend: () => Promise<void>;
+  reset: () => void;
 }
 
 export const useDashboardStore = create<DashboardState>()(
   persist(
     (set, get) => ({
+      reset: () => {
+        set({
+          classes: [],
+          tasks: [],
+          expenses: [],
+          budget: null,
+          debts: [],
+          emails: [],
+          emailBullets: [],
+          dismissedNoticeIds: [],
+          chatMessages: [],
+          offlineSyncQueue: [],
+        });
+      },
       cgpa: '8.71',
       credits: 42,
       setCgpa: (cgpa) => set({ cgpa }),
@@ -200,7 +224,7 @@ export const useDashboardStore = create<DashboardState>()(
       expenses: [],
       budget: {
         id: 'b1',
-        userId: 'u1',
+        userId: getActiveUserId(),
         monthlyLimit: 10000,
         currentSpending: 0,
         month: new Date().toISOString().slice(0, 7),
@@ -307,9 +331,10 @@ export const useDashboardStore = create<DashboardState>()(
 
       splitExpense: (totalAmount, description, person) => {
         const half = Math.round(totalAmount / 2);
+        const currentUserId = getActiveUserId();
         const newExp: Expense = {
           id: String(Date.now()),
-          userId: 'u1',
+          userId: currentUserId,
           amount: totalAmount,
           category: 'FOOD',
           description: `${description} (Split with ${person})`,
@@ -318,7 +343,7 @@ export const useDashboardStore = create<DashboardState>()(
         };
         const newDebt: Debt = {
           id: String(Date.now() + 1),
-          userId: 'u1',
+          userId: currentUserId,
           person,
           type: 'OWES_ME',
           amount: half,
@@ -483,9 +508,15 @@ export const useDashboardStore = create<DashboardState>()(
               isDismissed: dismissedSet.has(e.id),
             }));
             if (mergedEmails.length > 0) {
+              const hasPredefinedBullets = get().emailBullets.some((b) =>
+                b.includes('Semester End Examination') ||
+                b.includes('Continuous Internal Assessment') ||
+                b.includes('Annual University Hackathon')
+              );
               set({
                 emails: mergedEmails,
                 dismissedNoticeIds: Array.from(dismissedSet),
+                ...(hasPredefinedBullets ? { emailBullets: [] } : {}),
               });
             }
           }
@@ -536,6 +567,7 @@ export const useDashboardStore = create<DashboardState>()(
         aiMode: state.aiMode,
         downloadedModels: state.downloadedModels,
         activeOfflineModel: state.activeOfflineModel,
+        offlineSyncQueue: state.offlineSyncQueue,
       }),
     }
   )

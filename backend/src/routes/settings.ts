@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { inMemoryStore } from '../repositories/inMemoryStore.js';
+import { supabaseStore } from '../repositories/supabaseStore.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 export const settingsRoutes: FastifyPluginAsync = async (fastify) => {
@@ -7,7 +8,7 @@ export const settingsRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.get('/', async (req) => {
     const userId = req.userId!;
-    const profile = inMemoryStore.profiles.get(userId);
+    const profile = (await supabaseStore.getProfile(userId)) || inMemoryStore.profiles.get(userId) || null;
     const prefs = inMemoryStore.preferences.get(userId) || {
       quietHours: { enabled: true, startTime: '23:00', endTime: '07:00', criticalBypass: true },
       universityDomain: 'university.edu',
