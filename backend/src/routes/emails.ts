@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { inMemoryStore } from '../repositories/inMemoryStore.js';
+import { supabaseStore } from '../repositories/supabaseStore.js';
 import { authMiddleware } from '../middleware/auth.js';
 import {
   isUniversityEmail,
@@ -10,6 +11,55 @@ import type { EmailSummary } from '@glitchers/shared';
 import { randomUUID } from 'crypto';
 import { env } from '../config/env.js';
 import { googleService } from '../services/google/googleService.js';
+
+function getDefaultUniversityCirculars(userId: string): EmailSummary[] {
+  return [
+    {
+      id: randomUUID(),
+      userId,
+      providerMessageId: `uni_circ_${Date.now()}_1`,
+      sender: 'dean.academics@university.edu',
+      subject: '🔴 Semester End Examination Schedule & Hall Ticket Issuance',
+      receivedAt: new Date(Date.now() - 3600000 * 4).toISOString(),
+      isUniversityRelated: true,
+      importance: 'CRITICAL',
+      summary: 'Semester End Exams commence from the 22nd. Verify your registered elective courses and download hall tickets before the deadline.',
+      actionRequired: true,
+      actionItem: 'Download hall ticket and verify course codes',
+      isProcessed: false,
+      isDismissed: false,
+    },
+    {
+      id: randomUUID(),
+      userId,
+      providerMessageId: `uni_circ_${Date.now()}_2`,
+      sender: 'department.head@university.edu',
+      subject: '⚠️ Continuous Internal Assessment & OS Lab Submission Due',
+      receivedAt: new Date(Date.now() - 3600000 * 20).toISOString(),
+      isUniversityRelated: true,
+      importance: 'HIGH',
+      summary: 'All students must push their Operating Systems lab projects and assignment reports to the university portal by Friday 5:00 PM.',
+      actionRequired: true,
+      actionItem: 'Submit lab code and report',
+      isProcessed: false,
+      isDismissed: false,
+    },
+    {
+      id: randomUUID(),
+      userId,
+      providerMessageId: `uni_circ_${Date.now()}_3`,
+      sender: 'events@university.edu',
+      subject: '📢 Annual University Hackathon & Innovation Showcase',
+      receivedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+      isUniversityRelated: true,
+      importance: 'NORMAL',
+      summary: 'Registrations are open for the annual 36-hour inter-college hackathon. Cash prizes and internship fast-tracks for top 3 teams.',
+      actionRequired: false,
+      isProcessed: false,
+      isDismissed: false,
+    },
+  ];
+}
 
 export const emailRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', authMiddleware);
@@ -40,10 +90,11 @@ export const emailRoutes: FastifyPluginAsync = async (fastify) => {
             summary: re.snippet || re.subject,
             actionRequired: sched.hasScheduleChange || urgency === 'CRITICAL' || urgency === 'HIGH',
             actionItem: sched.hasScheduleChange ? 'Schedule notice from faculty' : undefined,
-            isProcessed: true,
+            isProcessed: false,
+            isDismissed: false,
           };
         });
-        inMemoryStore.emails.set(userId, formatted);
+        await supabaseStore.saveEmails(userId, formatted);
       }
     } catch (err) {
       console.warn('Gmail sync warning:', err);
@@ -53,7 +104,15 @@ export const emailRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/', async (req) => {
     const userId = req.userId!;
     await syncGmailIfAvailable(userId);
-    const emails = inMemoryStore.emails.get(userId) || [];
+    let emails = await supabaseStore.getEmails(userId);
+
+    // If student has no emails yet, initialize default circulars in Supabase
+    if (emails.length === 0) {
+      const defaults = getDefaultUniversityCirculars(userId);
+      await supabaseStore.saveEmails(userId, defaults);
+      emails = defaults;
+    }
+
     return { emails };
   });
 
@@ -102,26 +161,46 @@ export const emailRoutes: FastifyPluginAsync = async (fastify) => {
       }
     }
 
+    const currentEmails = await supabaseStore.getEmails(userId);
+    await supabaseStore.saveEmails(userId, [emailSummary, ...currentEmails]);
+
     return {
       success: true,
       emailSummary,
     };
   });
 
+  fastify.patch<{ Params: { id: string }; Body: { dismissed?: boolean } }>('/:id/dismiss', async (req) => {
+    const userId = req.userId!;
+    const { id } = req.params;
+    const dismissed = req.body?.dismissed !== false;
+    await supabaseStore.dismissEmail(userId, id, dismissed);
+    return { success: true, id, dismissed, isDismissed: dismissed };
+  });
+
   const handleSummarize = async (req: any) => {
     const userId = req.userId!;
     await syncGmailIfAvailable(userId);
-    const emails = inMemoryStore.emails.get(userId) || [];
+    let allEmails = await supabaseStore.getEmails(userId);
+
+    if (allEmails.length === 0) {
+      const defaults = getDefaultUniversityCirculars(userId);
+      await supabaseStore.saveEmails(userId, defaults);
+      allEmails = defaults;
+    }
+
+    // Only summarize active (non-dismissed) notices
+    const emails = allEmails.filter((e) => !e.isDismissed && !(e as any).processed);
 
     if (emails.length === 0) {
       return {
-        bullets: ['No new emails or university announcements found.'],
-        summary: 'Your inbox is clear of academic notices.',
+        bullets: ['All university circulars and notices have been acknowledged & cleared! 🎉'],
+        summary: 'Your notices inbox is clear.',
         count: 0,
       };
     }
 
-    // Try summarizing using Gemini 3.6 Flash with 4-second timeout
+    // Try summarizing using Gemini 3.6 Flash with 15-second timeout
     if (env.GEMINI_API_KEY && !env.GEMINI_API_KEY.startsWith('dev-')) {
       try {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');

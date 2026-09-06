@@ -11,10 +11,12 @@ interface AuthState {
   currentOnboardingStep: OnboardingStep;
   onboardingData: Record<string, any>;
   user: UserProfile | null;
+  token: string | null;
   gmailConnected: boolean;
   calendarConnected: boolean;
   isLoading: boolean;
   setUser: (user: UserProfile | null) => void;
+  setToken: (token: string | null) => void;
   setAuthenticated: (status: boolean) => void;
   setGoogleConnections: (gmail: boolean, calendar: boolean) => void;
   setAvatarUrl: (avatarUrl: string | null) => void;
@@ -33,11 +35,20 @@ export const useAuthStore = create<AuthState>()(
       currentOnboardingStep: 'GOOGLE_AUTH',
       onboardingData: {},
       user: null,
+      token: null,
       gmailConnected: false,
       calendarConnected: false,
       isLoading: false,
 
-      setUser: (user) => set({ user, isAuthenticated: !!user }),
+      setUser: (user) => {
+        const token = get().token || (user?.id ? `jwt_${user.id}` : null);
+        if (token) apiClient.setToken(token);
+        set({ user, isAuthenticated: !!user, token });
+      },
+      setToken: (token) => {
+        if (token) apiClient.setToken(token);
+        set({ token });
+      },
       setAuthenticated: (isAuthenticated) => set({ isAuthenticated }),
       setGoogleConnections: (gmailConnected, calendarConnected) => set({ gmailConnected, calendarConnected }),
       setAvatarUrl: (avatarUrl) =>
@@ -86,12 +97,18 @@ export const useAuthStore = create<AuthState>()(
               .join(' ') || 'Student User';
           }
 
+          let activeToken = token;
+
           // 1. Authenticate with backend /auth/login or /auth/me
           let user: UserProfile | null = null;
           try {
             const loginRes = await apiClient.login(safeEmail, safeName);
             if (loginRes?.user) {
               user = loginRes.user;
+            }
+            if (loginRes?.accessToken) {
+              activeToken = loginRes.accessToken;
+              apiClient.setToken(activeToken);
             }
           } catch {
             const meRes = await apiClient.get<{ user: UserProfile }>('/auth/me').catch(() => null);
@@ -102,8 +119,9 @@ export const useAuthStore = create<AuthState>()(
             const res = await apiClient.post<{ accessToken: string; user: UserProfile }>('/auth/google/callback', {
               code: 'mock_google_oauth_code',
             }).catch(() => null);
-            if (res?.accessToken && !token) {
-              apiClient.setToken(res.accessToken);
+            if (res?.accessToken) {
+              activeToken = res.accessToken;
+              apiClient.setToken(activeToken);
             }
             user = res?.user || {
               id: `usr_${safeEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
@@ -124,6 +142,11 @@ export const useAuthStore = create<AuthState>()(
             };
           }
 
+          if (!activeToken && user?.id) {
+            activeToken = `jwt_${user.id}`;
+            apiClient.setToken(activeToken);
+          }
+
           // Check if this user had previously completed onboarding
           const statusRes = await apiClient.getOnboardingStatus().catch(() => null);
           const isComplete = statusRes?.isComplete ?? user.isOnboardingComplete ?? false;
@@ -139,6 +162,7 @@ export const useAuthStore = create<AuthState>()(
           set({
             isAuthenticated: true,
             user: { ...user, isOnboardingComplete: isComplete },
+            token: activeToken || null,
             isOnboardingComplete: isComplete,
             currentOnboardingStep: step,
             onboardingData: statusRes?.state?.data || {},
@@ -157,6 +181,10 @@ export const useAuthStore = create<AuthState>()(
 
       checkSession: async () => {
         try {
+          const currentToken = get().token || (get().user?.id ? `jwt_${get().user!.id}` : null);
+          if (currentToken) {
+            apiClient.setToken(currentToken);
+          }
           const res = await apiClient.get<{ user: UserProfile }>('/auth/me').catch(() => null);
           if (res?.user) {
             const statusRes = await apiClient.getOnboardingStatus().catch(() => null);
@@ -164,6 +192,7 @@ export const useAuthStore = create<AuthState>()(
             set({
               isAuthenticated: true,
               user: res.user,
+              token: currentToken,
               isOnboardingComplete: isComplete,
               currentOnboardingStep: (statusRes?.state?.currentStep as OnboardingStep) || (isComplete ? 'COMPLETE' : 'GOOGLE_SERVICES'),
               onboardingData: statusRes?.state?.data || {},
@@ -184,22 +213,34 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: false,
           isOnboardingComplete: false,
           user: null,
+          token: null,
           currentOnboardingStep: 'GOOGLE_AUTH',
           onboardingData: {},
           gmailConnected: false,
           calendarConnected: false,
         });
         AsyncStorage.removeItem('glitchers-auth-storage').catch(() => null);
+        AsyncStorage.removeItem('glitchers-auth-token').catch(() => null);
       },
     }),
     {
       name: 'glitchers-auth-storage',
       storage: createJSONStorage(() => AsyncStorage),
+      onRehydrateStorage: () => (state) => {
+        if (state?.token) {
+          apiClient.setToken(state.token);
+        } else if (state?.user?.id) {
+          const derived = `jwt_${state.user.id}`;
+          state.token = derived;
+          apiClient.setToken(derived);
+        }
+      },
       partialize: (state) => ({
         isAuthenticated: state.isAuthenticated,
         isOnboardingComplete: state.isOnboardingComplete,
         currentOnboardingStep: state.currentOnboardingStep,
         user: state.user,
+        token: state.token,
         gmailConnected: state.gmailConnected,
         calendarConnected: state.calendarConnected,
         onboardingData: state.onboardingData,

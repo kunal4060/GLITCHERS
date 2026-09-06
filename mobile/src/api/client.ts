@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { AIChatResponse } from '@glitchers/shared';
 
 const PROD_HOST = 'https://glitchers-backend.onrender.com/api';
@@ -26,6 +27,10 @@ class ApiClient {
   private baseUrl: string = DEFAULT_HOST;
   private token: string = 'dev-token';
 
+  constructor() {
+    this.initializeToken().catch(() => null);
+  }
+
   public setBaseUrl(url: string) {
     this.baseUrl = url.endsWith('/') ? url.slice(0, -1) : url;
   }
@@ -36,6 +41,24 @@ class ApiClient {
 
   public setToken(token: string) {
     this.token = token;
+    AsyncStorage.setItem('glitchers-auth-token', token).catch(() => null);
+  }
+
+  public getToken(): string {
+    return this.token;
+  }
+
+  public async initializeToken(): Promise<string> {
+    try {
+      const stored = await AsyncStorage.getItem('glitchers-auth-token');
+      if (stored && stored.trim()) {
+        this.token = stored.trim();
+        return this.token;
+      }
+    } catch {
+      // ignore
+    }
+    return this.token;
   }
 
   public async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -162,6 +185,14 @@ class ApiClient {
 
   public async fetchEmails() {
     return this.get<{ emails: any[] }>('/emails');
+  }
+
+  public async dismissEmailNotice(id: string) {
+    return this.patch<{ success: boolean }>(`/emails/${id}/dismiss`, { dismissed: true });
+  }
+
+  public async restoreEmailNotice(id: string) {
+    return this.patch<{ success: boolean }>(`/emails/${id}/dismiss`, { dismissed: false });
   }
 
   public async summarizeEmails() {

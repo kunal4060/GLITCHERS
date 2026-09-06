@@ -9,7 +9,7 @@ import { useDashboardStore } from '../store/dashboardStore';
 import { getNextUpcomingClass } from '../utils/timetableTimeUtils';
 
 export const NotificationsScreen: React.FC = () => {
-  const { classes, tasks, emails } = useDashboardStore();
+  const { classes, tasks, emails, dismissedNoticeIds } = useDashboardStore();
   const now = new Date();
 
   // Dynamic notification generation
@@ -49,8 +49,9 @@ export const NotificationsScreen: React.FC = () => {
       });
     });
 
-  // 3. Important University notices
+  // 3. Important University notices (only active, unticked notices)
   emails
+    .filter((e) => !e.isDismissed && !dismissedNoticeIds.includes(e.id))
     .filter((e) => e.importance === 'CRITICAL' || e.importance === 'HIGH')
     .slice(0, 2)
     .forEach((e) => {

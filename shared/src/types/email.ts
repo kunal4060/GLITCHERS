@@ -35,6 +35,8 @@ export const EmailSummarySchema = z.object({
   extractedDeadline: z.string().datetime().nullable().optional(),
   scheduleChange: ScheduleChangeExtractionSchema.nullable().optional(),
   isProcessed: z.boolean().default(true),
+  isDismissed: z.boolean().default(false).optional(),
+  dismissedAt: z.string().datetime().nullable().optional(),
 });
 
 export type EmailSummary = z.infer<typeof EmailSummarySchema>;

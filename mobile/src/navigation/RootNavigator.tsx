@@ -23,6 +23,7 @@ import { PrivacyScreen } from '../screens/PrivacyScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { useAuthStore } from '../store/authStore';
+import { apiClient } from '../api/client';
 
 import { designTokens } from '../theme/designTokens';
 
@@ -216,8 +217,20 @@ function MainTabs({ navigation }: { navigation: any }) {
 }
 
 export const RootNavigator: React.FC = () => {
-  const { isAuthenticated, isOnboardingComplete, completeOnboarding, loginWithGoogle } = useAuthStore();
+  const { isAuthenticated, isOnboardingComplete, completeOnboarding, loginWithGoogle, checkSession, token, user } = useAuthStore();
   const [showManualOnboarding, setShowManualOnboarding] = useState(false);
+
+  React.useEffect(() => {
+    // Restore and verify active session on startup
+    if (isAuthenticated) {
+      if (token) {
+        apiClient.setToken(token);
+      } else if (user?.id) {
+        apiClient.setToken(`jwt_${user.id}`);
+      }
+      checkSession().catch(() => null);
+    }
+  }, [isAuthenticated]);
 
   React.useEffect(() => {
     // Catch Google OAuth redirect credentials from URL query params (web only)

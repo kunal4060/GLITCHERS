@@ -12,12 +12,12 @@ import type { ClassSession } from '@glitchers/shared';
 import { getClassStatus } from '../utils/timetableTimeUtils';
 import { apiClient } from '../api/client';
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 const getTodayDayName = () => {
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const today = dayNames[new Date().getDay()];
-  return DAYS.includes(today) ? today : 'Monday';
+  return today;
 };
 
 export const TimetableScreen: React.FC = () => {
@@ -189,7 +189,7 @@ export const TimetableScreen: React.FC = () => {
           <View>
             <Text style={styles.headerTitle}>Timetable</Text>
             <Text style={styles.headerSubtitle}>
-              {dayClasses.length} {dayClasses.length === 1 ? 'class' : 'classes'} on {selectedDay}
+              {dayClasses.length === 0 ? `Day is Off on ${selectedDay}` : `${dayClasses.length} ${dayClasses.length === 1 ? 'class' : 'classes'} on ${selectedDay}`}
             </Text>
           </View>
 
@@ -253,9 +253,9 @@ export const TimetableScreen: React.FC = () => {
         <ScrollView contentContainerStyle={styles.scheduleList}>
           {dayClasses.length === 0 ? (
             <View style={styles.emptyCard}>
-              <Ionicons name="cafe-outline" size={32} color="#64748B" style={{ marginBottom: 8 }} />
-              <Text style={styles.emptyTitle}>No classes scheduled for {selectedDay}</Text>
-              <Text style={styles.emptySub}>Enjoy your free academic hours or catch up on project work.</Text>
+              <Ionicons name="sunny-outline" size={36} color={designTokens.colors.primaryDark} style={{ marginBottom: 8 }} />
+              <Text style={styles.emptyTitle}>Day is Off • {selectedDay}</Text>
+              <Text style={styles.emptySub}>No classes scheduled for {selectedDay}. Enjoy your free time, recharge, or catch up on project work.</Text>
             </View>
           ) : (
             dayClasses.map((item, index) => {

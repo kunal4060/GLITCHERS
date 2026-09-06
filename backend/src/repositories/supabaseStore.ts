@@ -7,6 +7,8 @@ import type {
   Task,
   Expense,
   Debt,
+  EmailSummary,
+  Budget,
 } from '@glitchers/shared';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -803,6 +805,167 @@ export class SupabaseStore {
       }
     }
     return true;
+  }
+
+  // ==========================================
+  // EMAILS / UNIVERSITY NOTICES
+  // ==========================================
+
+  public async getEmails(userId: string): Promise<EmailSummary[]> {
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        const { data, error } = await supabase
+          .from('emails')
+          .select('*')
+          .eq('user_id', userId)
+          .order('received_at', { ascending: false });
+
+        if (data && !error && data.length > 0) {
+          const list: EmailSummary[] = data.map((d) => ({
+            id: d.id,
+            userId: d.user_id,
+            providerMessageId: d.provider_message_id,
+            sender: d.sender,
+            subject: d.subject,
+            receivedAt: d.received_at,
+            isUniversityRelated: d.is_university_related ?? true,
+            importance: d.importance || 'NORMAL',
+            summary: d.summary || d.subject,
+            actionRequired: d.action_required ?? false,
+            actionItem: d.action_item || undefined,
+            extractedDeadline: d.extracted_deadline || undefined,
+            scheduleChange: d.schedule_change || undefined,
+            isProcessed: d.processed ?? true,
+            isDismissed: d.processed ?? false,
+            dismissedAt: d.processed ? d.created_at : undefined,
+          }));
+          inMemoryStore.emails.set(userId, list);
+          return list;
+        }
+      } catch (err) {
+        console.warn('SupabaseStore.getEmails error:', err);
+      }
+    }
+
+    return inMemoryStore.emails.get(userId) || [];
+  }
+
+  public async saveEmails(userId: string, emails: EmailSummary[]): Promise<void> {
+    const prepared: EmailSummary[] = emails.map((e) => ({
+      ...e,
+      id: ensureUUID(e.id),
+      userId,
+    }));
+
+    inMemoryStore.emails.set(userId, prepared);
+
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId) && prepared.length > 0) {
+      try {
+        const rows = prepared.map((e) => ({
+          id: e.id,
+          user_id: userId,
+          provider_message_id: e.providerMessageId || `msg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          sender: e.sender,
+          subject: e.subject,
+          received_at: e.receivedAt || new Date().toISOString(),
+          is_university_related: e.isUniversityRelated ?? true,
+          importance: e.importance || 'NORMAL',
+          summary: e.summary || e.subject,
+          action_required: e.actionRequired ?? false,
+          action_item: e.actionItem || null,
+          extracted_deadline: e.extractedDeadline || null,
+          schedule_change: e.scheduleChange || null,
+          processed: e.isDismissed ?? (e.isProcessed ?? false),
+        }));
+
+        await supabase.from('emails').upsert(rows, { onConflict: 'id' });
+      } catch (err) {
+        console.warn('SupabaseStore.saveEmails warning:', err);
+      }
+    }
+  }
+
+  public async dismissEmail(userId: string, emailId: string, dismissed: boolean = true): Promise<boolean> {
+    const list = inMemoryStore.emails.get(userId) || [];
+    const updatedList = list.map((e) => (e.id === emailId ? { ...e, isDismissed: dismissed, isProcessed: dismissed } : e));
+    inMemoryStore.emails.set(userId, updatedList);
+
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        await supabase
+          .from('emails')
+          .update({ processed: dismissed })
+          .eq('id', emailId)
+          .eq('user_id', userId);
+      } catch (err) {
+        console.warn('SupabaseStore.dismissEmail warning:', err);
+      }
+    }
+    return true;
+  }
+
+  // ==========================================
+  // BUDGETS
+  // ==========================================
+
+  public async getBudget(userId: string): Promise<Budget | null> {
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        const { data, error } = await supabase
+          .from('budgets')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (data && !error) {
+          const budget: Budget = {
+            id: data.id,
+            userId: data.user_id,
+            monthlyLimit: Number(data.monthly_limit),
+            currentSpending: 0,
+            month: data.month,
+            categoryLimits: data.category_limits || {},
+            alertThresholds: data.alert_thresholds || [75, 90, 100],
+          };
+          inMemoryStore.budgets.set(userId, budget);
+          return budget;
+        }
+      } catch (err) {
+        console.warn('SupabaseStore.getBudget error:', err);
+      }
+    }
+
+    return inMemoryStore.budgets.get(userId) || null;
+  }
+
+  public async saveBudget(userId: string, budget: Budget): Promise<Budget> {
+    const validId = ensureUUID(budget.id);
+    const prepared: Budget = { ...budget, id: validId, userId };
+    inMemoryStore.budgets.set(userId, prepared);
+
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        await supabase.from('budgets').upsert({
+          id: validId,
+          user_id: userId,
+          monthly_limit: Number(prepared.monthlyLimit),
+          month: prepared.month,
+          category_limits: prepared.categoryLimits || {},
+          alert_thresholds: prepared.alertThresholds || [75, 90, 100],
+        }, { onConflict: 'user_id,month' });
+      } catch (err) {
+        console.warn('SupabaseStore.saveBudget warning:', err);
+      }
+    }
+
+    return prepared;
   }
 }
 

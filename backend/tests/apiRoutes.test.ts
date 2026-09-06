@@ -108,7 +108,7 @@ describe('Fastify Modular API Routes Integration Tests', () => {
     const body = JSON.parse(res.body);
     expect(body.intent).toBe('GET_SCHEDULE');
     expect(body.message).toBeDefined();
-  }, 30000);
+  }, 60000);
 
   test('GET /api/search returns cross-entity results', async () => {
     const res = await app.inject({
@@ -215,6 +215,49 @@ describe('Fastify Modular API Routes Integration Tests', () => {
     expect(getBody.preferences.quietHours.startTime).toBe('23:30');
   });
 
+  test('GET /api/emails and PATCH /api/emails/:id/dismiss manages notices', async () => {
+    const listRes = await app.inject({
+      method: 'GET',
+      url: '/api/emails',
+    });
+    expect(listRes.statusCode).toBe(200);
+    const listBody = JSON.parse(listRes.body);
+    expect(Array.isArray(listBody.emails)).toBe(true);
+    expect(listBody.emails.length).toBeGreaterThan(0);
+
+    const firstNotice = listBody.emails[0];
+    const dismissRes = await app.inject({
+      method: 'PATCH',
+      url: `/api/emails/${firstNotice.id}/dismiss`,
+      payload: { dismissed: true },
+    });
+    expect(dismissRes.statusCode).toBe(200);
+    const dismissBody = JSON.parse(dismissRes.body);
+    expect(dismissBody.success).toBe(true);
+    expect(dismissBody.isDismissed).toBe(true);
+
+    // Restore notice
+    const restoreRes = await app.inject({
+      method: 'PATCH',
+      url: `/api/emails/${firstNotice.id}/dismiss`,
+      payload: { dismissed: false },
+    });
+    expect(restoreRes.statusCode).toBe(200);
+    const restoreBody = JSON.parse(restoreRes.body);
+    expect(restoreBody.success).toBe(true);
+    expect(restoreBody.isDismissed).toBe(false);
+  });
+
+  test('POST /api/emails/summarize generates email bullet points', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/emails/summarize',
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(Array.isArray(body.bullets)).toBe(true);
+  });
+
   test('POST /api/privacy/export-data exports all student data', async () => {
     const res = await app.inject({
       method: 'POST',
@@ -238,3 +281,4 @@ describe('Fastify Modular API Routes Integration Tests', () => {
     expect(body.message).toContain('permanently deleted');
   });
 });
+

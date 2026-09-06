@@ -25,6 +25,9 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
     expenses,
     budget,
     emails,
+    emailBullets,
+    setEmailBullets,
+    dismissedNoticeIds,
     isLoading,
     avatarUrl,
     syncWithBackend,
@@ -32,8 +35,10 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
   } = useDashboardStore();
   const { gmailConnected, user } = useAuthStore();
 
-  const [emailBullets, setEmailBullets] = useState<string[]>([]);
   const [isSummarizingEmails, setIsSummarizingEmails] = useState(false);
+
+  const activeEmails = emails.filter((e) => !e.isDismissed && !dismissedNoticeIds.includes(e.id));
+  const urgentEmail = activeEmails.find((e) => e.importance === 'CRITICAL' || e.importance === 'HIGH');
 
   const handleSummarizeEmails = async () => {
     setIsSummarizingEmails(true);
@@ -49,25 +54,26 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
       setIsSummarizingEmails(false);
     }
 
-    if (emails.length > 0) {
-      setEmailBullets(emails.map((e) => `• [${e.importance}] ${e.subject}: ${e.summary}`));
+    if (activeEmails.length > 0 && emailBullets.length === 0) {
+      setEmailBullets(activeEmails.map((e) => `• [${e.importance}] ${e.subject}: ${e.summary}`));
     }
   };
 
   useEffect(() => {
     syncWithBackend().then(() => {
-      handleSummarizeEmails();
+      if (emailBullets.length === 0) {
+        handleSummarizeEmails();
+      }
     });
   }, []);
 
   useEffect(() => {
-    if (emails.length > 0 && emailBullets.length === 0) {
+    if (activeEmails.length > 0 && emailBullets.length === 0) {
       handleSummarizeEmails();
     }
-  }, [emails.length]);
+  }, [activeEmails.length]);
 
   const pendingTasks = tasks.filter((t) => t.status === 'TODO');
-  const urgentEmail = emails.find((e) => e.importance === 'CRITICAL' || e.importance === 'HIGH');
 
   // Real-time dynamic timetable calculations
   const now = new Date();
@@ -186,36 +192,62 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
             <StatCard
               variant="cream"
               title={`${urgentEmail ? 1 : 0} Important\nNotice`}
-              subtext={gmailConnected ? (urgentEmail ? 'Official' : 'All clear') : 'Not linked'}
+              subtext={gmailConnected ? (urgentEmail ? 'Official' : `${activeEmails.length} unread`) : 'Not linked'}
               icon={<Ionicons name="mail-outline" size={20} color={designTokens.colors.textPrimary} />}
               onPress={() => navigation?.navigate('Email')}
             />
           </View>
 
           {/* 4. Large Next Class Feature Card */}
-          <GlassCard
-            variant="hero"
-            style={styles.heroCard}
-            onPress={() => navigation?.navigate('Timetable')}
-          >
-            <View style={styles.heroTopRow}>
-              <Text style={styles.heroLabel}>
-                {nextClassInfo.isOngoing ? 'CURRENT CLASS' : nextClassInfo.isToday ? 'NEXT CLASS' : 'UPCOMING CLASS'}
+          {todayClasses.length === 0 ? (
+            <GlassCard
+              variant="hero"
+              style={styles.heroCard}
+              onPress={() => navigation?.navigate('Timetable')}
+            >
+              <View style={styles.heroTopRow}>
+                <Text style={styles.heroLabel}>DAY OFF</Text>
+                <StatusBadge label="Schedule Clear 🌴" variant="safe" />
+              </View>
+
+              <Text style={styles.heroSubjectTitle}>
+                Day is Off • No Classes Today
               </Text>
-              <StatusBadge label={nextClassInfo.statusLabel} variant={nextClassInfo.badgeVariant} />
-            </View>
 
-            <Text style={styles.heroSubjectTitle}>
-              {nextClass.subjectName.replace('\\n', '\n')}
-            </Text>
+              <Text style={styles.heroMetaText}>
+                No academic lectures scheduled for today. Enjoy your free time or catch up on project work!
+              </Text>
+              {nextClassInfo.nextClass && nextClassInfo.nextClass.id !== 'placeholder' ? (
+                <Text style={[styles.heroFacultyText, { marginTop: 8, opacity: 0.9 }]}>
+                  Next class: {nextClassInfo.nextClass.subjectName} ({nextClassInfo.statusLabel})
+                </Text>
+              ) : null}
+            </GlassCard>
+          ) : (
+            <GlassCard
+              variant="hero"
+              style={styles.heroCard}
+              onPress={() => navigation?.navigate('Timetable')}
+            >
+              <View style={styles.heroTopRow}>
+                <Text style={styles.heroLabel}>
+                  {nextClassInfo.isOngoing ? 'CURRENT CLASS' : nextClassInfo.isToday ? 'NEXT CLASS' : 'UPCOMING CLASS'}
+                </Text>
+                <StatusBadge label={nextClassInfo.statusLabel} variant={nextClassInfo.badgeVariant} />
+              </View>
 
-            <Text style={styles.heroMetaText}>
-              {nextClass.startTime} – {nextClass.endTime} • Room: {nextClass.room || 'AB1-204'}
-            </Text>
-            <Text style={styles.heroFacultyText}>
-              Faculty: {nextClass.faculty || 'Faculty'}
-            </Text>
-          </GlassCard>
+              <Text style={styles.heroSubjectTitle}>
+                {nextClass.subjectName.replace('\\n', '\n')}
+              </Text>
+
+              <Text style={styles.heroMetaText}>
+                {nextClass.startTime} – {nextClass.endTime} • Room: {nextClass.room || 'AB1-204'}
+              </Text>
+              <Text style={styles.heroFacultyText}>
+                Faculty: {nextClass.faculty || 'Faculty'}
+              </Text>
+            </GlassCard>
+          )}
 
         {/* 5. Priority Deadlines Section */}
         <View style={styles.sectionHeaderRow}>
@@ -371,7 +403,7 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
                     onPress={() => navigation?.navigate('Email')}
                     activeOpacity={0.75}
                   >
-                    <Text style={styles.viewNoticesBtnText}>View All University Notices ({emails.length}) →</Text>
+                    <Text style={styles.viewNoticesBtnText}>View All University Notices ({activeEmails.length}) →</Text>
                   </TouchableOpacity>
                 </View>
               </>

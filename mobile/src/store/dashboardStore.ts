@@ -29,6 +29,8 @@ interface DashboardState {
   budget: Budget | null;
   debts: Debt[];
   emails: EmailSummary[];
+  emailBullets: string[];
+  dismissedNoticeIds: string[];
   chatMessages: ChatMessage[];
   isLoading: boolean;
   isBackendConnected: boolean;
@@ -39,6 +41,9 @@ interface DashboardState {
   setBudget: (budget: Budget | null) => void;
   setDebts: (debts: Debt[]) => void;
   setEmails: (emails: EmailSummary[]) => void;
+  setEmailBullets: (bullets: string[]) => void;
+  dismissNotice: (noticeId: string) => void;
+  restoreNotice: (noticeId: string) => void;
   setChatMessages: (chatMessages: ChatMessage[]) => void;
   addChatMessage: (message: ChatMessage) => void;
   clearChatMessages: () => void;
@@ -203,6 +208,8 @@ export const useDashboardStore = create<DashboardState>()(
       },
       debts: [],
       emails: [],
+      emailBullets: [],
+      dismissedNoticeIds: [],
       chatMessages: [],
       isLoading: false,
       isBackendConnected: false,
@@ -213,6 +220,21 @@ export const useDashboardStore = create<DashboardState>()(
       setBudget: (budget) => set({ budget }),
       setDebts: (debts) => set({ debts }),
       setEmails: (emails) => set({ emails }),
+      setEmailBullets: (emailBullets) => set({ emailBullets }),
+      dismissNotice: (noticeId) => {
+        set((s) => ({
+          dismissedNoticeIds: Array.from(new Set([...s.dismissedNoticeIds, noticeId])),
+          emails: s.emails.map((e) => (e.id === noticeId ? { ...e, isDismissed: true } : e)),
+        }));
+        apiClient.dismissEmailNotice(noticeId).catch(() => null);
+      },
+      restoreNotice: (noticeId) => {
+        set((s) => ({
+          dismissedNoticeIds: s.dismissedNoticeIds.filter((id) => id !== noticeId),
+          emails: s.emails.map((e) => (e.id === noticeId ? { ...e, isDismissed: false } : e)),
+        }));
+        apiClient.restoreEmailNotice(noticeId).catch(() => null);
+      },
       setChatMessages: (chatMessages) => set({ chatMessages }),
       addChatMessage: (message) => set((s) => ({ chatMessages: [...s.chatMessages, message] })),
       clearChatMessages: () => {
@@ -350,6 +372,9 @@ export const useDashboardStore = create<DashboardState>()(
       syncWithBackend: async () => {
         set({ isLoading: true });
         try {
+          // Initialize/confirm token is ready before batch fetch
+          await apiClient.initializeToken();
+
           const [classRes, taskRes, expRes, budgetRes, debtRes, emailRes, chatRes, profileRes] = await Promise.allSettled([
             apiClient.fetchTimetableClasses(),
             apiClient.fetchTasks(),
@@ -361,27 +386,119 @@ export const useDashboardStore = create<DashboardState>()(
             apiClient.getProfile(),
           ]);
 
+          // 1. Classes: merge without data loss
           if (classRes.status === 'fulfilled' && classRes.value?.classes) {
-            set({ classes: classRes.value.classes, isBackendConnected: true });
+            const incoming = classRes.value.classes;
+            if (incoming.length > 0) {
+              set({ classes: incoming, isBackendConnected: true });
+            } else if (get().classes.length > 0) {
+              apiClient.saveTimetableClasses(get().classes).catch(() => null);
+            }
           }
+
+          // 2. Tasks: non-destructive merge (retain local offline tasks & push up)
           if (taskRes.status === 'fulfilled' && taskRes.value?.tasks) {
-            set({ tasks: taskRes.value.tasks });
+            const backendTasks: Task[] = taskRes.value.tasks;
+            const localTasks = get().tasks;
+            if (backendTasks.length > 0) {
+              const backendIds = new Set(backendTasks.map((t) => t.id));
+              const unsynced = localTasks.filter((t) => !backendIds.has(t.id));
+              set({ tasks: [...backendTasks, ...unsynced] });
+              for (const t of unsynced) {
+                apiClient.createTask({
+                  title: t.title,
+                  priority: t.priority,
+                  dueDate: t.dueDate,
+                  description: t.description,
+                }).catch(() => null);
+              }
+            } else if (localTasks.length > 0) {
+              for (const t of localTasks) {
+                apiClient.createTask({
+                  title: t.title,
+                  priority: t.priority,
+                  dueDate: t.dueDate,
+                  description: t.description,
+                }).catch(() => null);
+              }
+            }
           }
+
+          // 3. Expenses: non-destructive merge
           if (expRes.status === 'fulfilled' && expRes.value?.expenses) {
-            set({ expenses: expRes.value.expenses });
+            const backendExps: Expense[] = expRes.value.expenses;
+            const localExps = get().expenses;
+            if (backendExps.length > 0) {
+              const backendIds = new Set(backendExps.map((e) => e.id));
+              const unsynced = localExps.filter((e) => !backendIds.has(e.id));
+              set({ expenses: [...backendExps, ...unsynced] });
+            } else if (localExps.length > 0) {
+              for (const e of localExps) {
+                apiClient.createExpense({
+                  amount: Number(e.amount),
+                  category: e.category,
+                  description: e.description,
+                  merchant: e.merchant || undefined,
+                }).catch(() => null);
+              }
+            }
           }
+
+          // 4. Budget
           if (budgetRes.status === 'fulfilled' && budgetRes.value?.budget) {
             set({ budget: budgetRes.value.budget });
           }
+
+          // 5. Debts: non-destructive merge
           if (debtRes.status === 'fulfilled' && debtRes.value?.debts) {
-            set({ debts: debtRes.value.debts });
+            const backendDebts: Debt[] = debtRes.value.debts;
+            const localDebts = get().debts;
+            if (backendDebts.length > 0) {
+              const backendIds = new Set(backendDebts.map((d) => d.id));
+              const unsynced = localDebts.filter((d) => !backendIds.has(d.id));
+              set({ debts: [...backendDebts, ...unsynced] });
+            } else if (localDebts.length > 0) {
+              for (const d of localDebts) {
+                apiClient.createDebt({
+                  person: d.person,
+                  amount: Number(d.amount),
+                  type: d.type,
+                  notes: d.notes || undefined,
+                }).catch(() => null);
+              }
+            }
           }
+
+          // 6. Emails / University Circulars: merge & honor dismissed status
           if (emailRes.status === 'fulfilled' && emailRes.value?.emails) {
-            set({ emails: emailRes.value.emails });
+            const incomingEmails: EmailSummary[] = emailRes.value.emails;
+            const dismissedSet = new Set(get().dismissedNoticeIds);
+            incomingEmails.forEach((e) => {
+              if (e.isDismissed || (e as any).processed) {
+                dismissedSet.add(e.id);
+              }
+            });
+            const mergedEmails = incomingEmails.map((e) => ({
+              ...e,
+              isDismissed: dismissedSet.has(e.id),
+            }));
+            if (mergedEmails.length > 0) {
+              set({
+                emails: mergedEmails,
+                dismissedNoticeIds: Array.from(dismissedSet),
+              });
+            }
           }
+
+          // 7. Chat messages: keep recent messages intact
           if (chatRes.status === 'fulfilled' && chatRes.value?.messages) {
-            set({ chatMessages: chatRes.value.messages });
+            const backendMsgs = chatRes.value.messages;
+            if (backendMsgs.length > 0) {
+              set({ chatMessages: backendMsgs });
+            }
           }
+
+          // 8. Profile
           if (profileRes.status === 'fulfilled' && profileRes.value?.user) {
             const u = profileRes.value.user;
             if (u.cgpa) set({ cgpa: String(u.cgpa) });
@@ -409,6 +526,9 @@ export const useDashboardStore = create<DashboardState>()(
         expenses: state.expenses,
         budget: state.budget,
         debts: state.debts,
+        emails: state.emails,
+        emailBullets: state.emailBullets,
+        dismissedNoticeIds: state.dismissedNoticeIds,
         chatMessages: state.chatMessages,
         cgpa: state.cgpa,
         credits: state.credits,

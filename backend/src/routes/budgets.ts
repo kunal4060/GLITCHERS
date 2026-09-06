@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { inMemoryStore } from '../repositories/inMemoryStore.js';
+import { supabaseStore } from '../repositories/supabaseStore.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { calculateBudgetStatus, calculateBurnRateForecast } from '../services/finance/calculator.js';
 import type { Budget } from '@glitchers/shared';
@@ -10,8 +10,8 @@ export const budgetRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.get('/current', async (req) => {
     const userId = req.userId!;
-    const budget = inMemoryStore.budgets.get(userId);
-    const expenses = inMemoryStore.expenses.get(userId) || [];
+    const budget = await supabaseStore.getBudget(userId);
+    const expenses = await supabaseStore.getExpenses(userId);
 
     if (!budget) {
       return {
@@ -56,12 +56,12 @@ export const budgetRoutes: FastifyPluginAsync = async (fastify) => {
       alertThresholds: [75, 90, 100],
     };
 
-    inMemoryStore.budgets.set(userId, budget);
-    const expenses = inMemoryStore.expenses.get(userId) || [];
-    const status = calculateBudgetStatus(budget, expenses);
+    const savedBudget = await supabaseStore.saveBudget(userId, budget);
+    const expenses = await supabaseStore.getExpenses(userId);
+    const status = calculateBudgetStatus(savedBudget, expenses);
 
     return {
-      budget,
+      budget: savedBudget,
       status,
     };
   });
