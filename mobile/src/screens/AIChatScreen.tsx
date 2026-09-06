@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Modal, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { designTokens } from '../theme/designTokens';
 import { GlassCard } from '../components/common/GlassCard';
@@ -8,6 +9,7 @@ import { GradientBackground } from '../components/common/GradientBackground';
 import { AIGemSymbol } from '../components/common/AIGemSymbol';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useDashboardStore } from '../store/dashboardStore';
+import { useFloatingStore } from '../store/floatingStore';
 import { apiClient } from '../api/client';
 import { offlineAiEngine, HUGGINGFACE_OFFLINE_MODELS, type HuggingFaceModelInfo } from '../services/offlineAiEngine';
 import type { Task, Expense, Debt } from '@glitchers/shared';
@@ -74,6 +76,16 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
       }).catch(() => null);
     }
   }, []);
+
+  // Hide floating assistant bubble on AI Companion screen so it doesn't block the chat send button
+  useFocusEffect(
+    React.useCallback(() => {
+      useFloatingStore.getState().setBubbleVisible(false);
+      return () => {
+        useFloatingStore.getState().setBubbleVisible(true);
+      };
+    }, [])
+  );
 
   // Dynamic contextual prompt chips
   const lastUserText = messages.filter((m) => m.sender === 'user').slice(-1)[0]?.text.toLowerCase() || '';

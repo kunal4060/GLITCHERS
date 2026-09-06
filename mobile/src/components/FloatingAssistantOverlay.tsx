@@ -10,6 +10,7 @@ import {
 import { useFloatingStore } from '../store/floatingStore';
 import { useDashboardStore } from '../store/dashboardStore';
 import { useAuthStore } from '../store/authStore';
+import { useNavigationState } from '@react-navigation/native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AIGemSymbol } from './common/AIGemSymbol';
 import { designTokens } from '../theme/designTokens';
@@ -18,6 +19,23 @@ import { offlineAiEngine } from '../services/offlineAiEngine';
 import type { Task, Expense } from '@glitchers/shared';
 
 export const FloatingAssistantOverlay: React.FC = () => {
+  const isAiScreen = useNavigationState((state) => {
+    if (!state) return false;
+    let current: any = state;
+    while (current && current.routes && typeof current.index === 'number') {
+      const route = current.routes[current.index];
+      if (
+        route?.name === 'AI Companion' ||
+        route?.name === 'AIChat' ||
+        route?.name === 'AI'
+      ) {
+        return true;
+      }
+      current = route?.state;
+    }
+    return false;
+  });
+
   const {
     isBubbleVisible,
     isMenuExpanded,
@@ -139,7 +157,7 @@ export const FloatingAssistantOverlay: React.FC = () => {
   };
 
   const { isAuthenticated, isOnboardingComplete } = useAuthStore();
-  if (!isAuthenticated || !isOnboardingComplete || !isBubbleVisible) return null;
+  if (!isAuthenticated || !isOnboardingComplete || !isBubbleVisible || isAiScreen) return null;
 
   return (
     <View pointerEvents="box-none" style={styles.overlayContainer}>
