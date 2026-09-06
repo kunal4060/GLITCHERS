@@ -39,7 +39,11 @@ const EnvSchema = z.object({
   GEMINI_API_KEY: z.string().trim().default('').transform((v) => v || decodeFallback('QVEuQWI4Uk42SkExRVBKZ1Rfc2lpendhVkFONDNIUHBvMkhOYkJCQ1R3ckxtS09FYVNPa1E=')),
   GOOGLE_CLIENT_ID: z.string().trim().default(''),
   GOOGLE_CLIENT_SECRET: z.string().trim().default(''),
-  GOOGLE_REDIRECT_URI: z.string().trim().default('http://localhost:5000/api/auth/google/callback'),
+  GOOGLE_REDIRECT_URI: z.string().trim().default(
+    process.env.RENDER || process.env.NODE_ENV === 'production'
+      ? 'https://glitchers-backend.onrender.com/api/auth/google/callback'
+      : 'http://localhost:5000/api/auth/google/callback'
+  ),
   JWT_SECRET: z.string().trim().default('glitchers-jwt-secret-student-life-companion-2026'),
 });
 

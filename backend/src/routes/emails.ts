@@ -212,10 +212,8 @@ export const emailRoutes: FastifyPluginAsync = async (fastify) => {
     if (env.GEMINI_API_KEY && !env.GEMINI_API_KEY.startsWith('dev-')) {
       const CANDIDATE_MODELS = [
         'gemini-3.6-flash',
+        'gemini-flash-lite-latest',
         'gemini-flash-latest',
-        'gemini-2.5-flash',
-        'gemini-2.0-flash',
-        'gemini-1.5-flash',
       ];
       try {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
