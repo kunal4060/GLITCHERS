@@ -13,10 +13,13 @@ import {
   Platform,
   Linking,
   Alert,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/authStore';
 import { apiClient } from '../api/client';
+
+const APP_LOGO = require('../../assets/logo.png');
 
 export const LoginScreen: React.FC = () => {
   const { loginWithGoogle, isLoading } = useAuthStore();
@@ -135,9 +138,7 @@ export const LoginScreen: React.FC = () => {
         {/* Top Header Badge */}
         <View style={styles.topSection}>
           <View style={styles.brandIconContainer}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="sparkles" size={28} color="#2E7470" />
-            </View>
+            <Image source={APP_LOGO} style={styles.brandLogo} resizeMode="cover" />
           </View>
           <Text style={styles.brandTitle}>GLITCHERS</Text>
           <View style={styles.categoryPill}>
@@ -316,15 +317,15 @@ const styles = StyleSheet.create({
   brandIconContainer: {
     marginBottom: 12,
   },
-  iconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#E6F0EF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(46, 116, 112, 0.2)',
+  brandLogo: {
+    width: 68,
+    height: 68,
+    borderRadius: 18,
+    shadowColor: '#2E7470',
+    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 4,
   },
   brandTitle: {
     fontSize: 26,

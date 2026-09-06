@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+const DEFAULT_AVATAR = require('../../assets/default_avatar.jpg');
+
 interface NinjaAvatarProps {
   size?: 'small' | 'large';
   cgpa?: string;
@@ -34,32 +36,17 @@ export const NinjaAvatar: React.FC<NinjaAvatarProps> = ({
           width: containerSize,
           height: containerSize,
           borderRadius: containerSize / 2,
+          overflow: 'hidden',
+          borderWidth: isLarge ? 3 : 2,
+          borderColor: 'rgba(117, 167, 165, 0.5)',
         },
       ]}
     >
-      {customImageUri ? (
-        <Image
-          source={{ uri: customImageUri }}
-          style={{ width: containerSize, height: containerSize, borderRadius: containerSize / 2 }}
-          resizeMode="cover"
-        />
-      ) : (
-        <>
-          {/* Sword on back */}
-          <View style={[styles.sword, isLarge ? styles.swordLarge : styles.swordSmall]} />
-
-          {/* Ninja Head */}
-          <View style={[styles.ninjaHead, isLarge ? styles.headLarge : styles.headSmall]}>
-            {/* Red Headband */}
-            <View style={[styles.headband, isLarge ? styles.bandLarge : styles.bandSmall]} />
-            {/* Skin Face Mask Opening */}
-            <View style={[styles.faceOpening, isLarge ? styles.faceLarge : styles.faceSmall]} />
-          </View>
-
-          {/* Ninja Shoulders */}
-          <View style={[styles.ninjaShoulders, isLarge ? styles.shoulderLarge : styles.shoulderSmall]} />
-        </>
-      )}
+      <Image
+        source={customImageUri ? { uri: customImageUri } : DEFAULT_AVATAR}
+        style={{ width: containerSize, height: containerSize, borderRadius: containerSize / 2 }}
+        resizeMode="cover"
+      />
     </View>
   );
 
