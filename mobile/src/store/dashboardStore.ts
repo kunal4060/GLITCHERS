@@ -89,9 +89,30 @@ export const useDashboardStore = create<DashboardState>()(
       setAvatarUrl: (avatarUrl) => set({ avatarUrl }),
 
       aiMode: 'AUTO',
-      activeOfflineModel: 'HuggingFaceTB/SmolLM2-360M-Instruct',
-      downloadedModels: ['HuggingFaceTB/SmolLM2-360M-Instruct'],
+      activeOfflineModel: '',
+      downloadedModels: [],
       downloadProgress: {},
+      setAiMode: (aiMode) => set({ aiMode }),
+      setActiveOfflineModel: (activeOfflineModel) => set({ activeOfflineModel }),
+      downloadOfflineModel: async (modelId: string) => {
+        set((s) => ({
+          downloadProgress: { ...s.downloadProgress, [modelId]: 15 },
+        }));
+        await new Promise((r) => setTimeout(r, 250));
+        set((s) => ({
+          downloadProgress: { ...s.downloadProgress, [modelId]: 45 },
+        }));
+        await new Promise((r) => setTimeout(r, 300));
+        set((s) => ({
+          downloadProgress: { ...s.downloadProgress, [modelId]: 80 },
+        }));
+        await new Promise((r) => setTimeout(r, 250));
+        set((s) => ({
+          downloadProgress: { ...s.downloadProgress, [modelId]: 100 },
+          downloadedModels: Array.from(new Set([...s.downloadedModels, modelId])),
+          activeOfflineModel: modelId,
+        }));
+      },
 
       offlineSyncQueue: [],
       isOnline: true,
@@ -145,20 +166,6 @@ export const useDashboardStore = create<DashboardState>()(
           offlineSyncQueue: s.offlineSyncQueue.map((item) => ({ ...item, synced: true })),
         }));
         return { syncedCount };
-      },
-
-      setAiMode: (aiMode) => set({ aiMode }),
-      setActiveOfflineModel: (activeOfflineModel) => set({ activeOfflineModel }),
-      downloadOfflineModel: async (modelId: string) => {
-        for (let p = 15; p <= 100; p += 20) {
-          set((s) => ({ downloadProgress: { ...s.downloadProgress, [modelId]: Math.min(100, p) } }));
-          await new Promise((r) => setTimeout(r, 120));
-        }
-        set((s) => ({
-          downloadedModels: s.downloadedModels.includes(modelId) ? s.downloadedModels : [...s.downloadedModels, modelId],
-          activeOfflineModel: modelId,
-          downloadProgress: { ...s.downloadProgress, [modelId]: 100 },
-        }));
       },
 
       classes: [],
@@ -385,6 +392,8 @@ export const useDashboardStore = create<DashboardState>()(
         credits: state.credits,
         avatarUrl: state.avatarUrl,
         aiMode: state.aiMode,
+        downloadedModels: state.downloadedModels,
+        activeOfflineModel: state.activeOfflineModel,
       }),
     }
   )

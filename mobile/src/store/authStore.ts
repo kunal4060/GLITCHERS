@@ -68,19 +68,28 @@ export const useAuthStore = create<AuthState>()(
         }));
       },
 
-      loginWithGoogle: async (email = 'kunalugale4060@gmail.com', name = 'Kunal Ugale', token?: string) => {
+      loginWithGoogle: async (email?: string, name?: string, token?: string) => {
         set({ isLoading: true });
         try {
           if (token) {
             apiClient.setToken(token);
           }
 
-          const safeEmail = email.trim().toLowerCase();
+          const safeEmail = (email || '').trim().toLowerCase() || 'student@university.edu';
+          let safeName = (name || '').trim();
+          if (!safeName) {
+            const prefix = safeEmail.split('@')[0];
+            safeName = prefix
+              .split(/[._-]/)
+              .filter(Boolean)
+              .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+              .join(' ') || 'Student User';
+          }
 
           // 1. Authenticate with backend /auth/login or /auth/me
           let user: UserProfile | null = null;
           try {
-            const loginRes = await apiClient.login(safeEmail, name);
+            const loginRes = await apiClient.login(safeEmail, safeName);
             if (loginRes?.user) {
               user = loginRes.user;
             }
@@ -99,7 +108,7 @@ export const useAuthStore = create<AuthState>()(
             user = res?.user || {
               id: `usr_${safeEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
               email: safeEmail,
-              fullName: name,
+              fullName: safeName,
               university: safeEmail.includes('@') && !safeEmail.endsWith('gmail.com')
                 ? safeEmail.split('@')[1].toUpperCase()
                 : 'State Technological University',

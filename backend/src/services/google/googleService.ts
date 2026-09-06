@@ -53,9 +53,9 @@ export class GoogleService {
   }> {
     if (!this.oauth2Client || code.startsWith('mock_')) {
       return {
-        email: 'kunalugale4060@gmail.com',
-        googleId: 'google_sub_1092837465',
-        name: 'Kunal Ugale',
+        email: 'student@university.edu',
+        googleId: 'google_sub_' + Math.floor(Math.random() * 1000000000),
+        name: 'Student User',
         accessToken: 'mock_google_access_token',
         refreshToken: 'mock_google_refresh_token',
       };
@@ -68,11 +68,11 @@ export class GoogleService {
     const userInfo = await oauth2.userinfo.get();
 
     return {
-      email: userInfo.data.email || 'kunalugale4060@gmail.com',
+      email: userInfo.data.email || 'student@university.edu',
       googleId: userInfo.data.id || 'google_user_id',
-      name: userInfo.data.name || 'Kunal Ugale',
+      name: userInfo.data.name || (userInfo.data.email ? userInfo.data.email.split('@')[0] : 'Student User'),
       accessToken: tokens.access_token || '',
-      refreshToken: tokens.refresh_token || undefined,
+      refreshToken: tokens.refreshToken || undefined,
     };
   }
 

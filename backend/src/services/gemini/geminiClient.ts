@@ -261,7 +261,7 @@ export class GeminiAssistant {
 
     // Call Google Gemini API with cascade
     if (this.genAI) {
-      const systemPrompt = `You are a universal, world-class AI Student Companion and intelligent tutor for ${context.profile?.fullName || 'Kunal Ugale'} at ${context.profile?.university || 'State Technological University'}, combining the conversational depth of Google Gemini and ChatGPT.
+      const systemPrompt = `You are a universal, world-class AI Student Companion and intelligent tutor for ${context.profile?.fullName || 'the student'} at ${context.profile?.university || 'University'}, combining the conversational depth of Google Gemini and ChatGPT.
 
 Today's Date: ${context.now.toDateString()} (${context.currentDay}).
 Yesterday's Date: ${context.yesterday.toDateString()} (${context.yesterdayDay}).

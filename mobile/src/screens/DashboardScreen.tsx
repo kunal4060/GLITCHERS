@@ -30,7 +30,7 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
     syncWithBackend,
     completeTask,
   } = useDashboardStore();
-  const { gmailConnected } = useAuthStore();
+  const { gmailConnected, user } = useAuthStore();
 
   const [emailBullets, setEmailBullets] = useState<string[]>([]);
   const [isSummarizingEmails, setIsSummarizingEmails] = useState(false);
@@ -150,8 +150,12 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
           >
             <NinjaAvatar size="small" showBadges={false} customImageUri={avatarUrl} />
             <View style={styles.profileTextCol}>
-              <Text style={styles.greetingTitle}>Good morning, Kunal</Text>
-              <Text style={styles.semesterSubtitle}>VIT AP • Fall Semester 2026-27</Text>
+              <Text style={styles.greetingTitle}>
+                {new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening'}, {user?.fullName ? user.fullName.trim().split(' ')[0] : 'Student'}
+              </Text>
+              <Text style={styles.semesterSubtitle}>
+                {user?.university || 'University Life'} • {user?.semester ? `Semester ${user.semester}` : 'Active Semester'}
+              </Text>
             </View>
           </TouchableOpacity>
 

@@ -64,7 +64,7 @@ export const PrivacyScreen: React.FC = () => {
             <Ionicons name="logo-google" size={20} color="#EA4335" style={{ marginRight: 10 }} />
             <View>
               <Text style={styles.serviceTitle}>Google Account</Text>
-              <Text style={styles.serviceSub}>{user?.email || 'kunalugale4060@gmail.com'}</Text>
+              <Text style={styles.serviceSub}>{user?.email || 'student@university.edu'}</Text>
             </View>
           </View>
           <View style={styles.verifiedBadge}>

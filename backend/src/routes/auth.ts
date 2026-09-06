@@ -30,10 +30,12 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-  fastify.get<{ Querystring: { code?: string; returnUrl?: string } }>('/mock-google-login', async (req, reply) => {
+  fastify.get<{ Querystring: { code?: string; returnUrl?: string; email?: string; name?: string } }>('/mock-google-login', async (req, reply) => {
     const returnUrl = req.query.returnUrl || 'http://localhost:8082';
     const cleanBase = returnUrl.split('?')[0].replace(/\/$/, '');
-    const profile = await supabaseStore.syncOrEnsureUser('kunalugale4060@gmail.com', 'Kunal Ugale');
+    const email = req.query.email || 'student@university.edu';
+    const name = req.query.name || (email.split('@')[0].charAt(0).toUpperCase() + email.split('@')[0].slice(1));
+    const profile = await supabaseStore.syncOrEnsureUser(email, name);
     return reply.redirect(
       `${cleanBase}/?token=jwt_${profile.id}&email=${encodeURIComponent(profile.email)}&name=${encodeURIComponent(profile.fullName)}`
     );

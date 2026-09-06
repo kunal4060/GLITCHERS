@@ -637,7 +637,11 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
                     {aiMode === 'OFFLINE' ? '📴 Running 100% Offline' : '⚡ On-Device AI Models Available'}
                   </Text>
                   <Text style={styles.offlineEngineBannerSubtitle}>
-                    Active: {activeOfflineModel.split('/')[1] || 'SmolLM2'} • Tap to configure
+                    {downloadedModels.length === 0
+                      ? 'No models downloaded yet • Tap to download'
+                      : activeOfflineModel
+                      ? `Active: ${activeOfflineModel.split('/')[1] || activeOfflineModel} • Ready offline`
+                      : `${downloadedModels.length} model(s) downloaded • Tap to activate`}
                   </Text>
                 </View>
               </View>
@@ -849,9 +853,9 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
                             <Text style={[styles.modelCardName, isActive && { color: designTokens.colors.primaryDark }]}>
                               {m.name}
                             </Text>
-                            {isActive && (
+                            {isActive && isDownloaded && (
                               <View style={styles.activeTag}>
-                                <Text style={styles.activeTagText}>ACTIVE (TAP TO RE-SELECT)</Text>
+                                <Text style={styles.activeTagText}>ACTIVE (OFFLINE)</Text>
                               </View>
                             )}
                           </View>

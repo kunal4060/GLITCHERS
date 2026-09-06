@@ -45,18 +45,18 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
   const [universityDomain, setUniversityDomain] = useState(user?.universityDomain || 'university.edu');
 
   // 2. Profile
-  const [fullName, setFullName] = useState(user?.fullName || 'Kunal Ugale');
-  const [university, setUniversity] = useState(user?.university || 'State Technological University');
-  const [course, setCourse] = useState(user?.course || 'Computer Science & Engineering');
-  const [year, setYear] = useState(user?.year || 3);
-  const [semester, setSemester] = useState(user?.semester || 6);
+  const [fullName, setFullName] = useState(user?.fullName || '');
+  const [university, setUniversity] = useState(user?.university || '');
+  const [course, setCourse] = useState(user?.course || '');
+  const [year, setYear] = useState(String(user?.year || '3'));
+  const [semester, setSemester] = useState(String(user?.semester || '6'));
   const [section, setSection] = useState(user?.section || 'A');
 
   // 3. Academics
-  const [cgpa, setCgpa] = useState(user?.cgpa || '8.71');
+  const [cgpa, setCgpa] = useState(user?.cgpa || '8.50');
   const [creditsCompleted, setCreditsCompleted] = useState(String(user?.creditsCompleted ?? 42));
   const [creditsCurrent, setCreditsCurrent] = useState(String(user?.creditsCurrent ?? 18));
-  const [studentId, setStudentId] = useState(user?.studentId || 'CS2023-084');
+  const [studentId, setStudentId] = useState(user?.studentId || '');
 
   // 4 & 5. Timetable & Review
   const [timetableMode, setTimetableMode] = useState<'CHOICE' | 'MANUAL' | 'REVIEW'>('CHOICE');
@@ -210,8 +210,8 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
           fullName,
           university,
           course,
-          year,
-          semester,
+          year: parseInt(year, 10) || 1,
+          semester: parseInt(semester, 10) || 1,
           section,
           cgpa,
         });
@@ -230,8 +230,8 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
         fullName,
         university,
         course,
-        year,
-        semester,
+        year: parseInt(year, 10) || 1,
+        semester: parseInt(semester, 10) || 1,
         section,
         cgpa,
         creditsCompleted: Number(creditsCompleted) || 0,
@@ -482,18 +482,22 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   <Text style={styles.inputLabel}>Year</Text>
                   <TextInput
                     style={styles.textInput}
-                    value={String(year)}
-                    onChangeText={(t) => setYear(Number(t) || 1)}
+                    value={year}
+                    onChangeText={setYear}
                     keyboardType="numeric"
+                    placeholder="3"
+                    placeholderTextColor="#A09E9B"
                   />
                 </View>
                 <View style={[styles.inputGroup, { flex: 1 }]}>
                   <Text style={styles.inputLabel}>Semester</Text>
                   <TextInput
                     style={styles.textInput}
-                    value={String(semester)}
-                    onChangeText={(t) => setSemester(Number(t) || 1)}
+                    value={semester}
+                    onChangeText={setSemester}
                     keyboardType="numeric"
+                    placeholder="6"
+                    placeholderTextColor="#A09E9B"
                   />
                 </View>
                 <View style={[styles.inputGroup, { flex: 1 }]}>
@@ -1148,7 +1152,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
               <TouchableOpacity
                 style={[styles.primaryButton, { marginTop: 20 }]}
                 onPress={() => {
-                  completeOnboarding({ fullName, university, course, year, semester, section, cgpa });
+                  completeOnboarding({ fullName, university, course, year: parseInt(year, 10) || 1, semester: parseInt(semester, 10) || 1, section, cgpa });
                   setActiveStep('COMPLETE');
                 }}
               >

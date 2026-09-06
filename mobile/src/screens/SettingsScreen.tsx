@@ -28,7 +28,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
   const [editType, setEditType] = useState<'CGPA' | 'CREDITS'>('CGPA');
   const [editValue, setEditValue] = useState('');
 
-  const studentName = user?.fullName || 'KUNAL BALKRUSHN UGALE';
+  const studentName = user?.fullName || 'Student User';
 
   const handlePickImageFromGallery = async () => {
     try {
@@ -180,7 +180,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
         <View style={styles.menuCard}>
           <TouchableOpacity
             style={styles.menuRow}
-            onPress={() => Alert.alert('Profile Details', `Name: ${studentName}\nDegree: B.Tech Computer Science\nUniversity: VIT AP`)}
+            onPress={() => Alert.alert(
+              'Student Profile',
+              `Name: ${studentName}\nEmail: ${user?.email || 'student@university.edu'}\nCourse: ${user?.course || 'Computer Science'}\nUniversity: ${user?.university || 'University'}\nYear / Semester: Year ${user?.year || 3}, Sem ${user?.semester || 6}`
+            )}
           >
             <View style={styles.menuLeft}>
               <Ionicons name="person-outline" size={18} color={designTokens.colors.primaryDark} style={styles.menuIcon} />

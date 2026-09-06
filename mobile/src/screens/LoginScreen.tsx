@@ -21,7 +21,8 @@ import { apiClient } from '../api/client';
 export const LoginScreen: React.FC = () => {
   const { loginWithGoogle, isLoading } = useAuthStore();
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
-  const [customEmail, setCustomEmail] = useState('kunalugale4060@gmail.com');
+  const [customName, setCustomName] = useState('');
+  const [customEmail, setCustomEmail] = useState('');
   const [isRedirecting, setIsRedirecting] = useState(false);
 
   const handleGoogleLogin = async () => {
@@ -114,9 +115,9 @@ export const LoginScreen: React.FC = () => {
   };
 
   const handleDirectDemoLogin = async () => {
-    const emailToUse = customEmail.trim() || 'kunalugale4060@gmail.com';
-    let nameToUse = 'Kunal Ugale';
-    if (!emailToUse.toLowerCase().includes('kunalugale4060')) {
+    const emailToUse = customEmail.trim() || 'student@university.edu';
+    let nameToUse = customName.trim();
+    if (!nameToUse) {
       const prefix = emailToUse.split('@')[0];
       nameToUse = prefix
         .split(/[._-]/)
@@ -130,7 +131,7 @@ export const LoginScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#FAF7F2" />
-      <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         {/* Top Header Badge */}
         <View style={styles.topSection}>
           <View style={styles.brandIconContainer}>
@@ -176,14 +177,25 @@ export const LoginScreen: React.FC = () => {
         {/* Action Section */}
         <View style={styles.actionSection}>
           <View style={styles.accountBox}>
-            <Text style={styles.accountBoxLabel}>GOOGLE / UNIVERSITY ACCOUNT</Text>
+            <Text style={styles.accountBoxLabel}>STUDENT ACCOUNT DETAILS</Text>
+            <View style={[styles.accountInputRow, { marginBottom: 8, borderBottomWidth: 1, borderBottomColor: '#ECE7DE', paddingBottom: 6 }]}>
+              <Ionicons name="person-outline" size={18} color="#2E7470" style={{ marginRight: 8 }} />
+              <TextInput
+                style={styles.accountTextInput}
+                value={customName}
+                onChangeText={setCustomName}
+                placeholder="Your Full Name (e.g. Rahul Sharma)"
+                placeholderTextColor="#A09E9B"
+                autoCapitalize="words"
+              />
+            </View>
             <View style={styles.accountInputRow}>
               <Ionicons name="mail-outline" size={18} color="#2E7470" style={{ marginRight: 8 }} />
               <TextInput
                 style={styles.accountTextInput}
                 value={customEmail}
                 onChangeText={setCustomEmail}
-                placeholder="e.g. kunalugale4060@gmail.com"
+                placeholder="Email (e.g. student@university.edu)"
                 placeholderTextColor="#A09E9B"
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -281,7 +293,7 @@ export const LoginScreen: React.FC = () => {
             </View>
           </View>
         </Modal>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -292,7 +304,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAF7F2',
   },
   container: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: 24,
     justifyContent: 'space-between',
     paddingTop: 40,
