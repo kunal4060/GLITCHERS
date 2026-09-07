@@ -6,33 +6,32 @@ This document explains the entire system end-to-end: the high-level topology, co
 
 ---
 
-## 📑 Table of Contents
-
-1. [Executive Overview](#1-executive-overview)
-2. [High-Level System Topology](#2-high-level-system-topology)
-3. [Monorepo Package Structure](#3-monorepo-package-structure)
-4. [Mobile Frontend Architecture](#4-mobile-frontend-architecture)
+## 📑 Table of 1. [Executive Overview](#1-executive-overview)
+2. [Student Platform Architecture & AI Integration Flow](#2-student-platform-architecture--ai-integration-flow)
+3. [High-Level System Topology](#3-high-level-system-topology)
+4. [Monorepo Package Structure](#4-monorepo-package-structure)
+5. [Mobile Frontend Architecture](#5-mobile-frontend-architecture)
    - [Zustand State Architecture](#zustand-state-architecture)
    - [Android Floating Assistant Overlay](#android-floating-assistant-overlay)
-5. [Backend Architecture](#5-backend-architecture)
+6. [Backend Architecture](#6-backend-architecture)
    - [Fastify REST Server](#fastify-rest-server)
    - [Deterministic Algorithmic Engines](#deterministic-algorithmic-engines)
    - [Dual Persistence Layer](#dual-persistence-layer)
-6. [Database Schema & Data Model](#6-database-schema--data-model)
+7. [Database Schema & Data Model](#7-database-schema--data-model)
    - [Entity Relationship Diagram](#entity-relationship-diagram)
    - [Tenant Security & RLS](#tenant-security--rls)
-7. [AI Integration Architecture (NIA)](#7-ai-integration-architecture-nia)
+8. [AI Integration Architecture (NIA)](#8-ai-integration-architecture-nia)
    - [Hybrid Dual-Engine Topology](#hybrid-dual-engine-topology)
    - [Engine 1: Cloud Gemini & 12 Autonomous Tools](#engine-1-cloud-gemini--12-autonomous-tools)
    - [Live Student Context Builder](#live-student-context-builder)
    - [Engine 2: On-Device Hugging Face AI](#engine-2-on-device-hugging-face-ai)
    - [Multimodal OCR Pipeline](#multimodal-ocr-pipeline)
    - [Email Notice Summarization Pipeline](#email-notice-summarization-pipeline)
-8. [End-to-End Sequence Lifecycles](#8-end-to-end-sequence-lifecycles)
+9. [End-to-End Sequence Lifecycles](#9-end-to-end-sequence-lifecycles)
    - [Lifecycle A: Natural Language Expense Logging](#lifecycle-a-natural-language-expense-logging)
    - [Lifecycle B: Timetable Photo Extraction & Conflict Detection](#lifecycle-b-timetable-photo-extraction--conflict-detection)
    - [Lifecycle C: Offline Execution & Cloud Batch Sync](#lifecycle-c-offline-execution--cloud-batch-sync)
-9. [Deployment & Infrastructure](#9-deployment--infrastructure)
+10. [Deployment & Infrastructure](#10-deployment--infrastructure)structure)
 
 ---
 
@@ -63,7 +62,99 @@ At the core is **NIA** (**Nexa Intelligent Assistance**), an AI companion capabl
 
 ---
 
-## 2. High-Level System Topology
+## 2. Student Platform Architecture & AI Integration Flow
+
+This diagram illustrates the core lifecycle of NEXA—from student authentication through domain data aggregation, dual-engine AI reasoning, and personalized output delivery.
+
+![Student Platform Architecture & AI Integration Flow](./assets/architecture_flow.jpg)
+
+### Interactive Flowchart
+
+```mermaid
+flowchart TD
+    %% Styling Classes
+    classDef userNode fill:#38BDF8,stroke:#0284C7,stroke-width:2px,color:#FFFFFF,font-weight:bold;
+    classDef authNode fill:#E0F2FE,stroke:#0284C7,stroke-width:2px,color:#0F172A,font-weight:bold;
+    classDef dataNode fill:#F0FDF4,stroke:#16A34A,stroke-width:2px,color:#0F172A,font-weight:bold;
+    classDef domainNode fill:#FFFFFF,stroke:#64748B,stroke-width:2px,color:#0F172A,font-weight:600;
+    classDef aiProcNode fill:#EDE9FE,stroke:#7C3AED,stroke-width:2.5px,color:#4C1D95,font-weight:bold;
+    classDef onlineNode fill:#EFF6FF,stroke:#2563EB,stroke-width:2px,color:#1E3A8A,font-weight:bold;
+    classDef offlineNode fill:#FEF3C7,stroke:#D97706,stroke-width:2px,color:#78350F,font-weight:bold;
+    classDef outputNode fill:#F1F5F9,stroke:#334155,stroke-width:2px,color:#0F172A,font-weight:bold;
+    classDef resultNode fill:#FFFFFF,stroke:#94A3B8,stroke-width:1.5px,color:#1E293B,font-weight:500;
+
+    USER(["👤 USER"]):::userNode
+    LOGIN["💳 LOGIN / AUTHENTICATION 🔒\n(Google OAuth 2.0 / JWT Auth Tokens)"]:::authNode
+    STUDENT_DATA["👨‍🎓 STUDENT DATA\n(Collects all user-specific information)"]:::dataNode
+
+    TIMETABLE["📅 TIMETABLE\n• Lecture / Lab Slots\n• Conflict Detector"]:::domainNode
+    TASKS["📋 TASKS\n• Assignments & Deadlines\n• Smart Reminders"]:::domainNode
+    FINANCE["💰 FINANCE\n• Daily Expenses & Budget\n• Debts & Bill Splits"]:::domainNode
+    EMAIL["📧 EMAIL\n• University Circulars\n• Critical Notices"]:::domainNode
+    AI_COMPANION["🤖 AI COMPANION (NIA)\n• Conversational Assistant\n• Multimodal Photo OCR"]:::domainNode
+
+    AI_PROC["⚙️ AI PROCESSING LAYER ⚙️\n(Live Context Synthesis & Intent Routing)"]:::aiProcNode
+
+    ONLINE["☁️ ONLINE MODE — GEMINI AI\n• Multimodal OCR & Deep Reasoning\n• 12 Backend Autonomous Tools"]:::onlineNode
+    OFFLINE["🖥️ OFFLINE MODE — LOCAL / BUILT-IN AI\n• On-Device SLMs (Hugging Face GGUF)\n• Zero Latency & Offline Action Queue"]:::offlineNode
+
+    OUTPUT["📊 PERSONALIZED OUTPUT"]:::outputNode
+
+    REMINDERS["🔔 Reminders\n(Quiet-hours compliant alerts)"]:::resultNode
+    SUMMARIES["🔍 Summaries\n(Morning email briefings & digests)"]:::resultNode
+    INSIGHTS["💡 Insights\n(Safe daily burn rate & workload stats)"]:::resultNode
+    RECOMMENDATIONS["🎯 Recommendations\n(Upcoming deadlines & budget alerts)"]:::resultNode
+    ANSWERS["💬 Natural-language Answers\n(Universal tutoring & instant actions)"]:::resultNode
+
+    USER --> LOGIN
+    LOGIN --> STUDENT_DATA
+    
+    STUDENT_DATA --> TIMETABLE
+    STUDENT_DATA --> TASKS
+    STUDENT_DATA --> FINANCE
+    STUDENT_DATA --> EMAIL
+    STUDENT_DATA --> AI_COMPANION
+
+    TIMETABLE --> AI_PROC
+    TASKS --> AI_PROC
+    FINANCE --> AI_PROC
+    EMAIL --> AI_PROC
+    AI_COMPANION --> AI_PROC
+
+    AI_PROC --> ONLINE
+    AI_PROC --> OFFLINE
+
+    ONLINE --> OUTPUT
+    OFFLINE --> OUTPUT
+
+    OUTPUT --> REMINDERS
+    OUTPUT --> SUMMARIES
+    OUTPUT --> INSIGHTS
+    OUTPUT --> RECOMMENDATIONS
+    OUTPUT --> ANSWERS
+```
+
+### Flow Breakdown & System Pillars
+
+| Component | Technical Implementation | Purpose |
+| :--- | :--- | :--- |
+| **1. USER & AUTH** | Google OAuth 2.0 / JWT session tokens | One-tap student onboarding; exchanges token for secure session. |
+| **2. STUDENT DATA** | Supabase PostgreSQL + Zustand Hydration | Single source of truth collecting timetable, tasks, finances, and notices. |
+| **3. FIVE CORE DOMAINS** | React Native domain modules & Fastify APIs | Partitioned lifecycle trackers for Timetable, Tasks, Finance, Email, and NIA. |
+| **4. AI PROCESSING LAYER** | Dynamic Context Builder & Hybrid Router | Injects live student state and decides whether to route to Cloud or On-Device. |
+| **5. ONLINE MODE** | Google Gemini 3.6 Flash + 12 Function Tools | Multimodal OCR (receipts, timetables), deep reasoning, and autonomous tool calling. |
+| **6. OFFLINE MODE** | On-Device SLMs (Hugging Face) + Local Heuristics | 100% offline query answering, math solver, and atomic action queue for batch sync. |
+| **7. PERSONALIZED OUTPUT** | Responsive UI ActionCards & Alert Timeline | Reminders 🔔, Summaries 🔍, Insights 💡, Recommendations 🎯, and Answers 💬. |
+
+#### 🏛️ Four Foundation Pillars
+
+| 🛡️ Secure Data Storage | 🔔 Notifications | 🤖 AI Integration | ☁️ Offline Support |
+| :--- | :--- | :--- | :--- |
+| Supabase PostgreSQL with strict Row-Level Security (`auth.uid() = user_id`). | Dynamic timeline with automated Quiet-Hours suppression between 11:00 PM and 7:00 AM. | Hybrid dual-engine: Google Gemini Cloud coupled with On-Device Hugging Face models. | 100% on-device SLMs, local heuristics, and atomic batch sync queue for zero-network usage. |
+
+---
+
+## 3. High-Level System Topology
 
 ```mermaid
 flowchart TB
@@ -126,7 +217,7 @@ flowchart TB
 
 ---
 
-## 3. Monorepo Package Structure
+## 4. Monorepo Package Structure
 
 The repository uses standard **npm workspaces** with three core layers:
 
@@ -181,7 +272,7 @@ GLITCHERS/
 
 ---
 
-## 4. Mobile Frontend Architecture
+## 5. Mobile Frontend Architecture
 
 The frontend is built using **Expo SDK 52** and compiles simultaneously to **Android APK**, **iOS**, and **Web** (`react-native-web`).
 
@@ -228,7 +319,7 @@ The floating bubble operates in two modes:
 
 ---
 
-## 5. Backend Architecture
+## 6. Backend Architecture
 
 ### Fastify REST Server
 
@@ -270,7 +361,7 @@ The backend uses an abstraction pattern (`SupabaseStore` and `InMemoryStore`):
 
 ---
 
-## 6. Database Schema & Data Model
+## 7. Database Schema & Data Model
 
 The schema is defined in [schema.sql](file:///c:/Users/Admin/OneDrive/Desktop/GLICHERS/database/schema.sql) and enforces strict relational integrity.
 
@@ -397,7 +488,7 @@ Clients communicating directly with Supabase can only read and write rows matchi
 
 ---
 
-## 7. AI Integration Architecture (NIA)
+## 8. AI Integration Architecture (NIA)
 
 ### Hybrid Dual-Engine Topology
 
@@ -543,7 +634,7 @@ University circulars are typically long, bureaucratic, and packed with irrelevan
 
 ---
 
-## 8. End-to-End Sequence Lifecycles
+## 9. End-to-End Sequence Lifecycles
 
 ### Lifecycle A: Natural Language Expense Logging
 
@@ -620,7 +711,7 @@ sequenceDiagram
 
 ---
 
-## 9. Deployment & Infrastructure
+## 10. Deployment & Infrastructure
 
 ### Production Topology
 
