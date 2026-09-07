@@ -24,7 +24,7 @@ export const healthRoutes: FastifyPluginAsync = async (fastify) => {
 
     return {
       status: dbStatus.startsWith('unreachable') ? 'degraded' : 'ok',
-      service: 'GLITCHERS Fastify Backend',
+      service: 'NEXA Fastify Backend',
       version: '1.0.0',
       environment: env.NODE_ENV,
       uptimeSeconds: Math.floor(process.uptime()),

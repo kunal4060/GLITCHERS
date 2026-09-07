@@ -13,7 +13,7 @@ export const FloatingAIButton: React.FC<FloatingAIButtonProps> = ({ onPress }) =
       style={styles.container}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel="Open AI Student Companion"
+      accessibilityLabel="Open NIA Assistant"
     >
       <AIGemSymbol size={54} />
     </TouchableOpacity>

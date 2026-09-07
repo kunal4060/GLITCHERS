@@ -423,8 +423,8 @@ export class OfflineAIEngine {
 
     // 0. Conversational Greetings & Persona
     if (text.match(/^(?:hi|hello|hey|namaste|hola|sup|good morning|good afternoon|good evening|yo)\b/i) || text === 'hi' || text === 'hello') {
-      return `### 👋 Hello! I am your GLITCHERS AI Companion\n\n` +
-        `I am running 100% on-device using **${model.name}** (${model.quantization}).\n\n` +
+      return `### 👋 Hello! I am NIA (Nexa Intelligent Assistance)\n\n` +
+        `I am your AI companion in the NEXA app, running 100% on-device using **${model.name}** (${model.quantization}).\n\n` +
         `**Here is what I can do for you offline**:\n` +
         `• **Academic & Science**: Solve math equations, explain CS theory, physics laws, and chemistry.\n` +
         `• **Code Generator**: Write and explain Python, C++, JavaScript, and SQL algorithms.\n` +
@@ -435,8 +435,8 @@ export class OfflineAIEngine {
 
     // 0.1 Identity & Capabilities
     if (text.includes('who are you') || text.includes('what are you') || text.includes('what can you do') || text === 'help') {
-      return `### 🤖 About GLITCHERS On-Device AI\n\n` +
-        `I am your private, low-latency student companion powered by **${model.name}** (${model.parameters}).\n\n` +
+      return `### 🤖 About NIA (Nexa Intelligent Assistance)\n\n` +
+        `I am your private, low-latency student companion for NEXA powered by **${model.name}** (${model.parameters}).\n\n` +
         `• **Zero Network Dependency**: Runs completely on your device without transmitting data to external servers.\n` +
         `• **Specialty**: ${model.specialty}.\n` +
         `• **Quantization**: ${model.quantization} (${model.sizeMB} MB).\n\n` +

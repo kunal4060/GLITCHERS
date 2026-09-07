@@ -37,7 +37,7 @@ export const LoginScreen: React.FC = () => {
       if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.origin) {
         returnUrl = window.location.origin;
       } else {
-        returnUrl = 'glitchers://auth';
+        returnUrl = 'nexa://auth';
       }
 
       let googleAuthUrl: string | null = null;
@@ -140,9 +140,9 @@ export const LoginScreen: React.FC = () => {
           <View style={styles.brandIconContainer}>
             <Image source={APP_LOGO} style={styles.brandLogo} resizeMode="cover" />
           </View>
-          <Text style={styles.brandTitle}>GLITCHERS</Text>
+          <Text style={styles.brandTitle}>NEXA</Text>
           <View style={styles.categoryPill}>
-            <Text style={styles.categoryPillText}>AI STUDENT COMPANION</Text>
+            <Text style={styles.categoryPillText}>AI STUDENT COMPANION • POWERED BY NIA</Text>
           </View>
         </View>
 

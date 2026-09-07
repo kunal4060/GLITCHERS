@@ -1,5 +1,5 @@
 -- ====================================================================
--- GLITCHERS: AI Student Life Companion - Database Schema (Supabase / PostgreSQL)
+-- NEXA: AI Student Life Companion (powered by NIA) - Database Schema (Supabase / PostgreSQL)
 -- Migration: 001_initial_schema.sql
 -- ====================================================================
 

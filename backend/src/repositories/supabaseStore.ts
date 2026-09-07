@@ -727,7 +727,7 @@ export class SupabaseStore {
           .insert({
             id: newConvId,
             user_id: userId,
-            title: 'AI Companion Chat',
+            title: 'NIA Chat',
             created_at: new Date().toISOString(),
           })
           .select('id')

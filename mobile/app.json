@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "GLITCHERS",
-    "slug": "kunal",
-    "scheme": "glitchers",
+    "name": "NEXA",
+    "slug": "nexa",
+    "scheme": "nexa",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -20,7 +20,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FAF7F2"
       },
-      "package": "com.glitchers.studentcompanion",
+      "package": "com.nexa.studentcompanion",
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.SYSTEM_ALERT_WINDOW",

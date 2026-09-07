@@ -335,10 +335,10 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   : activeStep === 'FINANCE_SETUP'
                   ? 'Student Budget & Finance'
                   : activeStep === 'FLOATING_ASSISTANT'
-                  ? 'Floating AI Assistant'
+                  ? 'Floating Assistant (NIA)'
                   : activeStep === 'INITIAL_PROCESSING'
                   ? 'Preparing Workspace'
-                  : 'Welcome to GLITCHERS'}
+                  : 'Welcome to NEXA'}
               </Text>
             </View>
             <TouchableOpacity
@@ -1064,9 +1064,9 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   <Ionicons name="sparkles-outline" size={24} color="#2E7470" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.cardHeader}>Floating AI Assistant</Text>
+                  <Text style={styles.cardHeader}>Floating Assistant (NIA)</Text>
                   <Text style={styles.cardDesc}>
-                    A lightweight AI gem overlay you can tap from any screen or app to ask questions or record expenses.
+                    A lightweight AI gem overlay powered by NIA (Nexa Intelligent Assistance) you can tap from any screen or app to ask questions or record expenses.
                   </Text>
                 </View>
               </View>
@@ -1083,7 +1083,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
 
               <View style={styles.serviceToggleRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.toggleTitle}>Enable Floating Assistant</Text>
+                  <Text style={styles.toggleTitle}>Enable Floating Assistant (NIA)</Text>
                   <Text style={styles.toggleDesc}>
                     Draw over other applications. On Android, this requests the SYSTEM_ALERT_WINDOW permission.
                   </Text>
@@ -1107,7 +1107,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   style={[styles.primaryButton, { flex: 2 }]}
                   onPress={runInitializationPipeline}
                 >
-                  <Text style={styles.primaryButtonText}>Prepare My AI ⚡</Text>
+                  <Text style={styles.primaryButtonText}>Prepare My AI (NIA) ⚡</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1118,9 +1118,9 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
             <View style={styles.stepCard}>
               <View style={styles.prepHeader}>
                 <ActivityIndicator size="large" color="#2E7470" style={{ marginBottom: 16 }} />
-                <Text style={styles.prepTitle}>Preparing your Student AI</Text>
+                <Text style={styles.prepTitle}>Preparing your Student AI (NIA)</Text>
                 <Text style={styles.prepDesc}>
-                  Configuring your academic database, timetable engine, and personal assistant...
+                  Configuring your academic database, timetable engine, and NIA assistant...
                 </Text>
               </View>
 
@@ -1169,7 +1169,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
               </View>
               <Text style={styles.congratsTitle}>You are Ready!</Text>
               <Text style={styles.congratsDesc}>
-                GLICHERS is initialized and synchronized for {fullName} at {university}.
+                NEXA is initialized and synchronized for {fullName} at {university}.
               </Text>
 
               <View style={styles.summaryBox}>
@@ -1190,7 +1190,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   <Text style={styles.summaryVal}>₹{monthlyBudget}</Text>
                 </View>
                 <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>AI Companion</Text>
+                  <Text style={styles.summaryLabel}>NIA Assistant</Text>
                   <Text style={styles.summaryVal}>Online & Ready</Text>
                 </View>
               </View>

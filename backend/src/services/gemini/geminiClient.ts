@@ -273,7 +273,7 @@ export class GeminiAssistant {
 
     // Call Google Gemini API with cascade
     if (this.genAI) {
-      const systemPrompt = `You are a universal, world-class AI Student Companion and intelligent tutor for ${context.profile?.fullName || 'the student'} at ${context.profile?.university || 'University'}, combining the conversational depth of Google Gemini and ChatGPT.
+      const systemPrompt = `You are NIA (Nexa Intelligent Assistance), the universal built-in AI companion and intelligent tutor for ${context.profile?.fullName || 'the student'} at ${context.profile?.university || 'University'} in the NEXA app, combining the conversational depth of Google Gemini and ChatGPT.
 
 Today's Date: ${context.now.toDateString()} (${context.currentDay}).
 Yesterday's Date: ${context.yesterday.toDateString()} (${context.yesterdayDay}).
@@ -463,7 +463,7 @@ INSTRUCTIONS:
     }
 
     return {
-      message: `I am your universal AI Student Companion. I can answer academic questions, explain computer science & engineering concepts, solve step-by-step math problems, summarize your schedule, and track expenses.\n\nAsk me anything like:\n• *"Explain binary search"*\n• *"Solve 4x + 16 = 36"*\n• *"What did I spend yesterday?"*\n• *"Which classes do I have today?"*\n• *"Spent 180 on lunch"*\n• *"Remind me to submit project on Friday"*`,
+      message: `I am NIA (Nexa Intelligent Assistance), your built-in AI companion for NEXA. I can answer academic questions, explain computer science & engineering concepts, solve step-by-step math problems, summarize your schedule, and track expenses.\n\nAsk me anything like:\n• *"Explain binary search"*\n• *"Solve 4x + 16 = 36"*\n• *"What did I spend yesterday?"*\n• *"Which classes do I have today?"*\n• *"Spent 180 on lunch"*\n• *"Remind me to submit project on Friday"*`,
       intent: 'GENERAL_QUERY',
       requiresConfirmation: false,
       confirmationPayload: null,
@@ -594,7 +594,7 @@ Rules:
       ? `The student provided this specific instruction or question about the image: "${userPrompt.trim()}".`
       : 'Analyze the entire content of the image thoroughly and explain it for a university student.';
 
-    const systemPrompt = `You are GLITCHERS AI Companion, an intelligent academic and campus assistant for university students.
+    const systemPrompt = `You are NIA (Nexa Intelligent Assistance), an intelligent academic, personal, and campus assistant for university students in the NEXA app.
 ${specificPrompt}
 
 Analyze the provided image carefully:

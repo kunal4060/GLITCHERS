@@ -1,6 +1,6 @@
-# 🎓 GLITCHERS — Full-Stack AI Student Life Companion
+# 🎓 NEXA — Full-Stack AI Student Life Companion (powered by NIA)
 
-An autonomous, mobile-first AI-powered student assistant designed to unify university communications, timetable management, academic deadlines, financial tracking, shared expenses, and daily student operations into one intelligent system.
+An autonomous, mobile-first AI-powered student assistant (NIA: Nexa Intelligent Assistance) designed to unify university communications, timetable management, academic deadlines, financial tracking, shared expenses, and daily student operations into one intelligent system.
 
 ---
 
@@ -27,12 +27,12 @@ An autonomous, mobile-first AI-powered student assistant designed to unify unive
 │    • Shared Expenses: Group bill division with debt generation         │
 │    • Email: University-filtered circulars, reschedule detection        │
 │    • Documents: Syllabus & notice AI parser, 1-tap task conversion     │
-│    • AI Chat: Conversational student assistant with 12 backend tools   │
+│    • AI Chat (NIA): Conversational student assistant with 12 backend tools   │
 │    • Search: Real-time global cross-entity search across all data      │
 │    • Notifications: Priority alert feed & Quiet Hours indicator        │
 │    • Profile & Settings: Student identity, quiet hours, university domain│
 │    • Privacy: Google token revocation, JSON data export, account delete│
-│  - Floating Assistant: Draggable bubble (🎓) with translucent windows  │
+│    • Floating Assistant (NIA): Draggable bubble (🎓) with translucent windows  │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     │ (HTTP / WebSocket)
                                     ▼
@@ -95,7 +95,7 @@ npm run backend:dev
 Verify backend health:
 ```bash
 curl http://localhost:5000/health
-# {"status":"ok","service":"GLITCHERS Fastify Backend"}
+# {"status":"ok","service":"NEXA Fastify Backend"}
 ```
 
 ### 4. Start React Native Mobile Frontend (Expo)
@@ -111,7 +111,7 @@ npm run mobile:start
 
 ## 🧪 Automated Test Verification
 
-GLITCHERS includes an automated test suite verifying all deterministic finance math, conflict detection algorithms, reminder schedules, and Fastify API endpoints:
+NEXA includes an automated test suite verifying all deterministic finance math, conflict detection algorithms, reminder schedules, and Fastify API endpoints:
 
 ```bash
 # Run all tests
@@ -167,7 +167,7 @@ The Android Floating Assistant is implemented in Kotlin via Android's `WindowMan
   - Bridge: [`mobile/android/FloatingOverlayModule.kt`](./mobile/android/FloatingOverlayModule.kt)
 - **Permissions**:
   - `android.permission.SYSTEM_ALERT_WINDOW`
-  - In Android Settings -> Apps -> GLITCHERS -> "Display over other apps" -> Allow.
+  - In Android Settings -> Apps -> NEXA -> "Display over other apps" -> Allow.
 - **Features**:
   - Floats above all Android applications.
   - Remembers screen coordinates on drag.
@@ -187,4 +187,4 @@ The Android Floating Assistant is implemented in Kotlin via Android's `WindowMan
 
 ## 📄 License
 
-Proprietary & Confidential. Developed for GLITCHERS.
+Proprietary & Confidential. Developed for NEXA.

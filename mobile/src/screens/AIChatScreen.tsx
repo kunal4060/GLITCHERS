@@ -82,7 +82,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
     }
   }, []);
 
-  // Hide floating assistant bubble on AI Companion screen so it doesn't block the chat send button
+  // Hide floating assistant bubble on NIA screen so it doesn't block the chat send button
   useFocusEffect(
     React.useCallback(() => {
       useFloatingStore.getState().setBubbleVisible(false);
@@ -613,11 +613,11 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
           <View style={styles.headerLeft}>
             <AIGemSymbol size={34} />
             <View>
-              <Text style={styles.headerTitle}>AI Student Companion</Text>
+              <Text style={styles.headerTitle}>NIA</Text>
               <View style={styles.statusRow}>
                 <View style={[styles.onlineDot, aiMode === 'OFFLINE' && { backgroundColor: '#F59E0B' }]} />
                 <Text style={styles.statusText}>
-                  {aiMode === 'OFFLINE' ? '100% Offline (Hugging Face)' : 'Universal Command Center Active'}
+                  {aiMode === 'OFFLINE' ? '100% Offline (HF Engine)' : 'Nexa Intelligent Assistance'}
                 </Text>
               </View>
             </View>
@@ -690,9 +690,9 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
             <View style={{ marginBottom: 16 }}>
               <AIGemSymbol size={64} />
             </View>
-            <Text style={styles.emptyTitle}>Universal Student Command Center</Text>
+            <Text style={styles.emptyTitle}>NIA — Nexa Intelligent Assistance</Text>
             <Text style={styles.emptyDescription}>
-              Speak or type naturally. I can log your expenses, schedule assignments, split bills, and fetch live timetables.
+              Hello! I am NIA, your built-in AI companion for NEXA. Speak or type naturally. I can log your expenses, schedule assignments, split bills, and answer academic questions.
             </Text>
 
             {/* Offline Model Switcher Banner Shortcut */}
@@ -864,7 +864,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Ionicons name="hardware-chip-outline" size={22} color={designTokens.colors.primaryDark} />
                 <View>
-                  <Text style={styles.modalTitle}>Offline AI Engine</Text>
+                  <Text style={styles.modalTitle}>NIA Offline Engine</Text>
                   <Text style={styles.modalSubtitle}>Hugging Face On-Device Models</Text>
                 </View>
               </View>

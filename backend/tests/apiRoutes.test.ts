@@ -21,7 +21,7 @@ describe('Fastify Modular API Routes Integration Tests', () => {
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
     expect(body.status).toBe('ok');
-    expect(body.service).toBe('GLITCHERS Fastify Backend');
+    expect(body.service).toBe('NEXA Fastify Backend');
     expect(body.version).toBe('1.0.0');
     expect(body.database).toBeDefined();
     expect(body.database.provider).toBeDefined();

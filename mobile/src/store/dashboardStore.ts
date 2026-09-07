@@ -579,7 +579,7 @@ export const useDashboardStore = create<DashboardState>()(
       },
     }),
     {
-      name: 'glitchers-dashboard-storage',
+      name: 'nexa-dashboard-storage',
       storage: createJSONStorage(() => AsyncStorage),
       onRehydrateStorage: () => (state) => {
         if (state) {

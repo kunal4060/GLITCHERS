@@ -152,7 +152,7 @@ export const FloatingAssistantOverlay: React.FC = () => {
               {activeMiniWindow === 'FINANCE' && '💰 Quick Expense Entry'}
               {activeMiniWindow === 'TASKS' && '✅ Quick Student Tasks'}
               {activeMiniWindow === 'CALENDAR' && '🗓 Class & Event Schedule'}
-              {activeMiniWindow === 'AI' && '🤖 Quick Student AI'}
+              {activeMiniWindow === 'AI' && '🤖 NIA Assistant'}
             </Text>
             <TouchableOpacity onPress={closeMiniWindow} style={styles.closeBtn}>
               <Text style={styles.closeBtnText}>✕</Text>
@@ -292,7 +292,7 @@ export const FloatingAssistantOverlay: React.FC = () => {
               <View>
                 <TextInput
                   style={styles.input}
-                  placeholder="Ask anything about classes, money, tasks..."
+                  placeholder="Ask NIA about classes, money, tasks..."
                   placeholderTextColor="#94A3B8"
                   value={quickInput}
                   onChangeText={setQuickInput}
@@ -303,7 +303,7 @@ export const FloatingAssistantOverlay: React.FC = () => {
                   onPress={handleFloatingAI}
                   disabled={isAiLoading}
                 >
-                  <Text style={styles.actionBtnText}>{isAiLoading ? 'Processing...' : 'Ask AI'}</Text>
+                  <Text style={styles.actionBtnText}>{isAiLoading ? 'Processing...' : 'Ask NIA'}</Text>
                 </TouchableOpacity>
                 {quickAiResponse ? (
                   <View style={styles.card}>
@@ -337,7 +337,7 @@ export const FloatingAssistantOverlay: React.FC = () => {
           </TouchableOpacity>
           <TouchableOpacity style={styles.menuItem} onPress={() => openMiniWindow('AI')}>
             <Ionicons name="sparkles" size={16} color="#C4B5FD" />
-            <Text style={styles.menuItemText}>AI Chat</Text>
+            <Text style={styles.menuItemText}>NIA</Text>
           </TouchableOpacity>
         </View>
       )}

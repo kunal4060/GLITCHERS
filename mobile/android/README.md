@@ -1,6 +1,6 @@
 # Android Floating Student Assistant (Native Module)
 
-This directory contains the Android-specific implementation of the **Floating Student Assistant** for **GLITCHERS**.
+This directory contains the Android-specific implementation of the **Floating Student Assistant (NIA)** for **NEXA**.
 
 ## Architecture & Capabilities
 

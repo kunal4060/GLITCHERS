@@ -187,7 +187,7 @@ function MainTabs({ navigation }: { navigation: any }) {
         />
 
         <Tab.Screen
-          name="AI Companion"
+          name="NIA"
           component={AIChatScreen}
           options={{
             headerShown: false,
@@ -199,12 +199,12 @@ function MainTabs({ navigation }: { navigation: any }) {
                   color: focused ? designTokens.colors.textPrimary : designTokens.colors.textSecondary,
                 }}
               >
-                AI Companion
+                NIA
               </Text>
             ),
             tabBarIcon: ({ focused }) => (
               <Ionicons
-                name={focused ? 'school' : 'school-outline'}
+                name={focused ? 'sparkles' : 'sparkles-outline'}
                 size={20}
                 color={focused ? designTokens.colors.primary : designTokens.colors.textSecondary}
               />

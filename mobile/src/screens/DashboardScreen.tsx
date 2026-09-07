@@ -356,7 +356,7 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
           <View style={styles.emailDigestHeaderRow}>
             <View style={styles.emailDigestTitleGroup}>
               <AIGemSymbol size={22} />
-              <Text style={styles.emailDigestHeading}>AI EMAIL SUMMARY</Text>
+              <Text style={styles.emailDigestHeading}>NIA EMAIL SUMMARY</Text>
             </View>
             <View style={styles.geminiBadge}>
               <Text style={styles.geminiBadgeText}>Gemini 3.6 Flash</Text>
@@ -412,7 +412,7 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
                 {isSummarizingEmails ? (
                   <View style={styles.loadingContainer}>
                     <ActivityIndicator size="small" color={designTokens.colors.primaryDark} />
-                    <Text style={styles.loadingText}>Gemini is extracting key deadlines & notices...</Text>
+                    <Text style={styles.loadingText}>NIA is extracting key deadlines & notices...</Text>
                   </View>
                 ) : emailBullets.length > 0 ? (
                   <View style={styles.bulletsList}>

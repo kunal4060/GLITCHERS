@@ -42,7 +42,7 @@ class ApiClient {
   public setToken(token: string) {
     this.token = token;
     if (token) {
-      AsyncStorage.setItem('glitchers-auth-token', token).catch(() => null);
+      AsyncStorage.setItem('nexa-auth-token', token).catch(() => null);
     }
   }
 
@@ -52,6 +52,7 @@ class ApiClient {
 
   public clearToken() {
     this.token = '';
+    AsyncStorage.removeItem('nexa-auth-token').catch(() => null);
     AsyncStorage.removeItem('glitchers-auth-token').catch(() => null);
   }
 
@@ -76,9 +77,9 @@ class ApiClient {
       // ignore
     }
 
-    // 2. Try reading from dedicated token storage
+    // 2. Try reading from dedicated token storage (nexa first, then legacy fallback)
     try {
-      const stored = await AsyncStorage.getItem('glitchers-auth-token');
+      const stored = (await AsyncStorage.getItem('nexa-auth-token')) || (await AsyncStorage.getItem('glitchers-auth-token'));
       if (stored && stored.trim() && stored !== 'dev-token') {
         this.token = stored.trim();
         return this.token;
@@ -89,7 +90,7 @@ class ApiClient {
 
     // 3. Try reading from persisted authStore storage in AsyncStorage
     try {
-      const rawAuth = await AsyncStorage.getItem('glitchers-auth-storage');
+      const rawAuth = (await AsyncStorage.getItem('nexa-auth-storage')) || (await AsyncStorage.getItem('glitchers-auth-storage'));
       if (rawAuth) {
         const parsed = JSON.parse(rawAuth);
         const storedToken = parsed?.state?.token;

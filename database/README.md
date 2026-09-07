@@ -1,6 +1,6 @@
 # Supabase Database Migrations
 
-This folder contains reproducible PostgreSQL migrations for **GLITCHERS (AI Student Life Companion)**.
+This folder contains reproducible PostgreSQL migrations for **NEXA (AI Student Life Companion with NIA)**.
 
 ## Applying Migrations
 

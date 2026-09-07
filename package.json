@@ -1,8 +1,8 @@
 {
-  "name": "glitchers-monorepo",
+  "name": "nexa-monorepo",
   "version": "1.0.0",
   "private": true,
-  "description": "AI Student Life Companion - Monorepo",
+  "description": "NEXA: AI Student Life Companion (powered by NIA) - Monorepo",
   "workspaces": [
     "shared",
     "backend",

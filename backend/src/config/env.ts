@@ -44,7 +44,7 @@ const EnvSchema = z.object({
       ? 'https://glitchers-backend.onrender.com/api/auth/google/callback'
       : 'http://localhost:5000/api/auth/google/callback'
   ),
-  JWT_SECRET: z.string().trim().default('glitchers-jwt-secret-student-life-companion-2026'),
+  JWT_SECRET: z.string().trim().default('nexa-jwt-secret-student-life-companion-2026'),
 });
 
 export const env = EnvSchema.parse(process.env);

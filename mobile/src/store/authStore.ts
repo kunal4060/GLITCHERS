@@ -237,12 +237,14 @@ export const useAuthStore = create<AuthState>()(
         });
         useDashboardStore.getState().reset();
         apiClient.clearToken();
+        AsyncStorage.removeItem('nexa-auth-storage').catch(() => null);
+        AsyncStorage.removeItem('nexa-auth-token').catch(() => null);
         AsyncStorage.removeItem('glitchers-auth-storage').catch(() => null);
         AsyncStorage.removeItem('glitchers-auth-token').catch(() => null);
       },
     }),
     {
-      name: 'glitchers-auth-storage',
+      name: 'nexa-auth-storage',
       storage: createJSONStorage(() => AsyncStorage),
       onRehydrateStorage: () => (state) => {
         if (state) {

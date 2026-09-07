@@ -1,4 +1,4 @@
-package com.glitchers.studentcompanion.floating
+package com.nexa.studentcompanion.floating
 
 import android.app.Service
 import android.content.Context

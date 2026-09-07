@@ -235,8 +235,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
 
           <View style={styles.toggleRow}>
             <View style={{ flex: 1, paddingRight: 10 }}>
-              <Text style={styles.toggleTitle}>Floating AI Assistant</Text>
-              <Text style={styles.toggleSub}>Quick-access floating gem over other apps</Text>
+              <Text style={styles.toggleTitle}>Floating AI Assistant (NIA)</Text>
+              <Text style={styles.toggleSub}>Quick-access NIA floating gem over other apps</Text>
             </View>
             <Switch
               value={floatingAssistantEnabled}
