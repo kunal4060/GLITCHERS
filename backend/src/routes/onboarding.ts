@@ -21,7 +21,7 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
    */
   fastify.get('/status', async (req) => {
     const userId = req.userId!;
-    let state = inMemoryStore.onboardingStates.get(userId);
+    let state = await supabaseStore.getOnboardingState(userId);
 
     if (!state) {
       state = {
@@ -33,7 +33,7 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
         startedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      inMemoryStore.onboardingStates.set(userId, state);
+      await supabaseStore.saveOnboardingState(userId, state);
     }
 
     const profile = await supabaseStore.getProfile(userId);
@@ -78,7 +78,7 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
       }
     }
 
-    let state = inMemoryStore.onboardingStates.get(userId);
+    let state = (await supabaseStore.getOnboardingState(userId)) || inMemoryStore.onboardingStates.get(userId);
     if (!state) {
       state = {
         userId,
@@ -105,7 +105,7 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
       updatedAt: new Date().toISOString(),
     };
 
-    inMemoryStore.onboardingStates.set(userId, updatedState);
+    await supabaseStore.saveOnboardingState(userId, updatedState);
 
     // If profile data was updated, partially merge into profile
     if (data) {
@@ -275,7 +275,7 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
 
     // 4. Notifications & Preferences
     const notifSettings = body.notificationSettings || {};
-    inMemoryStore.preferences.set(userId, {
+    await supabaseStore.saveUserPreferences(userId, {
       quietHours: {
         enabled: notifSettings.quietHoursEnabled ?? true,
         startTime: notifSettings.quietHoursStart || '23:00',
@@ -283,6 +283,7 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
         criticalBypass: true,
       },
       universityDomain: body.profile?.universityDomain || 'university.edu',
+      floatingAssistantEnabled: body.floatingAssistantEnabled ?? true,
     });
     job.stepStatuses.notifications = { status: 'COMPLETED', message: 'Notification preferences saved' };
 
@@ -316,10 +317,10 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
     // Finalize Job & Onboarding State
     job.status = 'COMPLETED';
     job.completedAt = new Date().toISOString();
-    inMemoryStore.initializationJobs.set(jobId, job);
+    await supabaseStore.saveInitializationJob(job);
 
-    const existingState = inMemoryStore.onboardingStates.get(userId);
-    inMemoryStore.onboardingStates.set(userId, {
+    const existingState = (await supabaseStore.getOnboardingState(userId)) || inMemoryStore.onboardingStates.get(userId);
+    const finalState: OnboardingState = {
       ...(existingState || { userId, startedAt: new Date().toISOString() }),
       currentStep: 'COMPLETE',
       isComplete: true,
@@ -339,7 +340,8 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
       ],
       completedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-    });
+    };
+    await supabaseStore.saveOnboardingState(userId, finalState);
 
     return {
       success: true,
@@ -356,7 +358,7 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
    */
   fastify.get<{ Params: { jobId: string } }>('/jobs/:jobId', async (req, reply) => {
     const { jobId } = req.params;
-    const job = inMemoryStore.initializationJobs.get(jobId);
+    const job = (await supabaseStore.getInitializationJob(jobId)) || inMemoryStore.initializationJobs.get(jobId);
     if (!job) {
       return reply.status(404).send({ error: 'Job not found' });
     }

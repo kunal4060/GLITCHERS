@@ -9,6 +9,12 @@ import type {
   Debt,
   EmailSummary,
   Budget,
+  NotificationItem,
+  QuietHours,
+  Exam,
+  Assignment,
+  OnboardingState,
+  InitializationJob,
 } from '@glitchers/shared';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -540,9 +546,96 @@ export class SupabaseStore {
     const supabase = getSupabaseClient();
     if (supabase && UUID_REGEX.test(userId) && prepared.length > 0) {
       try {
+        // 1. Ensure active semester exists
+        let semesterId: string | null = null;
+        let timetableId: string | null = null;
+
+        const { data: existingSem } = await supabase
+          .from('semesters')
+          .select('id')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (existingSem) {
+          semesterId = existingSem.id;
+        } else {
+          const { data: newSem } = await supabase
+            .from('semesters')
+            .insert({
+              user_id: userId,
+              name: 'Semester 3 (Academic Year 2026-27)',
+              start_date: '2026-08-01',
+              end_date: '2026-12-20',
+              is_active: true,
+            })
+            .select('id')
+            .maybeSingle();
+          semesterId = newSem?.id || null;
+        }
+
+        // 2. Ensure active timetable exists
+        const { data: existingTt } = await supabase
+          .from('timetables')
+          .select('id')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (existingTt) {
+          timetableId = existingTt.id;
+        } else {
+          const { data: newTt } = await supabase
+            .from('timetables')
+            .insert({
+              user_id: userId,
+              semester_id: semesterId,
+              is_active: true,
+            })
+            .select('id')
+            .maybeSingle();
+          timetableId = newTt?.id || null;
+        }
+
+        // 3. Keep subjects lookup table synchronized with distinct courses
+        const uniqueSubjects = new Map<string, string | undefined>();
+        for (const c of prepared) {
+          if (c.subjectName && !uniqueSubjects.has(c.subjectName)) {
+            uniqueSubjects.set(c.subjectName, c.faculty || undefined);
+          }
+        }
+        for (const [subName, faculty] of uniqueSubjects.entries()) {
+          const { data: existingSub } = await supabase
+            .from('subjects')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('name', subName)
+            .maybeSingle();
+
+          if (!existingSub) {
+            await supabase.from('subjects').insert({
+              user_id: userId,
+              semester_id: semesterId,
+              name: subName,
+              short_name: subName.slice(0, 10),
+              code: subName,
+              faculty: faculty || null,
+            });
+          }
+        }
+
+        // 4. Fetch subject map
+        const { data: allSubjects } = await supabase
+          .from('subjects')
+          .select('id, name')
+          .eq('user_id', userId);
+
+        const subMap = new Map((allSubjects || []).map((s) => [s.name.toLowerCase().trim(), s.id]));
+
+        // 5. Upsert classes with timetable_id and subject_id
         const rows = prepared.map((c) => ({
           id: c.id,
           user_id: userId,
+          timetable_id: timetableId,
+          subject_id: subMap.get(c.subjectName.toLowerCase().trim()) || null,
           subject_name: c.subjectName,
           day: c.day,
           start_time: c.startTime.length === 5 ? `${c.startTime}:00` : c.startTime,
@@ -554,36 +647,6 @@ export class SupabaseStore {
         }));
 
         await supabase.from('classes').upsert(rows, { onConflict: 'id' });
-
-        // Keep subjects lookup table synchronized with distinct courses
-        try {
-          const uniqueSubjects = new Map<string, string | undefined>();
-          for (const c of prepared) {
-            if (c.subjectName && !uniqueSubjects.has(c.subjectName)) {
-              uniqueSubjects.set(c.subjectName, c.faculty || undefined);
-            }
-          }
-          for (const [subName, faculty] of uniqueSubjects.entries()) {
-            const { data: existingSub } = await supabase
-              .from('subjects')
-              .select('id')
-              .eq('user_id', userId)
-              .eq('name', subName)
-              .maybeSingle();
-
-            if (!existingSub) {
-              await supabase.from('subjects').insert({
-                user_id: userId,
-                name: subName,
-                short_name: subName.slice(0, 10),
-                code: subName,
-                faculty: faculty || null,
-              });
-            }
-          }
-        } catch {
-          // non-blocking fallback
-        }
       } catch (err) {
         console.warn('SupabaseStore.saveClasses warning:', err);
       }
@@ -1012,6 +1075,434 @@ export class SupabaseStore {
     }
 
     return prepared;
+  }
+
+  // ==========================================
+  // NOTIFICATIONS
+  // ==========================================
+
+  public async getNotifications(userId: string): Promise<NotificationItem[]> {
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        const { data, error } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', userId)
+          .order('scheduled_for', { ascending: false });
+
+        if (data && !error) {
+          const list: NotificationItem[] = data.map((d) => ({
+            id: d.id,
+            userId: d.user_id,
+            title: d.title,
+            message: d.message,
+            type: d.type,
+            priority: d.priority || 'NORMAL',
+            read: d.read ?? false,
+            scheduledFor: d.scheduled_for,
+            sentAt: d.sent_at || null,
+            sourceId: d.source_id || undefined,
+          }));
+          inMemoryStore.notifications.set(userId, list);
+          return list;
+        }
+      } catch (err) {
+        console.warn('SupabaseStore.getNotifications error:', err);
+      }
+    }
+
+    return inMemoryStore.notifications.get(userId) || [];
+  }
+
+  public async createNotification(userId: string, notification: Partial<NotificationItem>): Promise<NotificationItem> {
+    const validId = ensureUUID(notification.id);
+    const item: NotificationItem = {
+      id: validId,
+      userId,
+      title: notification.title || 'Notification',
+      message: notification.message || '',
+      type: notification.type || 'SYSTEM_ALERT',
+      priority: notification.priority || 'NORMAL',
+      read: notification.read ?? false,
+      scheduledFor: notification.scheduledFor || new Date().toISOString(),
+      sentAt: notification.sentAt || new Date().toISOString(),
+      sourceId: notification.sourceId,
+    };
+
+    const list = inMemoryStore.notifications.get(userId) || [];
+    inMemoryStore.notifications.set(userId, [item, ...list]);
+
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        await supabase.from('notifications').upsert({
+          id: validId,
+          user_id: userId,
+          title: item.title,
+          message: item.message,
+          type: item.type,
+          priority: item.priority,
+          read: item.read,
+          scheduled_for: item.scheduledFor,
+          sent_at: item.sentAt,
+          source_id: item.sourceId || null,
+        });
+      } catch (err) {
+        console.warn('SupabaseStore.createNotification warning:', err);
+      }
+    }
+
+    return item;
+  }
+
+  public async markNotificationAsRead(userId: string, notificationId: string): Promise<boolean> {
+    const list = inMemoryStore.notifications.get(userId) || [];
+    const item = list.find((n) => n.id === notificationId);
+    if (item) item.read = true;
+
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        await supabase
+          .from('notifications')
+          .update({ read: true })
+          .eq('id', notificationId)
+          .eq('user_id', userId);
+        return true;
+      } catch (err) {
+        console.warn('SupabaseStore.markNotificationAsRead warning:', err);
+      }
+    }
+
+    return true;
+  }
+
+  // ==========================================
+  // USER PREFERENCES & SETTINGS
+  // ==========================================
+
+  public async getUserPreferences(userId: string): Promise<{
+    quietHours: QuietHours;
+    universityDomain: string;
+    floatingAssistantEnabled: boolean;
+    aiProcessingEnabled: boolean;
+  }> {
+    const fallback = {
+      quietHours: { enabled: true, startTime: '23:00', endTime: '07:00', criticalBypass: true },
+      universityDomain: 'university.edu',
+      floatingAssistantEnabled: true,
+      aiProcessingEnabled: true,
+    };
+
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        const { data, error } = await supabase
+          .from('user_preferences')
+          .select('*')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (data && !error) {
+          const res = {
+            quietHours: {
+              enabled: data.quiet_hours_enabled ?? true,
+              startTime: (data.quiet_hours_start || '23:00:00').slice(0, 5),
+              endTime: (data.quiet_hours_end || '07:00:00').slice(0, 5),
+              criticalBypass: data.critical_bypass ?? true,
+            },
+            universityDomain: data.university_domain || 'university.edu',
+            floatingAssistantEnabled: data.floating_assistant_enabled ?? true,
+            aiProcessingEnabled: data.ai_processing_enabled ?? true,
+          };
+          inMemoryStore.preferences.set(userId, {
+            quietHours: res.quietHours,
+            universityDomain: res.universityDomain,
+          });
+          return res;
+        }
+      } catch (err) {
+        console.warn('SupabaseStore.getUserPreferences error:', err);
+      }
+    }
+
+    const inMem = inMemoryStore.preferences.get(userId);
+    return {
+      quietHours: inMem?.quietHours || fallback.quietHours,
+      universityDomain: inMem?.universityDomain || fallback.universityDomain,
+      floatingAssistantEnabled: true,
+      aiProcessingEnabled: true,
+    };
+  }
+
+  public async saveUserPreferences(userId: string, prefs: {
+    quietHours?: Partial<QuietHours>;
+    universityDomain?: string;
+    floatingAssistantEnabled?: boolean;
+    aiProcessingEnabled?: boolean;
+  }): Promise<void> {
+    const current = await this.getUserPreferences(userId);
+    const updated = {
+      quietHours: { ...current.quietHours, ...(prefs.quietHours || {}) },
+      universityDomain: prefs.universityDomain || current.universityDomain,
+      floatingAssistantEnabled: prefs.floatingAssistantEnabled ?? current.floatingAssistantEnabled,
+      aiProcessingEnabled: prefs.aiProcessingEnabled ?? current.aiProcessingEnabled,
+    };
+
+    inMemoryStore.preferences.set(userId, {
+      quietHours: updated.quietHours,
+      universityDomain: updated.universityDomain,
+    });
+
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        await supabase.from('user_preferences').upsert({
+          user_id: userId,
+          quiet_hours_enabled: updated.quietHours.enabled,
+          quiet_hours_start: `${updated.quietHours.startTime}:00`,
+          quiet_hours_end: `${updated.quietHours.endTime}:00`,
+          critical_bypass: updated.quietHours.criticalBypass,
+          floating_assistant_enabled: updated.floatingAssistantEnabled,
+          ai_processing_enabled: updated.aiProcessingEnabled,
+          university_domain: updated.universityDomain,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+      } catch (err) {
+        console.warn('SupabaseStore.saveUserPreferences warning:', err);
+      }
+    }
+  }
+
+  // ==========================================
+  // EXAMS
+  // ==========================================
+
+  public async getExams(userId: string): Promise<Exam[]> {
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        const { data, error } = await supabase
+          .from('exams')
+          .select('*')
+          .eq('user_id', userId)
+          .order('date', { ascending: true });
+
+        if (data && !error && data.length > 0) {
+          const list: Exam[] = data.map((d) => ({
+            id: d.id,
+            userId: d.user_id,
+            subject: d.subject,
+            date: d.date,
+            time: (d.time || '10:00:00').slice(0, 5),
+            room: d.room || undefined,
+            syllabus: d.syllabus || undefined,
+            importance: d.importance || 'CRITICAL',
+          }));
+          inMemoryStore.exams.set(userId, list);
+          return list;
+        }
+      } catch (err) {
+        console.warn('SupabaseStore.getExams error:', err);
+      }
+    }
+
+    return inMemoryStore.exams.get(userId) || [];
+  }
+
+  public async createExam(userId: string, exam: Partial<Exam>): Promise<Exam> {
+    const validId = ensureUUID(exam.id);
+    const newExam: Exam = {
+      id: validId,
+      userId,
+      subject: exam.subject || 'Subject Exam',
+      date: exam.date || new Date().toISOString().slice(0, 10),
+      time: (exam.time || '10:00').slice(0, 5),
+      room: exam.room || null,
+      syllabus: exam.syllabus || null,
+      importance: exam.importance || 'CRITICAL',
+    };
+
+    const list = inMemoryStore.exams.get(userId) || [];
+    inMemoryStore.exams.set(userId, [...list, newExam]);
+
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        await supabase.from('exams').upsert({
+          id: validId,
+          user_id: userId,
+          subject: newExam.subject,
+          date: newExam.date,
+          time: newExam.time.length === 5 ? `${newExam.time}:00` : newExam.time,
+          room: newExam.room || null,
+          syllabus: newExam.syllabus || null,
+          importance: newExam.importance,
+        });
+      } catch (err) {
+        console.warn('SupabaseStore.createExam warning:', err);
+      }
+    }
+
+    return newExam;
+  }
+
+  public async deleteExam(userId: string, examId: string): Promise<boolean> {
+    const list = inMemoryStore.exams.get(userId) || [];
+    inMemoryStore.exams.set(userId, list.filter((e) => e.id !== examId));
+
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        await supabase.from('exams').delete().eq('id', examId).eq('user_id', userId);
+        return true;
+      } catch (err) {
+        console.warn('SupabaseStore.deleteExam warning:', err);
+      }
+    }
+
+    return true;
+  }
+
+  // ==========================================
+  // GOOGLE ACCOUNTS & ONBOARDING STATE
+  // ==========================================
+
+  public async saveGoogleAccount(userId: string, data: {
+    googleId: string;
+    email: string;
+    accessToken?: string;
+    refreshToken?: string;
+    scopes?: string[];
+  }): Promise<void> {
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        await supabase.from('google_accounts').upsert({
+          user_id: userId,
+          google_id: data.googleId,
+          email: data.email,
+          access_token: data.accessToken || null,
+          refresh_token: data.refreshToken || null,
+          scopes: data.scopes || ['userinfo.email', 'userinfo.profile', 'openid'],
+          gmail_connected: true,
+          calendar_connected: true,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+      } catch (err) {
+        console.warn('SupabaseStore.saveGoogleAccount warning:', err);
+      }
+    }
+  }
+
+  public async saveOnboardingState(userId: string, state: OnboardingState): Promise<void> {
+    inMemoryStore.onboardingStates.set(userId, state);
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        await supabase.from('onboarding_state').upsert({
+          user_id: userId,
+          current_step: state.currentStep,
+          completed_steps: state.completedSteps,
+          is_complete: state.isComplete,
+          data: state.data || {},
+          started_at: state.startedAt || new Date().toISOString(),
+          completed_at: state.completedAt || null,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+      } catch (err) {
+        console.warn('SupabaseStore.saveOnboardingState warning:', err);
+      }
+    }
+  }
+
+  public async getOnboardingState(userId: string): Promise<OnboardingState | null> {
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        const { data, error } = await supabase
+          .from('onboarding_state')
+          .select('*')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (data && !error) {
+          const state: OnboardingState = {
+            userId: data.user_id,
+            currentStep: data.current_step,
+            completedSteps: data.completed_steps || [],
+            isComplete: data.is_complete ?? false,
+            data: data.data || {},
+            startedAt: data.started_at,
+            completedAt: data.completed_at || undefined,
+            updatedAt: data.updated_at,
+          };
+          inMemoryStore.onboardingStates.set(userId, state);
+          return state;
+        }
+      } catch (err) {
+        console.warn('SupabaseStore.getOnboardingState error:', err);
+      }
+    }
+
+    return inMemoryStore.onboardingStates.get(userId) || null;
+  }
+
+  public async saveInitializationJob(job: InitializationJob): Promise<void> {
+    inMemoryStore.initializationJobs.set(job.id, job);
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(job.userId)) {
+      try {
+        await supabase.from('initialization_jobs').upsert({
+          id: ensureUUID(job.id),
+          user_id: job.userId,
+          status: job.status,
+          step_statuses: job.stepStatuses || {},
+          started_at: job.startedAt || new Date().toISOString(),
+          completed_at: job.completedAt || null,
+          error_message: job.errorMessage || null,
+          retry_count: job.retryCount || 0,
+        });
+      } catch (err) {
+        console.warn('SupabaseStore.saveInitializationJob warning:', err);
+      }
+    }
+  }
+
+  public async getInitializationJob(jobId: string): Promise<InitializationJob | null> {
+    const inMem = inMemoryStore.initializationJobs.get(jobId);
+    if (inMem) return inMem;
+
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(jobId)) {
+      try {
+        const { data, error } = await supabase
+          .from('initialization_jobs')
+          .select('*')
+          .eq('id', jobId)
+          .maybeSingle();
+
+        if (data && !error) {
+          const job: InitializationJob = {
+            id: data.id,
+            userId: data.user_id,
+            status: data.status,
+            stepStatuses: data.step_statuses || {},
+            startedAt: data.started_at,
+            completedAt: data.completed_at || undefined,
+            errorMessage: data.error_message || undefined,
+            retryCount: data.retry_count || 0,
+          };
+          inMemoryStore.initializationJobs.set(jobId, job);
+          return job;
+        }
+      } catch (err) {
+        console.warn('SupabaseStore.getInitializationJob error:', err);
+      }
+    }
+
+    return null;
   }
 }
 

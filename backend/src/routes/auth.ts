@@ -74,6 +74,13 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         scopes: ['userinfo.email', 'userinfo.profile', 'openid', 'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/calendar.events'],
       });
 
+      await supabaseStore.saveGoogleAccount(profile.id, {
+        googleId: googleId || `google_${profile.email.replace(/[^a-zA-Z0-9]/g, '_')}`,
+        email,
+        accessToken,
+        scopes: ['userinfo.email', 'userinfo.profile', 'openid', 'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/calendar.events'],
+      });
+
       return reply.redirect(
         `${cleanBase}/?token=jwt_${profile.id}&email=${encodeURIComponent(profile.email)}&name=${encodeURIComponent(profile.fullName)}`
       );
@@ -101,6 +108,13 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       email,
       gmailConnected: true,
       calendarConnected: true,
+      scopes: ['userinfo.email', 'userinfo.profile', 'openid', 'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/calendar.events'],
+    });
+
+    await supabaseStore.saveGoogleAccount(profile.id, {
+      googleId: googleId || `google_${profile.email.replace(/[^a-zA-Z0-9]/g, '_')}`,
+      email,
+      accessToken,
       scopes: ['userinfo.email', 'userinfo.profile', 'openid', 'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/calendar.events'],
     });
 

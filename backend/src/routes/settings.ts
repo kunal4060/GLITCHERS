@@ -8,17 +8,14 @@ export const settingsRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.get('/', async (req) => {
     const userId = req.userId!;
-    const profile = (await supabaseStore.getProfile(userId)) || inMemoryStore.profiles.get(userId) || null;
-    const prefs = inMemoryStore.preferences.get(userId) || {
-      quietHours: { enabled: true, startTime: '23:00', endTime: '07:00', criticalBypass: true },
-      universityDomain: 'university.edu',
-    };
+    const profile = await supabaseStore.getProfile(userId);
+    const prefs = await supabaseStore.getUserPreferences(userId);
 
     return {
       profile,
       preferences: prefs,
-      floatingAssistantEnabled: true,
-      aiInsightsEnabled: true,
+      floatingAssistantEnabled: prefs.floatingAssistantEnabled,
+      aiInsightsEnabled: prefs.aiProcessingEnabled,
     };
   });
 
@@ -26,18 +23,13 @@ export const settingsRoutes: FastifyPluginAsync = async (fastify) => {
     '/',
     async (req) => {
       const userId = req.userId!;
-      const current = inMemoryStore.preferences.get(userId) || {
-        quietHours: { enabled: true, startTime: '23:00', endTime: '07:00', criticalBypass: true },
-        universityDomain: 'university.edu',
-      };
+      await supabaseStore.saveUserPreferences(userId, {
+        universityDomain: req.body.universityDomain,
+        quietHours: req.body.quietHours,
+        floatingAssistantEnabled: req.body.floatingAssistantEnabled,
+      });
 
-      const updated = {
-        ...current,
-        ...(req.body.universityDomain ? { universityDomain: req.body.universityDomain } : {}),
-        ...(req.body.quietHours ? { quietHours: { ...current.quietHours, ...req.body.quietHours } } : {}),
-      };
-
-      inMemoryStore.preferences.set(userId, updated);
+      const updated = await supabaseStore.getUserPreferences(userId);
       return { success: true, preferences: updated };
     }
   );

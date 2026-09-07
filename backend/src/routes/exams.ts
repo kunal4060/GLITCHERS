@@ -1,15 +1,15 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { inMemoryStore } from '../repositories/inMemoryStore.js';
+import { supabaseStore } from '../repositories/supabaseStore.js';
 import { authMiddleware } from '../middleware/auth.js';
 import type { Exam } from '@glitchers/shared';
-import { randomUUID } from 'crypto';
 
 export const examRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', authMiddleware);
 
   fastify.get('/', async (req) => {
     const userId = req.userId!;
-    const exams = inMemoryStore.exams.get(userId) || [];
+    const exams = await supabaseStore.getExams(userId);
     return { exams };
   });
 
@@ -23,30 +23,22 @@ export const examRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: 'Subject, date, and time are required' });
     }
 
-    const newExam: Exam = {
-      id: randomUUID(),
-      userId,
+    const created = await supabaseStore.createExam(userId, {
       subject,
       date,
       time,
       room: room || null,
       syllabus: syllabus || null,
       importance: importance || 'CRITICAL',
-    };
+    });
 
-    const exams = inMemoryStore.exams.get(userId) || [];
-    exams.push(newExam);
-    inMemoryStore.exams.set(userId, exams);
-
-    return { exam: newExam };
+    return { exam: created };
   });
 
   fastify.delete<{ Params: { id: string } }>('/:id', async (req, reply) => {
     const userId = req.userId!;
     const { id } = req.params;
-    const exams = inMemoryStore.exams.get(userId) || [];
-    const filtered = exams.filter((e) => e.id !== id);
-    inMemoryStore.exams.set(userId, filtered);
+    await supabaseStore.deleteExam(userId, id);
     return { success: true };
   });
 };
