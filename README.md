@@ -6,6 +6,8 @@ An autonomous, mobile-first AI-powered student assistant (NIA: Nexa Intelligent 
 
 ## 🏛️ System Architecture
 
+> 📖 **Full Architecture Guide**: See [ARCHITECTURE.md](./ARCHITECTURE.md) for the complete end-to-end topology, database ERD, dual AI engine diagrams, and execution sequence flows.
+
 ```
                                  GOOGLE CLOUD
                      (OAuth 2.0 / Gmail / Calendar APIs)
@@ -177,6 +179,7 @@ The Android Floating Assistant is implemented in Kotlin via Android's `WindowMan
 
 ## 📚 Master Documentation References
 
+- [`ARCHITECTURE.md`](./ARCHITECTURE.md) — Complete system architecture, database ERD & AI integration flow
 - [`PROMPT.md`](./PROMPT.md) — Complete 3,142-line product requirements and specifications
 - [`INSTRUCTION.md`](./INSTRUCTION.md) — Engineering agent non-negotiable rules and quality gates
 - [`IDIA.md`](./IDIA.md) — Product vision, user stories, and feature roadmap
