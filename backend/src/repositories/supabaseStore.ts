@@ -554,6 +554,36 @@ export class SupabaseStore {
         }));
 
         await supabase.from('classes').upsert(rows, { onConflict: 'id' });
+
+        // Keep subjects lookup table synchronized with distinct courses
+        try {
+          const uniqueSubjects = new Map<string, string | undefined>();
+          for (const c of prepared) {
+            if (c.subjectName && !uniqueSubjects.has(c.subjectName)) {
+              uniqueSubjects.set(c.subjectName, c.faculty || undefined);
+            }
+          }
+          for (const [subName, faculty] of uniqueSubjects.entries()) {
+            const { data: existingSub } = await supabase
+              .from('subjects')
+              .select('id')
+              .eq('user_id', userId)
+              .eq('name', subName)
+              .maybeSingle();
+
+            if (!existingSub) {
+              await supabase.from('subjects').insert({
+                user_id: userId,
+                name: subName,
+                short_name: subName.slice(0, 10),
+                code: subName,
+                faculty: faculty || null,
+              });
+            }
+          }
+        } catch {
+          // non-blocking fallback
+        }
       } catch (err) {
         console.warn('SupabaseStore.saveClasses warning:', err);
       }
