@@ -8,6 +8,7 @@ import { NinjaAvatar } from '../components/NinjaAvatar';
 import { useAuthStore } from '../store/authStore';
 import { useDashboardStore } from '../store/dashboardStore';
 import { apiClient } from '../api/client';
+import { confirmAction } from '../utils/alertUtils';
 
 interface SettingsScreenProps {
   onRestartOnboarding?: () => void;
@@ -248,25 +249,45 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
         </View>
 
         {/* Replay Onboarding */}
-        {onRestartOnboarding && (
-          <TouchableOpacity style={styles.restartBtn} onPress={onRestartOnboarding} activeOpacity={0.82}>
-            <Ionicons name="refresh-outline" size={16} color={designTokens.colors.primaryDark} style={{ marginRight: 6 }} />
-            <Text style={styles.restartBtnText}>Re-open Onboarding Setup</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={styles.restartBtn}
+          onPress={() => {
+            confirmAction(
+              'Re-open Onboarding',
+              'Do you want to re-open the setup wizard to update your university, timetable, and budget preferences?',
+              () => {
+                if (onRestartOnboarding) {
+                  onRestartOnboarding();
+                } else {
+                  useAuthStore.getState().resetOnboarding();
+                  if (navigation?.navigate) {
+                    navigation.navigate('Onboarding');
+                  }
+                }
+              },
+              'Open Setup Wizard'
+            );
+          }}
+          activeOpacity={0.82}
+        >
+          <Ionicons name="refresh-outline" size={16} color={designTokens.colors.primaryDark} style={{ marginRight: 6 }} />
+          <Text style={styles.restartBtnText}>Re-open Onboarding Setup</Text>
+        </TouchableOpacity>
 
         {/* Log Out */}
         <TouchableOpacity
           style={styles.logoutBtn}
           onPress={() => {
-            Alert.alert('Log Out', 'Are you sure you want to log out of your student account?', [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Log Out', style: 'destructive', onPress: () => logout() },
-            ]);
+            confirmAction(
+              'Log Out',
+              'Are you sure you want to log out of your student account?',
+              () => logout(),
+              'Log Out'
+            );
           }}
           activeOpacity={0.82}
         >
-          <Ionicons name="log-out-outline" size={16} color="#C25E4A" style={{ marginRight: 6 }} />
+          <Ionicons name="log-out-outline" size={16} color="#BA1A1A" style={{ marginRight: 6 }} />
           <Text style={styles.logoutBtnText}>Log Out</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -331,9 +352,10 @@ const styles = StyleSheet.create({
     paddingBottom: 110,
   },
   screenTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
-    color: designTokens.colors.textPrimary,
+    color: '#111827',
+    letterSpacing: -0.3,
     marginBottom: 10,
   },
   heroSection: {
@@ -344,7 +366,7 @@ const styles = StyleSheet.create({
   studentName: {
     fontSize: 16,
     fontWeight: '800',
-    color: designTokens.colors.textPrimary,
+    color: '#111827',
     marginTop: 14,
     textAlign: 'center',
     letterSpacing: 0.5,
@@ -360,9 +382,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: 'rgba(117, 167, 165, 0.4)',
+    borderColor: 'rgba(26, 28, 29, 0.08)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: designTokens.radii.pill,
@@ -370,15 +392,15 @@ const styles = StyleSheet.create({
   changePhotoBtnText: {
     fontSize: 12,
     fontWeight: '700',
-    color: designTokens.colors.primaryDark,
+    color: '#111827',
   },
   resetPhotoBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#FEF2F2',
+    backgroundColor: 'rgba(186, 26, 26, 0.06)',
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: 'rgba(186, 26, 26, 0.15)',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: designTokens.radii.pill,
@@ -386,7 +408,7 @@ const styles = StyleSheet.create({
   resetPhotoBtnText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#B91C1C',
+    color: '#BA1A1A',
   },
   academicChipsRow: {
     flexDirection: 'row',
@@ -397,56 +419,56 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.12)',
+    borderColor: 'rgba(26, 28, 29, 0.08)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: designTokens.radii.pill,
   },
   academicChipLabel: {
     fontSize: 12,
-    color: designTokens.colors.textSecondary,
+    color: '#76777D',
     fontWeight: '600',
   },
   academicChipValue: {
     fontSize: 13,
-    color: designTokens.colors.primaryDark,
+    color: '#006A63',
     fontWeight: '800',
   },
   semesterPill: {
-    backgroundColor: designTokens.colors.primarySoft,
+    backgroundColor: 'rgba(0, 106, 99, 0.08)',
     paddingHorizontal: 16,
     paddingVertical: 7,
     borderRadius: designTokens.radii.pill,
     marginTop: 10,
   },
   semesterText: {
-    color: designTokens.colors.primaryDeep,
+    color: '#006A63',
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.5,
   },
   changeSemesterText: {
-    color: designTokens.colors.primaryDark,
+    color: '#006A63',
     fontSize: 13,
     fontWeight: '600',
     marginTop: 10,
   },
   sectionHeader: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: designTokens.colors.textPrimary,
-    letterSpacing: 0.5,
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#76777D',
+    letterSpacing: 0.8,
     marginBottom: 8,
     marginTop: 8,
   },
   menuCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: designTokens.radii.card,
+    borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.06)',
+    borderColor: 'rgba(26, 28, 29, 0.06)',
     marginBottom: 16,
     ...designTokens.shadows.card,
   },
@@ -469,16 +491,16 @@ const styles = StyleSheet.create({
   menuLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: designTokens.colors.textPrimary,
+    color: '#111827',
   },
   chevron: {
     fontSize: 18,
-    color: designTokens.colors.textMuted,
+    color: '#9CA3AF',
     fontWeight: '400',
   },
   divider: {
     height: 1,
-    backgroundColor: 'rgba(41, 51, 50, 0.06)',
+    backgroundColor: 'rgba(26, 28, 29, 0.05)',
     marginLeft: 50,
   },
   toggleRow: {
@@ -491,30 +513,30 @@ const styles = StyleSheet.create({
   toggleTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: designTokens.colors.textPrimary,
+    color: '#111827',
   },
   toggleSub: {
     fontSize: 11,
-    color: designTokens.colors.textSecondary,
+    color: '#76777D',
     marginTop: 2,
   },
   restartBtn: {
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
     paddingVertical: 14,
     borderRadius: designTokens.radii.pill,
     alignItems: 'center',
     marginTop: 8,
     borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.08)',
+    borderColor: 'rgba(26, 28, 29, 0.08)',
   },
   restartBtnText: {
-    color: designTokens.colors.textSecondary,
+    color: '#76777D',
     fontSize: 13,
     fontWeight: '700',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(30, 41, 39, 0.55)',
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
@@ -526,31 +548,31 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 24,
     borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.08)',
+    borderColor: 'rgba(26, 28, 29, 0.06)',
     ...designTokens.shadows.card,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
-    color: designTokens.colors.textPrimary,
+    color: '#111827',
     marginBottom: 6,
   },
   modalSubtitle: {
-    fontSize: 13,
-    color: designTokens.colors.textSecondary,
+    fontSize: 12,
+    color: '#76777D',
     marginBottom: 18,
     lineHeight: 18,
   },
   modalInput: {
-    backgroundColor: '#F8F6F2',
+    backgroundColor: '#F9F9FB',
     borderWidth: 1.5,
-    borderColor: designTokens.colors.primary,
+    borderColor: '#006A63',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 18,
     fontWeight: '700',
-    color: designTokens.colors.textPrimary,
+    color: '#111827',
     marginBottom: 20,
   },
   modalBtnRow: {
@@ -564,18 +586,18 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   modalCancelBtnText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: designTokens.colors.textSecondary,
+    color: '#76777D',
   },
   modalSaveBtn: {
-    backgroundColor: designTokens.colors.primaryDark,
+    backgroundColor: '#111827',
     paddingHorizontal: 20,
     paddingVertical: 10,
-    borderRadius: 10,
+    borderRadius: designTokens.radii.pill,
   },
   modalSaveBtnText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: '#FFFFFF',
   },
@@ -583,17 +605,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FAF7F2',
+    backgroundColor: 'rgba(186, 26, 26, 0.06)',
     borderWidth: 1,
-    borderColor: '#ECE6DC',
-    borderRadius: 16,
+    borderColor: 'rgba(186, 26, 26, 0.15)',
+    borderRadius: designTokens.radii.pill,
     paddingVertical: 14,
     marginTop: 12,
     marginBottom: 20,
   },
   logoutBtnText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
-    color: '#C25E4A',
+    color: '#BA1A1A',
   },
 });

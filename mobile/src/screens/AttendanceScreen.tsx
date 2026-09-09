@@ -75,27 +75,39 @@ export const AttendanceScreen: React.FC = () => {
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Attendance</Text>
-          <Text style={styles.subTitle}>Overall academic attendance tracker & bunk advisor</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <View style={styles.headerDot} />
+            <Text style={styles.headerTag}>ATTENDANCE REGISTRY</Text>
+          </View>
+          <Text style={styles.title}>Academic Attendance</Text>
+          <Text style={styles.subTitle}>Overall course attendance tracking & AI bunk advisor</Text>
         </View>
 
-        {/* Overall Score Card */}
+        {/* Obsidian Hero Score Card */}
         <View style={styles.scoreCard}>
-          <View style={styles.scoreLeft}>
-            <Text style={styles.scoreNumber}>{overallPct}%</Text>
-            <Text style={styles.scoreLabel}>OVERALL ATTENDANCE</Text>
-            <Text style={styles.scoreDetail}>
-              {totalAttended} of {totalClasses} classes attended
-            </Text>
-          </View>
+          <View style={styles.scoreTopRow}>
+            <View>
+              <Text style={styles.scoreLabel}>OVERALL ATTENDANCE</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
+                <Text style={styles.scoreNumber}>{overallPct}%</Text>
+                <Text style={styles.scoreDetail}>
+                  {totalAttended} / {totalClasses} sessions
+                </Text>
+              </View>
+            </View>
 
-          <View style={styles.scoreRight}>
             <View
               style={[
                 styles.statusBadge,
                 overallPct >= 80 ? styles.badgeSuccess : overallPct >= 75 ? styles.badgeWarning : styles.badgeDanger,
               ]}
             >
+              <View
+                style={[
+                  styles.badgeDot,
+                  { backgroundColor: overallPct >= 80 ? '#006A63' : overallPct >= 75 ? '#D97706' : '#BA1A1A' },
+                ]}
+              />
               <Text
                 style={[
                   styles.statusBadgeText,
@@ -105,7 +117,26 @@ export const AttendanceScreen: React.FC = () => {
                 {overallPct >= 80 ? 'SAFE ZONE' : overallPct >= 75 ? 'MARGINAL' : 'ALERT'}
               </Text>
             </View>
-            <Text style={styles.targetNote}>Minimum required: 75%</Text>
+          </View>
+
+          {/* Progress Track */}
+          <View style={styles.heroProgressTrack}>
+            <View
+              style={[
+                styles.heroProgressFill,
+                {
+                  width: `${Math.min(100, overallPct)}%`,
+                  backgroundColor: overallPct >= 80 ? '#006A63' : overallPct >= 75 ? '#F59E0B' : '#BA1A1A',
+                },
+              ]}
+            />
+          </View>
+
+          <View style={styles.heroFooter}>
+            <Text style={styles.targetNote}>Requirement: 75% minimum threshold</Text>
+            <Text style={styles.heroSummaryNote}>
+              {overallPct >= 75 ? '✓ Criteria Satisfied' : '⚠️ Action Needed'}
+            </Text>
           </View>
         </View>
 
@@ -121,7 +152,9 @@ export const AttendanceScreen: React.FC = () => {
             <View key={course.id} style={styles.courseCard}>
               <View style={styles.courseTopRow}>
                 <View style={styles.courseInfo}>
-                  <Text style={styles.courseCode}>{course.code}</Text>
+                  <View style={styles.courseCodeBadge}>
+                    <Text style={styles.courseCode}>{course.code}</Text>
+                  </View>
                   <Text style={styles.courseName}>{course.name}</Text>
                   <Text style={styles.facultyName}>{course.faculty}</Text>
                 </View>
@@ -136,7 +169,7 @@ export const AttendanceScreen: React.FC = () => {
                     {pct}%
                   </Text>
                   <Text style={styles.classesRatio}>
-                    {course.attended}/{course.total}
+                    {course.attended}/{course.total} attended
                   </Text>
                 </View>
               </View>
@@ -152,30 +185,40 @@ export const AttendanceScreen: React.FC = () => {
                 />
               </View>
 
-              {/* Bunk Advisor Pill */}
+              {/* Bunk Advisor Row */}
               <View style={styles.advisorRow}>
                 {pct >= 75 ? (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 }}>
-                    <Ionicons name="shield-checkmark-outline" size={13} color={designTokens.colors.primaryDark} />
+                  <View style={styles.bunkSafeBox}>
+                    <Ionicons name="shield-checkmark" size={12} color="#006A63" />
                     <Text style={styles.bunkSafeText}>
-                      Can safely miss <Text style={{ fontWeight: '800' }}>{safeBunks}</Text> classes
+                      Can safely bunk <Text style={{ fontWeight: '800' }}>{safeBunks}</Text> class{safeBunks === 1 ? '' : 'es'}
                     </Text>
                   </View>
                 ) : (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 }}>
-                    <Ionicons name="alert-circle-outline" size={13} color={designTokens.colors.accentPeachDot} />
+                  <View style={styles.bunkAlertBox}>
+                    <Ionicons name="alert-circle" size={12} color="#BA1A1A" />
                     <Text style={styles.bunkAlertText}>
-                      Must attend <Text style={{ fontWeight: '800' }}>{needToAttend}</Text> classes to hit 75%
+                      Must attend next <Text style={{ fontWeight: '800' }}>{needToAttend}</Text> class{needToAttend === 1 ? '' : 'es'}
                     </Text>
                   </View>
                 )}
 
                 <View style={styles.btnGroup}>
-                  <TouchableOpacity style={styles.presentBtn} onPress={() => markAttendance(course.id, true)}>
-                    <Text style={styles.btnTextPresent}>+ Present</Text>
+                  <TouchableOpacity
+                    style={styles.presentBtn}
+                    onPress={() => markAttendance(course.id, true)}
+                    activeOpacity={0.75}
+                  >
+                    <Ionicons name="checkmark" size={12} color="#006A63" />
+                    <Text style={styles.btnTextPresent}>Present</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.absentBtn} onPress={() => markAttendance(course.id, false)}>
-                    <Text style={styles.btnTextAbsent}>- Absent</Text>
+                  <TouchableOpacity
+                    style={styles.absentBtn}
+                    onPress={() => markAttendance(course.id, false)}
+                    activeOpacity={0.75}
+                  >
+                    <Ionicons name="close" size={12} color="#BA1A1A" />
+                    <Text style={styles.btnTextAbsent}>Absent</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -191,67 +234,108 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: designTokens.spacing.lg, paddingBottom: 100 },
   header: { marginBottom: 16 },
-  title: { fontSize: 24, fontWeight: '800', color: designTokens.colors.textPrimary },
-  subTitle: { fontSize: 13, color: designTokens.colors.textSecondary, marginTop: 4 },
+  headerDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#006A63' },
+  headerTag: { fontSize: 10, fontWeight: '800', color: '#76777D', letterSpacing: 0.8 },
+  title: { fontSize: 22, fontWeight: '800', color: '#111827', letterSpacing: -0.3 },
+  subTitle: { fontSize: 12, color: '#76777D', marginTop: 3 },
   scoreCard: {
-    flexDirection: 'row',
-    backgroundColor: '#D8E8E7',
-    borderRadius: designTokens.radii.card,
-    padding: 18,
+    backgroundColor: '#111827',
+    borderRadius: 20,
+    padding: 20,
     marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(117, 167, 165, 0.20)',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    ...designTokens.shadows.card,
+    shadowColor: '#111827',
+    shadowOpacity: 0.16,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 16,
+    elevation: 6,
   },
-  scoreLeft: { flex: 1 },
-  scoreNumber: { fontSize: 36, fontWeight: '800', color: designTokens.colors.primaryDeep },
-  scoreLabel: { fontSize: 11, fontWeight: '700', color: designTokens.colors.textSecondary, letterSpacing: 0.5, marginTop: 2 },
-  scoreDetail: { fontSize: 12, color: designTokens.colors.textSecondary, marginTop: 4 },
-  scoreRight: { alignItems: 'flex-end' },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: designTokens.radii.pill },
-  badgeSuccess: { backgroundColor: designTokens.colors.primarySoft },
-  badgeWarning: { backgroundColor: designTokens.colors.accentPeachCard },
-  badgeDanger: { backgroundColor: '#FADBD8' },
-  statusBadgeText: { fontSize: 10, fontWeight: '800' },
-  badgeTextSuccess: { color: designTokens.colors.primaryDeep },
-  badgeTextWarning: { color: designTokens.colors.accentPeachDeep },
-  badgeTextDanger: { color: designTokens.colors.accentWine },
-  targetNote: { fontSize: 11, color: designTokens.colors.textSecondary, marginTop: 6 },
-  sectionHeader: { fontSize: 11, fontWeight: '800', color: designTokens.colors.textPrimary, letterSpacing: 0.6, marginBottom: 12 },
+  scoreTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  scoreNumber: { fontSize: 38, fontWeight: '800', color: '#FFFFFF', letterSpacing: -1 },
+  scoreLabel: { fontSize: 10, fontWeight: '800', color: '#9CA3AF', letterSpacing: 0.8 },
+  scoreDetail: { fontSize: 12, color: '#9CA3AF' },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: designTokens.radii.pill,
+  },
+  badgeDot: { width: 6, height: 6, borderRadius: 3 },
+  badgeSuccess: { backgroundColor: 'rgba(0, 106, 99, 0.20)' },
+  badgeWarning: { backgroundColor: 'rgba(217, 119, 6, 0.20)' },
+  badgeDanger: { backgroundColor: 'rgba(186, 26, 26, 0.20)' },
+  statusBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  badgeTextSuccess: { color: '#34D399' },
+  badgeTextWarning: { color: '#FBBF24' },
+  badgeTextDanger: { color: '#F87171' },
+  heroProgressTrack: {
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 3,
+    marginTop: 16,
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  heroProgressFill: { height: '100%', borderRadius: 3 },
+  heroFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  targetNote: { fontSize: 11, color: '#9CA3AF' },
+  heroSummaryNote: { fontSize: 11, fontWeight: '700', color: '#E5E7EB' },
+  sectionHeader: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#76777D',
+    letterSpacing: 0.8,
+    marginBottom: 12,
+  },
   courseCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: designTokens.radii.card,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.06)',
+    borderColor: 'rgba(26, 28, 29, 0.06)',
     ...designTokens.shadows.card,
   },
   courseTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   courseInfo: { flex: 1, paddingRight: 10 },
-  courseCode: { fontSize: 11, fontWeight: '700', color: designTokens.colors.primaryDark, textTransform: 'uppercase' },
-  courseName: { fontSize: 15, fontWeight: '700', color: designTokens.colors.textPrimary, marginTop: 2 },
-  facultyName: { fontSize: 12, color: designTokens.colors.textSecondary, marginTop: 3 },
+  courseCodeBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(0, 106, 99, 0.08)',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginBottom: 4,
+  },
+  courseCode: { fontSize: 10, fontWeight: '800', color: '#006A63', letterSpacing: 0.5 },
+  courseName: { fontSize: 15, fontWeight: '700', color: '#111827' },
+  facultyName: { fontSize: 12, color: '#76777D', marginTop: 2 },
   pctBox: { alignItems: 'flex-end' },
-  pctNumber: { fontSize: 20, fontWeight: '800' },
-  classesRatio: { fontSize: 12, color: designTokens.colors.textMuted, marginTop: 2 },
-  textSuccess: { color: designTokens.colors.primaryDark },
-  textWarning: { color: designTokens.colors.accentPeachDot },
-  textDanger: { color: designTokens.colors.accentWine },
+  pctNumber: { fontSize: 22, fontWeight: '800' },
+  classesRatio: { fontSize: 11, color: '#76777D', marginTop: 2 },
+  textSuccess: { color: '#006A63' },
+  textWarning: { color: '#D97706' },
+  textDanger: { color: '#BA1A1A' },
   progressBg: {
-    height: 6,
-    backgroundColor: '#E6E0D4',
-    borderRadius: 3,
+    height: 5,
+    backgroundColor: 'rgba(26, 28, 29, 0.06)',
+    borderRadius: 2.5,
     marginTop: 12,
     marginBottom: 10,
     overflow: 'hidden',
   },
-  progressFill: { height: '100%', borderRadius: 3 },
-  bgSuccess: { backgroundColor: designTokens.colors.primary },
-  bgWarning: { backgroundColor: designTokens.colors.accentPeachDot },
-  bgDanger: { backgroundColor: designTokens.colors.accentWine },
+  progressFill: { height: '100%', borderRadius: 2.5 },
+  bgSuccess: { backgroundColor: '#006A63' },
+  bgWarning: { backgroundColor: '#D97706' },
+  bgDanger: { backgroundColor: '#BA1A1A' },
   advisorRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -259,13 +343,51 @@ const styles = StyleSheet.create({
     marginTop: 4,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(41, 51, 50, 0.06)',
+    borderTopColor: 'rgba(26, 28, 29, 0.05)',
   },
-  bunkSafeText: { fontSize: 11, color: designTokens.colors.primaryDeep },
-  bunkAlertText: { fontSize: 11, color: designTokens.colors.accentWine },
+  bunkSafeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0, 106, 99, 0.08)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  bunkSafeText: { fontSize: 11, color: '#006A63', fontWeight: '500' },
+  bunkAlertBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(186, 26, 26, 0.08)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  bunkAlertText: { fontSize: 11, color: '#BA1A1A', fontWeight: '500' },
   btnGroup: { flexDirection: 'row', gap: 6 },
-  presentBtn: { backgroundColor: designTokens.colors.primarySoft, paddingHorizontal: 10, paddingVertical: 5, borderRadius: designTokens.radii.pill },
-  absentBtn: { backgroundColor: '#EAE5DB', paddingHorizontal: 10, paddingVertical: 5, borderRadius: designTokens.radii.pill },
-  btnTextPresent: { color: designTokens.colors.primaryDeep, fontSize: 11, fontWeight: '700' },
-  btnTextAbsent: { color: designTokens.colors.textSecondary, fontSize: 11, fontWeight: '700' },
+  presentBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(0, 106, 99, 0.08)',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: designTokens.radii.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 106, 99, 0.15)',
+  },
+  absentBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(186, 26, 26, 0.08)',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: designTokens.radii.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(186, 26, 26, 0.15)',
+  },
+  btnTextPresent: { color: '#006A63', fontSize: 11, fontWeight: '700' },
+  btnTextAbsent: { color: '#BA1A1A', fontSize: 11, fontWeight: '700' },
 });

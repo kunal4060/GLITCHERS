@@ -17,6 +17,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuthStore } from '../store/authStore';
 import { useDashboardStore } from '../store/dashboardStore';
 import { apiClient } from '../api/client';
+import { designTokens } from '../theme/designTokens';
+import { GradientBackground } from '../components/common/GradientBackground';
+import { confirmAction } from '../utils/alertUtils';
 import type { ClassSession, DayOfWeekType } from '@glitchers/shared';
 
 const DAYS_OF_WEEK: DayOfWeekType[] = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
@@ -311,9 +314,10 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
       : 9;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FAF7F2" />
-      <View style={styles.container}>
+    <GradientBackground>
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="dark-content" backgroundColor="transparent" />
+        <View style={styles.container}>
         {/* Top Stepper Bar */}
         <View style={styles.stepperContainer}>
           <View style={styles.stepperHeaderRow}>
@@ -341,18 +345,37 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   : 'Welcome to NEXA'}
               </Text>
             </View>
-            <TouchableOpacity
-              style={styles.signOutButton}
-              onPress={() => {
-                Alert.alert('Sign Out', 'Return to login screen?', [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Sign Out', style: 'destructive', onPress: () => logout() },
-                ]);
-              }}
-            >
-              <Ionicons name="log-out-outline" size={14} color="#7A7875" style={{ marginRight: 4 }} />
-              <Text style={styles.signOutButtonText}>Sign Out</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {user?.course || user?.university ? (
+                <TouchableOpacity
+                  style={styles.signOutButton}
+                  onPress={() => {
+                    completeOnboarding();
+                    onComplete();
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="close" size={14} color="#006A63" style={{ marginRight: 3 }} />
+                  <Text style={[styles.signOutButtonText, { color: '#006A63', fontWeight: '700' }]}>Exit</Text>
+                </TouchableOpacity>
+              ) : null}
+
+              <TouchableOpacity
+                style={styles.signOutButton}
+                onPress={() => {
+                  confirmAction(
+                    'Sign Out',
+                    'Return to login screen?',
+                    () => logout(),
+                    'Sign Out'
+                  );
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="log-out-outline" size={14} color="#76777D" style={{ marginRight: 3 }} />
+                <Text style={styles.signOutButtonText}>Sign Out</Text>
+              </TouchableOpacity>
+            </View>
           </View>
           <View style={styles.stepProgressBar}>
             <View style={[styles.stepProgressFill, { width: `${(stepNumber / 8) * 100}%` }]} />
@@ -365,7 +388,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
             <View style={styles.stepCard}>
               <View style={styles.iconHeading}>
                 <View style={styles.iconCircle}>
-                  <Ionicons name="link-outline" size={24} color="#2E7470" />
+                  <Ionicons name="link-outline" size={24} color="#006A63" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardHeader}>Authorize Google Services</Text>
@@ -385,7 +408,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                 <Switch
                   value={gmailEnabled}
                   onValueChange={setGmailEnabled}
-                  trackColor={{ false: '#D8D4CC', true: '#2E7470' }}
+                  trackColor={{ false: '#E2E2E4', true: '#006A63' }}
                   thumbColor="#FFFFFF"
                 />
               </View>
@@ -400,7 +423,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                 <Switch
                   value={calendarEnabled}
                   onValueChange={setCalendarEnabled}
-                  trackColor={{ false: '#D8D4CC', true: '#2E7470' }}
+                  trackColor={{ false: '#E2E2E4', true: '#006A63' }}
                   thumbColor="#FFFFFF"
                 />
               </View>
@@ -412,7 +435,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   value={universityDomain}
                   onChangeText={setUniversityDomain}
                   placeholder="e.g. university.edu"
-                  placeholderTextColor="#A09E9B"
+                  placeholderTextColor="#76777D"
                   autoCapitalize="none"
                 />
                 <Text style={styles.inputHelp}>
@@ -434,7 +457,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
             <View style={styles.stepCard}>
               <View style={styles.iconHeading}>
                 <View style={styles.iconCircle}>
-                  <Ionicons name="person-outline" size={24} color="#2E7470" />
+                  <Ionicons name="person-outline" size={24} color="#006A63" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardHeader}>Student Profile</Text>
@@ -451,7 +474,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   value={fullName}
                   onChangeText={setFullName}
                   placeholder="Your Name"
-                  placeholderTextColor="#A09E9B"
+                  placeholderTextColor="#76777D"
                 />
               </View>
 
@@ -462,7 +485,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   value={university}
                   onChangeText={setUniversity}
                   placeholder="e.g. State Technological University"
-                  placeholderTextColor="#A09E9B"
+                  placeholderTextColor="#76777D"
                 />
               </View>
 
@@ -473,7 +496,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   value={course}
                   onChangeText={setCourse}
                   placeholder="e.g. Computer Science & Engineering"
-                  placeholderTextColor="#A09E9B"
+                  placeholderTextColor="#76777D"
                 />
               </View>
 
@@ -486,7 +509,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                     onChangeText={setYear}
                     keyboardType="numeric"
                     placeholder="3"
-                    placeholderTextColor="#A09E9B"
+                    placeholderTextColor="#76777D"
                   />
                 </View>
                 <View style={[styles.inputGroup, { flex: 1 }]}>
@@ -497,7 +520,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                     onChangeText={setSemester}
                     keyboardType="numeric"
                     placeholder="6"
-                    placeholderTextColor="#A09E9B"
+                    placeholderTextColor="#76777D"
                   />
                 </View>
                 <View style={[styles.inputGroup, { flex: 1 }]}>
@@ -507,7 +530,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                     value={section}
                     onChangeText={setSection}
                     placeholder="A"
-                    placeholderTextColor="#A09E9B"
+                    placeholderTextColor="#76777D"
                   />
                 </View>
               </View>
@@ -540,7 +563,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
             <View style={styles.stepCard}>
               <View style={styles.iconHeading}>
                 <View style={styles.iconCircle}>
-                  <Ionicons name="school-outline" size={24} color="#2E7470" />
+                  <Ionicons name="school-outline" size={24} color="#006A63" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardHeader}>Academic Records</Text>
@@ -557,7 +580,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   value={cgpa}
                   onChangeText={setCgpa}
                   placeholder="e.g. 8.71"
-                  placeholderTextColor="#A09E9B"
+                  placeholderTextColor="#76777D"
                   keyboardType="numeric"
                 />
               </View>
@@ -571,7 +594,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                     onChangeText={setCreditsCompleted}
                     keyboardType="numeric"
                     placeholder="42"
-                    placeholderTextColor="#A09E9B"
+                    placeholderTextColor="#76777D"
                   />
                 </View>
                 <View style={[styles.inputGroup, { flex: 1 }]}>
@@ -582,7 +605,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                     onChangeText={setCreditsCurrent}
                     keyboardType="numeric"
                     placeholder="18"
-                    placeholderTextColor="#A09E9B"
+                    placeholderTextColor="#76777D"
                   />
                 </View>
               </View>
@@ -594,7 +617,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   value={studentId}
                   onChangeText={setStudentId}
                   placeholder="e.g. CS2023-084"
-                  placeholderTextColor="#A09E9B"
+                  placeholderTextColor="#76777D"
                 />
               </View>
 
@@ -627,7 +650,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
             <View style={styles.stepCard}>
               <View style={styles.iconHeading}>
                 <View style={styles.iconCircle}>
-                  <Ionicons name="calendar-outline" size={24} color="#2E7470" />
+                  <Ionicons name="calendar-outline" size={24} color="#006A63" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardHeader}>Add Your Timetable</Text>
@@ -639,15 +662,15 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
 
               {/* Option A: Upload image/document */}
               <TouchableOpacity
-                style={[styles.optionCard, isAnalyzingImage && { borderColor: '#2E7470', backgroundColor: '#F0F8F6' }]}
+                style={[styles.optionCard, isAnalyzingImage && { borderColor: '#006A63', backgroundColor: 'rgba(0, 106, 99, 0.06)' }]}
                 onPress={handleUploadTimetable}
                 disabled={isAnalyzingImage}
               >
                 <View style={styles.optionIconContainer}>
                   {isAnalyzingImage ? (
-                    <ActivityIndicator size="small" color="#2E7470" />
+                    <ActivityIndicator size="small" color="#006A63" />
                   ) : (
-                    <Ionicons name="cloud-upload-outline" size={28} color="#2E7470" />
+                    <Ionicons name="cloud-upload-outline" size={28} color="#006A63" />
                   )}
                 </View>
                 <View style={{ flex: 1 }}>
@@ -668,7 +691,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                 onPress={() => setTimetableMode('MANUAL')}
               >
                 <View style={styles.optionIconContainer}>
-                  <Ionicons name="create-outline" size={28} color="#D4856A" />
+                  <Ionicons name="create-outline" size={28} color="#BA1A1A" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.optionTitle}>Enter Timetable Manually</Text>
@@ -692,7 +715,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                 }}
               >
                 <View style={styles.optionIconContainer}>
-                  <Ionicons name="checkmark-done-circle-outline" size={28} color="#2E7470" />
+                  <Ionicons name="checkmark-done-circle-outline" size={28} color="#006A63" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.optionTitle}>Use Sample Academic Schedule</Text>
@@ -723,7 +746,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   value={manualSubject}
                   onChangeText={setManualSubject}
                   placeholder="e.g. Computer Networks"
-                  placeholderTextColor="#A09E9B"
+                  placeholderTextColor="#76777D"
                 />
               </View>
 
@@ -752,7 +775,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                     value={manualStartTime}
                     onChangeText={setManualStartTime}
                     placeholder="10:00"
-                    placeholderTextColor="#A09E9B"
+                    placeholderTextColor="#76777D"
                   />
                 </View>
                 <View style={[styles.inputGroup, { flex: 1 }]}>
@@ -762,7 +785,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                     value={manualEndTime}
                     onChangeText={setManualEndTime}
                     placeholder="11:00"
-                    placeholderTextColor="#A09E9B"
+                    placeholderTextColor="#76777D"
                   />
                 </View>
               </View>
@@ -775,7 +798,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                     value={manualRoom}
                     onChangeText={setManualRoom}
                     placeholder="AB1-204"
-                    placeholderTextColor="#A09E9B"
+                    placeholderTextColor="#76777D"
                   />
                 </View>
                 <View style={[styles.inputGroup, { flex: 1.5 }]}>
@@ -785,7 +808,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                     value={manualFaculty}
                     onChangeText={setManualFaculty}
                     placeholder="Dr. Sharma"
-                    placeholderTextColor="#A09E9B"
+                    placeholderTextColor="#76777D"
                   />
                 </View>
               </View>
@@ -812,7 +835,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
             <View style={styles.stepCard}>
               <View style={styles.iconHeading}>
                 <View style={styles.iconCircle}>
-                  <Ionicons name="list-outline" size={24} color="#2E7470" />
+                  <Ionicons name="list-outline" size={24} color="#006A63" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardHeader}>Review Class Schedule</Text>
@@ -825,7 +848,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
               {/* Conflict Detection Banner */}
               {classes.length >= 2 && (
                 <View style={styles.conflictNoticeBox}>
-                  <Ionicons name="checkmark-circle-outline" size={18} color="#2E7470" />
+                  <Ionicons name="checkmark-circle-outline" size={18} color="#006A63" />
                   <Text style={styles.conflictNoticeText}>
                     Schedule Conflict Engine active: No overlapping class collisions detected.
                   </Text>
@@ -847,7 +870,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                       </Text>
                     </View>
                     <TouchableOpacity onPress={() => handleRemoveClass(idx)}>
-                      <Ionicons name="trash-outline" size={20} color="#D4856A" />
+                      <Ionicons name="trash-outline" size={20} color="#BA1A1A" />
                     </TouchableOpacity>
                   </View>
                 ))}
@@ -855,9 +878,9 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
 
               {/* Empty state if 0 classes */}
               {classes.length === 0 && (
-                <View style={{ padding: 24, alignItems: 'center', backgroundColor: '#FAF8F5', borderRadius: 12, marginVertical: 12, borderWidth: 1, borderColor: '#EAE6E1' }}>
-                  <Ionicons name="calendar-outline" size={38} color="#A09E9B" style={{ marginBottom: 8 }} />
-                  <Text style={{ fontSize: 15, fontWeight: '600', color: '#1B3B36', marginBottom: 4 }}>No classes added yet</Text>
+                <View style={{ padding: 24, alignItems: 'center', backgroundColor: '#F3F3F5', borderRadius: 12, marginVertical: 12, borderWidth: 1, borderColor: 'rgba(26, 28, 29, 0.08)' }}>
+                  <Ionicons name="calendar-outline" size={38} color="#76777D" style={{ marginBottom: 8 }} />
+                  <Text style={{ fontSize: 15, fontWeight: '600', color: '#111827', marginBottom: 4 }}>No classes added yet</Text>
                   <Text style={{ fontSize: 13, color: '#666', textAlign: 'center', marginBottom: 16, lineHeight: 18 }}>
                     Your schedule hasn't been populated yet. Re-upload a clearer timetable photo, add your subjects manually, or load sample courses.
                   </Text>
@@ -891,7 +914,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   setActiveStep('TIMETABLE');
                 }}
               >
-                <Ionicons name="add-circle-outline" size={18} color="#2E7470" />
+                <Ionicons name="add-circle-outline" size={18} color="#006A63" />
                 <Text style={styles.addMoreBtnText}>Add Another Class</Text>
               </TouchableOpacity>
 
@@ -920,7 +943,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
             <View style={styles.stepCard}>
               <View style={styles.iconHeading}>
                 <View style={styles.iconCircle}>
-                  <Ionicons name="notifications-outline" size={24} color="#2E7470" />
+                  <Ionicons name="notifications-outline" size={24} color="#006A63" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardHeader}>Notification Preferences</Text>
@@ -955,7 +978,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                 <Switch
                   value={quietHoursEnabled}
                   onValueChange={setQuietHoursEnabled}
-                  trackColor={{ false: '#D8D4CC', true: '#2E7470' }}
+                  trackColor={{ false: '#E2E2E4', true: '#006A63' }}
                   thumbColor="#FFFFFF"
                 />
               </View>
@@ -968,7 +991,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                     value={quietHoursStart}
                     onChangeText={setQuietHoursStart}
                     placeholder="23:00"
-                    placeholderTextColor="#A09E9B"
+                    placeholderTextColor="#76777D"
                   />
                 </View>
                 <View style={[styles.inputGroup, { flex: 1 }]}>
@@ -978,7 +1001,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                     value={quietHoursEnd}
                     onChangeText={setQuietHoursEnd}
                     placeholder="07:00"
-                    placeholderTextColor="#A09E9B"
+                    placeholderTextColor="#76777D"
                   />
                 </View>
               </View>
@@ -1005,7 +1028,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
             <View style={styles.stepCard}>
               <View style={styles.iconHeading}>
                 <View style={styles.iconCircle}>
-                  <Ionicons name="wallet-outline" size={24} color="#2E7470" />
+                  <Ionicons name="wallet-outline" size={24} color="#006A63" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardHeader}>Student Budget Setup</Text>
@@ -1023,7 +1046,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   onChangeText={setMonthlyBudget}
                   keyboardType="numeric"
                   placeholder="10000"
-                  placeholderTextColor="#A09E9B"
+                  placeholderTextColor="#76777D"
                 />
               </View>
 
@@ -1035,7 +1058,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   onChangeText={setStartingBalance}
                   keyboardType="numeric"
                   placeholder="7500"
-                  placeholderTextColor="#A09E9B"
+                  placeholderTextColor="#76777D"
                 />
               </View>
 
@@ -1061,7 +1084,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
             <View style={styles.stepCard}>
               <View style={styles.iconHeading}>
                 <View style={styles.iconCircle}>
-                  <Ionicons name="sparkles-outline" size={24} color="#2E7470" />
+                  <Ionicons name="sparkles-outline" size={24} color="#006A63" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardHeader}>Floating Assistant (NIA)</Text>
@@ -1073,7 +1096,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
 
               <View style={styles.assistantPreviewBox}>
                 <View style={styles.floatingGemBadge}>
-                  <Ionicons name="sparkles" size={20} color="#2E7470" />
+                  <Ionicons name="sparkles" size={20} color="#006A63" />
                 </View>
                 <Text style={styles.assistantPreviewTitle}>Always Accessible</Text>
                 <Text style={styles.assistantPreviewDesc}>
@@ -1091,7 +1114,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                 <Switch
                   value={floatingAssistantEnabled}
                   onValueChange={setFloatingAssistantEnabled}
-                  trackColor={{ false: '#D8D4CC', true: '#2E7470' }}
+                  trackColor={{ false: '#E2E2E4', true: '#006A63' }}
                   thumbColor="#FFFFFF"
                 />
               </View>
@@ -1117,7 +1140,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
           {activeStep === 'INITIAL_PROCESSING' && (
             <View style={styles.stepCard}>
               <View style={styles.prepHeader}>
-                <ActivityIndicator size="large" color="#2E7470" style={{ marginBottom: 16 }} />
+                <ActivityIndicator size="large" color="#006A63" style={{ marginBottom: 16 }} />
                 <Text style={styles.prepTitle}>Preparing your Student AI (NIA)</Text>
                 <Text style={styles.prepDesc}>
                   Configuring your academic database, timetable engine, and NIA assistant...
@@ -1129,11 +1152,11 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   <View key={st.key} style={styles.stageRow}>
                     <View style={styles.stageIcon}>
                       {st.done ? (
-                        <Ionicons name="checkmark-circle" size={22} color="#2E7470" />
+                        <Ionicons name="checkmark-circle" size={22} color="#006A63" />
                       ) : st.inProgress ? (
-                        <ActivityIndicator size="small" color="#2E7470" />
+                        <ActivityIndicator size="small" color="#006A63" />
                       ) : (
-                        <Ionicons name="ellipse-outline" size={18} color="#D8D4CC" />
+                        <Ionicons name="ellipse-outline" size={18} color="#E2E2E4" />
                       )}
                     </View>
                     <Text
@@ -1207,13 +1230,14 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
         </ScrollView>
       </View>
     </SafeAreaView>
+  </GradientBackground>
   );
 };
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#F9F9FB',
   },
   container: {
     flex: 1,
@@ -1223,8 +1247,8 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#ECE6DC',
-    backgroundColor: '#FAF7F2',
+    borderBottomColor: 'rgba(26, 28, 29, 0.08)',
+    backgroundColor: '#F9F9FB',
   },
   stepperHeaderRow: {
     flexDirection: 'row',
@@ -1242,35 +1266,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 10,
-    backgroundColor: '#F0ECE4',
+    backgroundColor: 'rgba(26, 28, 29, 0.06)',
     borderWidth: 1,
-    borderColor: '#E2DED6',
+    borderColor: 'rgba(26, 28, 29, 0.08)',
   },
   signOutButtonText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#7A7875',
+    color: '#76777D',
   },
   stepperTitle: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#2E7470',
+    color: '#006A63',
     letterSpacing: 0.5,
   },
   stepperSubtitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#1A1A1A',
+    color: '#111827',
   },
   stepProgressBar: {
     height: 4,
-    backgroundColor: '#E6E0D4',
+    backgroundColor: '#EEEEF0',
     borderRadius: 2,
     overflow: 'hidden',
   },
   stepProgressFill: {
     height: '100%',
-    backgroundColor: '#2E7470',
+    backgroundColor: '#006A63',
     borderRadius: 2,
   },
   scrollContent: {
@@ -1282,7 +1306,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 24,
     borderWidth: 1,
-    borderColor: '#ECE6DC',
+    borderColor: 'rgba(26, 28, 29, 0.08)',
     shadowColor: '#000000',
     shadowOpacity: 0.04,
     shadowOffset: { width: 0, height: 4 },
@@ -1299,39 +1323,39 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#E6F0EF',
+    backgroundColor: 'rgba(0, 106, 99, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   cardHeader: {
     fontSize: 19,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: '#111827',
     marginBottom: 3,
   },
   cardDesc: {
     fontSize: 13,
     lineHeight: 18,
-    color: '#656360',
+    color: '#76777D',
   },
   serviceToggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0ECE4',
+    borderBottomColor: 'rgba(26, 28, 29, 0.06)',
     gap: 12,
   },
   toggleTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#1A1A1A',
+    color: '#111827',
     marginBottom: 3,
   },
   toggleDesc: {
     fontSize: 12,
     lineHeight: 17,
-    color: '#656360',
+    color: '#76777D',
   },
   inputGroup: {
     marginTop: 14,
@@ -1339,22 +1363,22 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#3D3B39',
+    color: '#111827',
     marginBottom: 6,
   },
   textInput: {
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#F9F9FB',
     borderWidth: 1,
-    borderColor: '#ECE6DC',
+    borderColor: 'rgba(26, 28, 29, 0.08)',
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    color: '#1A1A1A',
+    color: '#111827',
   },
   inputHelp: {
     fontSize: 11,
-    color: '#7A7875',
+    color: '#76777D',
     marginTop: 5,
     lineHeight: 15,
   },
@@ -1368,12 +1392,17 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   primaryButton: {
-    backgroundColor: '#2E7470',
-    borderRadius: 16,
+    backgroundColor: '#111827',
+    borderRadius: designTokens.radii.pill,
     paddingVertical: 15,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 20,
+    shadowColor: '#111827',
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 4,
   },
   primaryButtonText: {
     fontSize: 15,
@@ -1382,66 +1411,67 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     flex: 1,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#D8D4CC',
-    borderRadius: 16,
+    borderColor: 'rgba(26, 28, 29, 0.08)',
+    borderRadius: designTokens.radii.pill,
     paddingVertical: 15,
     alignItems: 'center',
     justifyContent: 'center',
   },
   secondaryButtonText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#3D3B39',
+    color: '#374151',
   },
   optionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#ECE6DC',
+    borderColor: 'rgba(26, 28, 29, 0.06)',
     borderRadius: 18,
     padding: 16,
     marginBottom: 14,
     gap: 14,
+    ...designTokens.shadows.card,
   },
   optionIconContainer: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(0, 106, 99, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   optionTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: '#111827',
     marginBottom: 3,
   },
   optionDesc: {
     fontSize: 12,
     lineHeight: 17,
-    color: '#656360',
+    color: '#76777D',
   },
   dayPill: {
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 12,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
     marginRight: 8,
     borderWidth: 1,
-    borderColor: '#ECE6DC',
+    borderColor: 'rgba(26, 28, 29, 0.08)',
   },
   dayPillActive: {
-    backgroundColor: '#2E7470',
-    borderColor: '#2E7470',
+    backgroundColor: '#111827',
+    borderColor: '#111827',
   },
   dayPillText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#3D3B39',
+    color: '#374151',
   },
   dayPillTextActive: {
     color: '#FFFFFF',
@@ -1449,7 +1479,7 @@ const styles = StyleSheet.create({
   conflictNoticeBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EBF4F3',
+    backgroundColor: 'rgba(0, 106, 99, 0.06)',
     padding: 12,
     borderRadius: 14,
     marginBottom: 16,
@@ -1457,7 +1487,7 @@ const styles = StyleSheet.create({
   },
   conflictNoticeText: {
     fontSize: 12,
-    color: '#2E7470',
+    color: '#006A63',
     fontWeight: '600',
     flex: 1,
   },
@@ -1468,14 +1498,14 @@ const styles = StyleSheet.create({
   classItemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
     padding: 12,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#ECE6DC',
+    borderColor: 'rgba(26, 28, 29, 0.06)',
   },
   classTimeBadge: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(0, 106, 99, 0.08)',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
@@ -1484,21 +1514,21 @@ const styles = StyleSheet.create({
   classDayText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#2E7470',
+    color: '#006A63',
   },
   classTimeText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#1A1A1A',
+    color: '#111827',
   },
   classSubjectText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: '#111827',
   },
   classMetaText: {
     fontSize: 11,
-    color: '#656360',
+    color: '#76777D',
     marginTop: 2,
   },
   addMoreBtn: {
@@ -1511,7 +1541,7 @@ const styles = StyleSheet.create({
   addMoreBtnText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#2E7470',
+    color: '#006A63',
   },
   pillRow: {
     flexDirection: 'row',
@@ -1522,37 +1552,38 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     borderRadius: 12,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#ECE6DC',
+    borderColor: 'rgba(26, 28, 29, 0.08)',
   },
   timePillActive: {
-    backgroundColor: '#2E7470',
-    borderColor: '#2E7470',
+    backgroundColor: '#111827',
+    borderColor: '#111827',
   },
   timePillText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#3D3B39',
+    color: '#374151',
   },
   timePillTextActive: {
     color: '#FFFFFF',
   },
   assistantPreviewBox: {
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
     padding: 18,
     borderRadius: 18,
     alignItems: 'center',
     marginVertical: 16,
     borderWidth: 1,
-    borderColor: '#ECE6DC',
+    borderColor: 'rgba(26, 28, 29, 0.06)',
+    ...designTokens.shadows.card,
   },
   floatingGemBadge: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#E6F0EF',
+    backgroundColor: 'rgba(0, 106, 99, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
@@ -1560,13 +1591,13 @@ const styles = StyleSheet.create({
   assistantPreviewTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: '#111827',
     marginBottom: 4,
   },
   assistantPreviewDesc: {
     fontSize: 12,
     lineHeight: 18,
-    color: '#656360',
+    color: '#76777D',
     textAlign: 'center',
   },
   prepHeader: {
@@ -1576,12 +1607,12 @@ const styles = StyleSheet.create({
   prepTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: '#111827',
     marginBottom: 6,
   },
   prepDesc: {
     fontSize: 13,
-    color: '#656360',
+    color: '#76777D',
     textAlign: 'center',
     lineHeight: 19,
   },
@@ -1600,21 +1631,21 @@ const styles = StyleSheet.create({
   },
   stageText: {
     fontSize: 14,
-    color: '#A09E9B',
+    color: '#9CA3AF',
   },
   stageTextActive: {
-    color: '#1A1A1A',
+    color: '#111827',
     fontWeight: '600',
   },
   stageTextDone: {
-    color: '#2E7470',
+    color: '#006A63',
     fontWeight: '600',
   },
   congratsCircle: {
     width: 68,
     height: 68,
     borderRadius: 34,
-    backgroundColor: '#2E7470',
+    backgroundColor: '#006A63',
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'center',
@@ -1623,25 +1654,26 @@ const styles = StyleSheet.create({
   congratsTitle: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#1A1A1A',
+    color: '#111827',
     textAlign: 'center',
     marginBottom: 8,
   },
   congratsDesc: {
     fontSize: 14,
     lineHeight: 20,
-    color: '#656360',
+    color: '#76777D',
     textAlign: 'center',
     marginBottom: 20,
   },
   summaryBox: {
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
     borderRadius: 18,
     padding: 16,
     gap: 10,
     borderWidth: 1,
-    borderColor: '#ECE6DC',
+    borderColor: 'rgba(26, 28, 29, 0.06)',
     marginBottom: 24,
+    ...designTokens.shadows.card,
   },
   summaryItem: {
     flexDirection: 'row',
@@ -1650,19 +1682,24 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 13,
-    color: '#7A7875',
+    color: '#76777D',
   },
   summaryVal: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: '#111827',
   },
   launchButton: {
-    backgroundColor: '#2E7470',
-    borderRadius: 16,
+    backgroundColor: '#111827',
+    borderRadius: designTokens.radii.pill,
     paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#111827',
+    shadowOpacity: 0.16,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 12,
+    elevation: 5,
   },
   launchButtonText: {
     fontSize: 16,

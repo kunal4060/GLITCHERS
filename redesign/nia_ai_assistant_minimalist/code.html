@@ -1,0 +1,324 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
+<title>NIA - Nexa Intelligent Assistance</title>
+<!-- Tailwind CSS v3 with forms and container-queries -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration -->
+<script data-purpose="tailwind-config">
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              teal: '#006a63',
+              'teal-dark': '#00504a',
+              'teal-light': '#80d5cb',
+              emerald: '#10B981',
+              surface: '#F9F9FB',
+              'surface-card': '#FFFFFF',
+              dark: '#0f172a',
+              muted: '#64748b',
+              border: '#e2e8f0',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+          },
+          boxShadow: {
+            subtle: '0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02)',
+            card: '0 2px 8px -2px rgba(15, 23, 42, 0.05), 0 1px 3px -1px rgba(15, 23, 42, 0.03)',
+            dock: '0 -4px 20px -2px rgba(15, 23, 42, 0.04)',
+          }
+        }
+      }
+    };
+  </script>
+<!-- Google Font: Inter -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+<style data-purpose="custom-scrollbars">
+    /* Hide scrollbar for clean horizontal prompt chips */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+<style data-purpose="ios-safe-areas">
+    /* iOS viewport & safe area adaptations */
+    .safe-top {
+      padding-top: env(safe-area-inset-top, 14px);
+    }
+    .safe-bottom {
+      padding-bottom: env(safe-area-inset-bottom, 8px);
+    }
+    .chat-container-height {
+      height: calc(100dvh - 200px);
+    }
+  </style>
+</head>
+<body class="bg-[#F1F3F5] text-slate-900 font-sans antialiased selection:bg-slate-900 selection:text-white flex justify-center items-center min-h-screen">
+<!-- BEGIN: MobileDeviceFrame -->
+<main class="w-full max-w-[420px] h-[100dvh] bg-[#F9F9FB] flex flex-col justify-between shadow-2xl relative overflow-hidden border-x border-slate-200/70" data-purpose="app-viewport">
+<!-- BEGIN: TopBar -->
+<header class="w-full bg-[#F9F9FB]/90 backdrop-blur-xl z-30 border-b border-slate-200/60 pt-2 pb-2.5 px-4 safe-top" data-purpose="header-section">
+<!-- iOS Status Bar Mockup -->
+
+<!-- Main Assistant Identity Header -->
+<div class="flex items-center justify-between mt-1" data-purpose="assistant-nav-bar">
+<div class="flex items-center space-x-2.5">
+<!-- Sleek Minimal Spark Logo Badge -->
+<div class="relative w-9 h-9 rounded-xl bg-slate-950 text-white flex items-center justify-center shadow-xs border border-slate-800">
+<svg class="w-4.5 h-4.5 text-white" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+<path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-[#F9F9FB] rounded-full"></span>
+</div>
+<!-- Assistant Titles -->
+<div class="flex flex-col">
+<div class="flex items-center space-x-1.5">
+<h1 class="font-semibold text-slate-950 tracking-tight text-[15px] leading-tight">NIA</h1>
+<span class="text-[9px] font-bold tracking-wider uppercase bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-[4px] border border-slate-200/80">PRO</span>
+</div>
+<p class="text-[11px] text-slate-400 font-normal leading-none mt-0.5">Nexa Intelligent Assistance</p>
+</div>
+</div>
+<!-- Header Actions: Trash/Clear and Model Selector -->
+<div class="flex items-center space-x-1.5">
+<!-- Clear Conversation Button -->
+<button aria-label="Clear Chat History" class="w-8 h-8 rounded-full border border-slate-200/80 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:border-rose-200 transition-colors shadow-2xs active:scale-95" type="button">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+<path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<!-- Model Switcher Selector -->
+<button class="inline-flex items-center space-x-1.5 bg-white border border-slate-200/80 hover:border-slate-300 text-slate-700 px-2.5 py-1.5 rounded-full text-[11px] font-medium shadow-2xs active:bg-slate-50 transition-all" type="button">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+<span class="tracking-tight text-slate-800 font-medium">Auto (HF)</span>
+<svg class="w-2.5 h-2.5 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+</div>
+</header>
+<!-- END: TopBar -->
+<!-- BEGIN: ChatScrollArea -->
+<div class="flex-1 overflow-y-auto px-4 py-4 space-y-3.5 chat-container-height" data-purpose="chat-messages-stream">
+<!-- User Bubble 1: Minimal Dark Slate Pill -->
+<div class="flex flex-col items-end space-y-1" data-purpose="user-message">
+<div class="max-w-[80%] bg-slate-950 text-white rounded-2xl rounded-br-sm px-3.5 py-2 shadow-subtle">
+<p class="text-[13.5px] font-normal leading-relaxed text-slate-100">Which classes do I have?</p>
+</div>
+<span class="text-[10px] text-slate-400 font-mono tracking-tight pr-1">19:12</span>
+</div>
+<!-- User Bubble 2: Sleek Attachment Card -->
+<div class="flex flex-col items-end space-y-1" data-purpose="user-image-message">
+<div class="max-w-[84%] bg-slate-950 text-white rounded-2xl rounded-br-sm p-2.5 shadow-subtle space-y-2">
+<div class="flex items-center space-x-2 px-1 text-[13px] font-normal text-slate-200">
+<svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="">Attached Timetable Schedule</span>
+</div>
+<div class="bg-white/5 border border-white/10 rounded-xl p-2 flex items-center justify-between space-x-3">
+<div class="flex items-center space-x-2.5 truncate">
+<div class="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center text-slate-300 text-xs shrink-0">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div class="truncate text-left">
+<p class="text-[12px] font-medium text-white truncate">timetable_scan_fall.jpg</p>
+<p class="text-[10px] text-slate-400">1.8 MB • OCR Extracted</p>
+</div>
+</div>
+<span class="text-[10px] font-medium text-emerald-400 bg-emerald-950/60 border border-emerald-800/40 rounded px-1.5 py-0.5">Parsed</span>
+</div>
+</div>
+<span class="text-[10px] text-slate-400 font-mono tracking-tight pr-1">19:13</span>
+</div>
+<!-- Assistant Response Card: Minimalist Structured Card -->
+<div class="flex flex-col items-start space-y-1 pt-1" data-purpose="assistant-response-message">
+<div class="w-full bg-white border border-slate-200/70 rounded-2xl rounded-tl-sm p-4 shadow-subtle">
+<!-- Assistant Meta Header -->
+<div class="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-100">
+<div class="flex items-center space-x-2">
+<span class="flex h-1.5 w-1.5 relative">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+<span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+</span>
+<span class="text-[11px] font-semibold text-slate-900 uppercase tracking-wider">Schedule Analysis</span>
+</div>
+<span class="text-[10px] text-slate-400 font-mono">Today, 20:33</span>
+</div>
+<!-- Clean Body Copy -->
+<p class="text-[13px] text-slate-600 leading-relaxed font-normal mb-3.5">
+            Based on your uploaded syllabus and master timetable, here is your remaining schedule for today:
+          </p>
+<!-- Course Cards Container -->
+<div class="space-y-2 mb-3.5" data-purpose="classes-list">
+<!-- Class Card 1 -->
+<div class="group bg-[#FBFBFC] hover:bg-slate-50/90 border border-slate-200/70 rounded-xl p-3 flex items-center justify-between transition-all">
+<div class="flex items-center space-x-3">
+<div class="w-1 h-8 bg-emerald-500 rounded-full"></div>
+<div>
+<div class="flex items-center space-x-2">
+<h4 class="text-[13px] font-semibold text-slate-900 leading-none">STS2010</h4>
+<span class="text-[11px] text-slate-500 font-normal leading-none">• Soft Skills</span>
+</div>
+<p class="text-[11px] text-slate-400 mt-1 font-normal">AB1 - Hall 204 · Dr. K. Raman</p>
+</div>
+</div>
+<div class="text-right shrink-0">
+<span class="inline-flex items-center text-[11px] font-medium bg-white border border-slate-200/80 text-slate-800 px-2.5 py-1 rounded-md shadow-2xs font-mono">
+                  08:00 AM
+                </span>
+</div>
+</div>
+<!-- Class Card 2 -->
+<div class="group bg-[#FBFBFC] hover:bg-slate-50/90 border border-slate-200/70 rounded-xl p-3 flex items-center justify-between transition-all">
+<div class="flex items-center space-x-3">
+<div class="w-1 h-8 bg-slate-900 rounded-full"></div>
+<div>
+<div class="flex items-center space-x-2">
+<h4 class="text-[13px] font-semibold text-slate-900 leading-none">MAT1003</h4>
+<span class="text-[11px] text-slate-500 font-normal leading-none">• Discrete Math</span>
+</div>
+<p class="text-[11px] text-slate-400 mt-1 font-normal">SJ-312 · Prof. A. Miller</p>
+</div>
+</div>
+<div class="text-right shrink-0">
+<span class="inline-flex items-center text-[11px] font-medium bg-white border border-slate-200/80 text-slate-800 px-2.5 py-1 rounded-md shadow-2xs font-mono">
+                  10:00 AM
+                </span>
+</div>
+</div>
+</div>
+<!-- Quick Minimal Ghost CTAs -->
+<div class="flex items-center space-x-2 pt-1 border-t border-slate-100">
+<button class="text-[11.5px] font-medium text-slate-800 bg-white hover:bg-slate-50 border border-slate-200/80 rounded-lg px-3 py-1.5 flex items-center space-x-1.5 transition-colors shadow-2xs active:scale-95" type="button">
+<svg class="w-3.5 h-3.5 text-slate-600" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+<path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="">Add to Calendar</span>
+</button>
+<button class="text-[11.5px] font-medium text-slate-600 hover:text-slate-900 bg-transparent hover:bg-slate-100/60 rounded-lg px-3 py-1.5 flex items-center space-x-1.5 transition-colors" type="button">
+<svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+<path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="">Summarize</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- END: ChatScrollArea -->
+<!-- BEGIN: InputAndSuggestionZone -->
+<div class="bg-[#F9F9FB] border-t border-slate-200/50 pt-2 pb-1" data-purpose="interaction-zone">
+<!-- Horizontal Scrollable Suggestion Chips -->
+<div class="w-full overflow-x-auto no-scrollbar px-4 pb-2.5 flex items-center space-x-1.5" data-purpose="quick-prompts">
+<button class="whitespace-nowrap flex items-center space-x-1.5 bg-white hover:bg-slate-50 active:scale-95 border border-slate-200/70 rounded-full px-3 py-1 text-[11.5px] font-medium text-slate-700 shadow-2xs transition-all" type="button">
+<span class="text-slate-400 text-xs font-mono">📐</span>
+<span class="">Solve 4x + 16 = 36</span>
+</button>
+<button class="whitespace-nowrap flex items-center space-x-1.5 bg-white hover:bg-slate-50 active:scale-95 border border-slate-200/70 rounded-full px-3 py-1 text-[11.5px] font-medium text-slate-700 shadow-2xs transition-all" type="button">
+<span class="text-slate-400 text-xs font-mono">📊</span>
+<span class="">Conclude app data</span>
+</button>
+<button class="whitespace-nowrap flex items-center space-x-1.5 bg-white hover:bg-slate-50 active:scale-95 border border-slate-200/70 rounded-full px-3 py-1 text-[11.5px] font-medium text-slate-700 shadow-2xs transition-all" type="button">
+<span class="text-slate-400 text-xs font-mono">📝</span>
+<span class="">Yesterday notes</span>
+</button>
+<button class="whitespace-nowrap flex items-center space-x-1.5 bg-white hover:bg-slate-50 active:scale-95 border border-slate-200/70 rounded-full px-3 py-1 text-[11.5px] font-medium text-slate-700 shadow-2xs transition-all" type="button">
+<span class="text-slate-400 text-xs font-mono">🗓️</span>
+<span class="">Next deadline</span>
+</button>
+</div>
+<!-- Bottom Chat Composer Bar -->
+<div class="px-3 pb-2 flex items-center space-x-2" data-purpose="composer-bar">
+<!-- Camera / Photo Attachment Button -->
+<button aria-label="Upload photo or take picture" class="w-9 h-9 shrink-0 rounded-full bg-white border border-slate-200/80 flex items-center justify-center text-slate-500 hover:text-slate-800 hover:border-slate-300 active:scale-95 shadow-2xs transition-all" type="button">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+<path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" stroke-linecap="round" stroke-linejoin="round"></path>
+<path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<!-- Sleek Rounded Input Pill -->
+<div class="flex-1 relative flex items-center">
+<input class="w-full bg-white text-slate-900 text-[13px] rounded-full pl-4 pr-10 py-2 border border-slate-200/90 focus:outline-none focus:ring-1 focus:ring-slate-950 focus:border-slate-950 shadow-2xs placeholder:text-slate-400 font-normal tracking-tight" placeholder="Ask Nia anything or scan notes..." type="text">
+<!-- Mic / Audio Prompt Icon -->
+<button aria-label="Voice dictation" class="absolute right-3 text-slate-400 hover:text-slate-700 transition-colors" type="button">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+<path d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+<!-- Send / Action Submit Button (Crisp Dark Circle) -->
+<button aria-label="Send query" class="w-9 h-9 shrink-0 rounded-full bg-slate-950 hover:bg-slate-800 text-white active:scale-95 flex items-center justify-center transition-all shadow-subtle" type="button">
+<svg class="w-3.5 h-3.5 transform -rotate-45 -translate-y-0.2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M5 12h14M12 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+</div>
+<!-- END: InputAndSuggestionZone -->
+<!-- BEGIN: PersistentBottomNavigationBar -->
+<nav class="bg-white/95 backdrop-blur-md border-t border-slate-200/70 px-2 pt-2 safe-bottom z-30" data-purpose="bottom-tab-bar">
+<div class="grid grid-cols-5 items-center pb-1">
+<!-- Tab 1: Home -->
+<button class="flex flex-col items-center justify-center text-slate-400 hover:text-slate-700 py-1 transition-colors" type="button">
+<svg class="w-5 h-5 mb-1 stroke-current" fill="none" stroke-width="1.6" viewBox="0 0 24 24">
+<path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-[10px] font-medium leading-none">Home</span>
+</button>
+<!-- Tab 2: Timetable -->
+<button class="flex flex-col items-center justify-center text-slate-400 hover:text-slate-700 py-1 transition-colors" type="button">
+<svg class="w-5 h-5 mb-1 stroke-current" fill="none" stroke-width="1.6" viewBox="0 0 24 24">
+<rect height="18" rx="3" stroke-linecap="round" stroke-linejoin="round" width="18" x="3" y="4"></rect>
+<path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-[10px] font-medium leading-none">Timetable</span>
+</button>
+<!-- Tab 3: Tasks -->
+<button class="flex flex-col items-center justify-center text-slate-400 hover:text-slate-700 py-1 transition-colors" type="button">
+<svg class="w-5 h-5 mb-1 stroke-current" fill="none" stroke-width="1.6" viewBox="0 0 24 24">
+<rect height="18" rx="4" stroke-linecap="round" stroke-linejoin="round" width="18" x="3" y="3"></rect>
+<path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-[10px] font-medium leading-none">Tasks</span>
+</button>
+<!-- Tab 4: Finance -->
+<button class="flex flex-col items-center justify-center text-slate-400 hover:text-slate-700 py-1 transition-colors" type="button">
+<svg class="w-5 h-5 mb-1 stroke-current" fill="none" stroke-width="1.6" viewBox="0 0 24 24">
+<rect height="12" rx="2" stroke-linecap="round" stroke-linejoin="round" width="20" x="2" y="6"></rect>
+<circle cx="12" cy="12" r="2.5" stroke-linecap="round" stroke-linejoin="round"></circle>
+<path d="M6 12h.01M18 12h.01" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-[10px] font-medium leading-none">Finance</span>
+</button>
+<!-- Tab 5: NIA (Active Tab) -->
+<button class="flex flex-col items-center justify-center text-slate-950 font-semibold py-1 transition-colors relative" type="button">
+<div class="relative">
+<svg class="w-5 h-5 mb-1 text-slate-950" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="absolute -top-0.5 -right-1 w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+</div>
+<span class="text-[10px] font-semibold text-slate-950 leading-none">NIA</span>
+</button>
+</div>
+<!-- iOS Home Indicator Bar -->
+<div class="w-32 h-1 bg-slate-900/70 rounded-full mx-auto mt-2 mb-1"></div>
+</nav>
+<!-- END: PersistentBottomNavigationBar -->
+</main>
+<!-- END: MobileDeviceFrame -->
+
+
+</body></html>

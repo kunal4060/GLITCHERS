@@ -5,7 +5,7 @@ import { designTokens } from '../theme/designTokens';
 import { GradientBackground } from '../components/common/GradientBackground';
 import { useDashboardStore } from '../store/dashboardStore';
 
-export const SearchScreen: React.FC = () => {
+export const SearchScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'CLASSES' | 'TASKS' | 'FINANCE' | 'EMAILS'>('ALL');
 
@@ -66,7 +66,7 @@ export const SearchScreen: React.FC = () => {
           <Ionicons name="search-outline" size={18} color={designTokens.colors.textSecondary} style={{ marginRight: 8 }} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search classes, tasks, expenses, debts, emails..."
+            placeholder="Ask Nia anything or search classes, tasks, finance..."
             placeholderTextColor="#8C9692"
             value={query}
             onChangeText={setQuery}
@@ -95,12 +95,50 @@ export const SearchScreen: React.FC = () => {
 
         {/* Results List */}
         <ScrollView style={styles.results} contentContainerStyle={styles.scrollPadding}>
+          {query.trim().length > 0 && (
+            <TouchableOpacity
+              style={styles.aiPromptCard}
+              onPress={() => {
+                navigation?.navigate('MainTabs', { screen: 'NIA' });
+              }}
+              activeOpacity={0.85}
+            >
+              <View style={styles.aiPromptIconCircle}>
+                <Ionicons name="sparkles" size={16} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.aiPromptLabel}>ASK NIA AI ASSISTANT</Text>
+                <Text style={styles.aiPromptQuery} numberOfLines={1}>"{query}"</Text>
+              </View>
+              <View style={styles.aiPromptArrowBtn}>
+                <Text style={styles.aiPromptArrowText}>Ask</Text>
+                <Ionicons name="arrow-forward" size={12} color="#006A63" />
+              </View>
+            </TouchableOpacity>
+          )}
+
           <Text style={styles.countText}>
             {filteredItems.length} {filteredItems.length === 1 ? 'RESULT' : 'RESULTS'} FOUND
           </Text>
 
           {filteredItems.map((item) => (
-            <View key={item.id} style={styles.resultCard}>
+            <TouchableOpacity
+              key={item.id}
+              style={styles.resultCard}
+              activeOpacity={0.8}
+              onPress={() => {
+                if (!navigation) return;
+                if (item.category === 'CLASSES') {
+                  navigation.navigate('MainTabs', { screen: 'Timetable' });
+                } else if (item.category === 'TASKS') {
+                  navigation.navigate('MainTabs', { screen: 'Tasks' });
+                } else if (item.category === 'FINANCE') {
+                  navigation.navigate('MainTabs', { screen: 'Finance' });
+                } else if (item.category === 'EMAILS') {
+                  navigation.navigate('Email');
+                }
+              }}
+            >
               <View style={styles.iconContainer}>
                 <Ionicons name={item.icon} size={20} color={designTokens.colors.primaryDark} />
               </View>
@@ -111,7 +149,8 @@ export const SearchScreen: React.FC = () => {
                 <Text style={styles.itemTitle}>{item.title}</Text>
                 <Text style={styles.itemSubtitle}>{item.subtitle}</Text>
               </View>
-            </View>
+              <Ionicons name="chevron-forward" size={16} color="#76777D" style={{ alignSelf: 'center', marginLeft: 8 }} />
+            </TouchableOpacity>
           ))}
         </ScrollView>
       </View>
@@ -130,13 +169,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: designTokens.radii.pill,
     borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.10)',
+    borderColor: 'rgba(26, 28, 29, 0.08)',
     ...designTokens.shadows.card,
   },
   searchInput: {
     flex: 1,
-    color: designTokens.colors.textPrimary,
-    fontSize: 14,
+    color: '#111827',
+    fontSize: 13,
     paddingVertical: 12,
   },
   chipScroll: {
@@ -144,51 +183,97 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   chip: {
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: designTokens.radii.pill,
     borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.08)',
+    borderColor: 'rgba(26, 28, 29, 0.08)',
   },
   chipActive: {
-    backgroundColor: designTokens.colors.primaryPill,
-    borderColor: designTokens.colors.primary,
+    backgroundColor: '#111827',
+    borderColor: '#111827',
   },
-  chipText: { color: designTokens.colors.textSecondary, fontSize: 11, fontWeight: '700' },
-  chipTextActive: { color: designTokens.colors.textPrimary },
+  chipText: { color: '#76777D', fontSize: 11, fontWeight: '700' },
+  chipTextActive: { color: '#FFFFFF' },
   results: { flex: 1 },
   scrollPadding: { padding: 16, paddingBottom: 100 },
   countText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: designTokens.colors.textMuted,
-    letterSpacing: 0.6,
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#76777D',
+    letterSpacing: 0.8,
     marginBottom: 12,
   },
   resultCard: {
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
-    borderRadius: designTokens.radii.card,
+    borderRadius: 16,
     padding: 14,
     marginBottom: 10,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.06)',
+    borderColor: 'rgba(26, 28, 29, 0.06)',
     ...designTokens.shadows.card,
   },
   iconContainer: {
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: designTokens.colors.primarySoft,
+    backgroundColor: 'rgba(0, 106, 99, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
+  aiPromptCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 14,
+    gap: 12,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 106, 99, 0.25)',
+    ...designTokens.shadows.card,
+  },
+  aiPromptIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#006A63',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aiPromptLabel: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#006A63',
+    letterSpacing: 0.8,
+  },
+  aiPromptQuery: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: '#111827',
+    marginTop: 2,
+  },
+  aiPromptArrowBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0, 106, 99, 0.08)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 9999,
+  },
+  aiPromptArrowText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#006A63',
+  },
   itemDetails: { flex: 1 },
   categoryRow: { marginBottom: 2 },
-  itemCategory: { fontSize: 9, fontWeight: '800', color: designTokens.colors.primaryDeep, letterSpacing: 0.5 },
-  itemTitle: { fontSize: 14, fontWeight: '700', color: designTokens.colors.textPrimary },
-  itemSubtitle: { fontSize: 12, color: designTokens.colors.textSecondary, marginTop: 3 },
+  itemCategory: { fontSize: 9, fontWeight: '800', color: '#006A63', letterSpacing: 0.5 },
+  itemTitle: { fontSize: 14, fontWeight: '700', color: '#111827' },
+  itemSubtitle: { fontSize: 12, color: '#76777D', marginTop: 3 },
 });

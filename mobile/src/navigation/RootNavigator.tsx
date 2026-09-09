@@ -13,6 +13,7 @@ import { AIChatScreen } from '../screens/AIChatScreen';
 // Secondary Stack & Deep Feature Screens
 import { AttendanceScreen } from '../screens/AttendanceScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { ProfileScreen } from '../screens/ProfileScreen';
 import { ExamsAndAssignmentsScreen } from '../screens/ExamsAndAssignmentsScreen';
 import { CalendarScreen } from '../screens/CalendarScreen';
 import { EmailScreen } from '../screens/EmailScreen';
@@ -40,22 +41,28 @@ function MainTabs({ navigation }: { navigation: any }) {
           headerStyle: { backgroundColor: 'transparent' },
           headerTintColor: designTokens.colors.textPrimary,
           headerTitleStyle: { fontWeight: '700' },
+          tabBarHideOnKeyboard: true,
           tabBarStyle: {
-            backgroundColor: '#F6F3ED',
-            borderTopColor: 'rgba(41, 51, 50, 0.08)',
-            borderTopWidth: 1,
-            height: 72,
-            paddingBottom: 10,
+            position: 'absolute',
+            bottom: Platform.OS === 'ios' ? 24 : 16,
+            left: 16,
+            right: 16,
+            backgroundColor: '#FFFFFF',
+            borderRadius: 36,
+            height: 64,
+            paddingBottom: 8,
             paddingTop: 8,
-            elevation: 0,
-            shadowColor: '#3D352E',
-            shadowOffset: { width: 0, height: -2 },
-            shadowOpacity: 0.03,
-            shadowRadius: 6,
+            borderWidth: 1,
+            borderColor: 'rgba(226, 226, 228, 0.8)',
+            elevation: 8,
+            shadowColor: '#0F172A',
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.08,
+            shadowRadius: 24,
           },
-          tabBarActiveTintColor: designTokens.colors.textPrimary,
+          tabBarActiveTintColor: designTokens.colors.primary,
           tabBarInactiveTintColor: designTokens.colors.textSecondary,
-          tabBarLabelStyle: { fontSize: 11, fontWeight: '600', marginTop: 2 },
+          tabBarLabelStyle: { fontSize: 10, fontWeight: '600', marginTop: 2, letterSpacing: -0.2 },
         }}
       >
         <Tab.Screen
@@ -64,46 +71,22 @@ function MainTabs({ navigation }: { navigation: any }) {
           options={{
             headerShown: false,
             tabBarLabel: ({ focused }) => (
-              <View style={{ alignItems: 'center' }}>
-                <Text
-                  style={{
-                    fontSize: 11,
-                    fontWeight: focused ? '700' : '500',
-                    color: focused ? designTokens.colors.textPrimary : designTokens.colors.textSecondary,
-                  }}
-                >
-                  Home
-                </Text>
-                {focused && (
-                  <View
-                    style={{
-                      width: 22,
-                      height: 3,
-                      borderRadius: 1.5,
-                      backgroundColor: designTokens.colors.accentPeachDot, // #D4856A
-                      marginTop: 3,
-                    }}
-                  />
-                )}
-              </View>
-            ),
-            tabBarIcon: ({ focused }) => (
-              <View
+              <Text
                 style={{
-                  width: 52,
-                  height: 30,
-                  borderRadius: 15,
-                  backgroundColor: focused ? designTokens.colors.primaryPill : 'transparent',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  fontSize: 10,
+                  fontWeight: focused ? '700' : '500',
+                  color: focused ? designTokens.colors.primary : designTokens.colors.textSecondary,
                 }}
               >
-                <Ionicons
-                  name={focused ? 'home' : 'home-outline'}
-                  size={19}
-                  color={focused ? designTokens.colors.textPrimary : designTokens.colors.textSecondary}
-                />
-              </View>
+                Home
+              </Text>
+            ),
+            tabBarIcon: ({ focused }) => (
+              <Ionicons
+                name={focused ? 'home' : 'home-outline'}
+                size={20}
+                color={focused ? designTokens.colors.primary : designTokens.colors.textSecondary}
+              />
             ),
           }}
         />
@@ -116,12 +99,12 @@ function MainTabs({ navigation }: { navigation: any }) {
             tabBarLabel: ({ focused }) => (
               <Text
                 style={{
-                  fontSize: 11,
+                  fontSize: 10,
                   fontWeight: focused ? '700' : '500',
-                  color: focused ? designTokens.colors.textPrimary : designTokens.colors.textSecondary,
+                  color: focused ? designTokens.colors.primary : designTokens.colors.textSecondary,
                 }}
               >
-                Timetable
+                Schedule
               </Text>
             ),
             tabBarIcon: ({ focused }) => (
@@ -142,9 +125,9 @@ function MainTabs({ navigation }: { navigation: any }) {
             tabBarLabel: ({ focused }) => (
               <Text
                 style={{
-                  fontSize: 11,
+                  fontSize: 10,
                   fontWeight: focused ? '700' : '500',
-                  color: focused ? designTokens.colors.textPrimary : designTokens.colors.textSecondary,
+                  color: focused ? designTokens.colors.primary : designTokens.colors.textSecondary,
                 }}
               >
                 Tasks
@@ -168,9 +151,9 @@ function MainTabs({ navigation }: { navigation: any }) {
             tabBarLabel: ({ focused }) => (
               <Text
                 style={{
-                  fontSize: 11,
+                  fontSize: 10,
                   fontWeight: focused ? '700' : '500',
-                  color: focused ? designTokens.colors.textPrimary : designTokens.colors.textSecondary,
+                  color: focused ? designTokens.colors.primary : designTokens.colors.textSecondary,
                 }}
               >
                 Finance
@@ -178,7 +161,7 @@ function MainTabs({ navigation }: { navigation: any }) {
             ),
             tabBarIcon: ({ focused }) => (
               <Ionicons
-                name={focused ? 'cash' : 'cash-outline'}
+                name={focused ? 'wallet' : 'wallet-outline'}
                 size={20}
                 color={focused ? designTokens.colors.primary : designTokens.colors.textSecondary}
               />
@@ -194,19 +177,19 @@ function MainTabs({ navigation }: { navigation: any }) {
             tabBarLabel: ({ focused }) => (
               <Text
                 style={{
-                  fontSize: 11,
+                  fontSize: 10,
                   fontWeight: focused ? '700' : '500',
-                  color: focused ? designTokens.colors.textPrimary : designTokens.colors.textSecondary,
+                  color: focused ? designTokens.colors.secondary : designTokens.colors.textSecondary,
                 }}
               >
-                NIA
+                Nia AI
               </Text>
             ),
             tabBarIcon: ({ focused }) => (
               <Ionicons
                 name={focused ? 'sparkles' : 'sparkles-outline'}
                 size={20}
-                color={focused ? designTokens.colors.primary : designTokens.colors.textSecondary}
+                color={focused ? designTokens.colors.secondary : designTokens.colors.textSecondary}
               />
             ),
           }}
@@ -321,15 +304,11 @@ export const RootNavigator: React.FC = () => {
       }}
     >
       <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
+      <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
       <Stack.Screen
         name="Account"
-        children={(props) => (
-          <SettingsScreen
-            {...props}
-            onRestartOnboarding={() => setShowManualOnboarding(true)}
-          />
-        )}
-        options={{ title: 'Student Profile & Account' }}
+        component={ProfileScreen}
+        options={{ headerShown: false }}
       />
       <Stack.Screen name="Attendance" component={AttendanceScreen} options={{ title: 'Attendance & Bunker' }} />
       <Stack.Screen name="Email" component={EmailScreen} options={{ title: 'University Circulars' }} />
@@ -338,13 +317,15 @@ export const RootNavigator: React.FC = () => {
       <Stack.Screen name="Docs" component={DocumentsScreen} options={{ title: 'Document Intelligence' }} />
       <Stack.Screen name="Search" component={SearchScreen} options={{ title: 'Global Search' }} />
       <Stack.Screen name="Alerts" component={NotificationsScreen} options={{ title: 'Notifications' }} />
+      <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings & Preferences' }} />
       <Stack.Screen name="Privacy" component={PrivacyScreen} options={{ title: 'Privacy & Credentials' }} />
-      <Stack.Screen name="Onboarding">
-        {() => (
+      <Stack.Screen name="Onboarding" options={{ headerShown: false }}>
+        {({ navigation }: { navigation: any }) => (
           <OnboardingScreen
             onComplete={() => {
               completeOnboarding();
               setShowManualOnboarding(false);
+              navigation?.navigate('MainTabs');
             }}
           />
         )}

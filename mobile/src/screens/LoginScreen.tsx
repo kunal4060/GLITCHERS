@@ -133,7 +133,7 @@ export const LoginScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FAF7F2" />
+      <StatusBar barStyle="dark-content" backgroundColor="#F9F9FB" />
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         {/* Top Header Badge */}
         <View style={styles.topSection}>
@@ -302,7 +302,7 @@ export const LoginScreen: React.FC = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#F9F9FB',
   },
   container: {
     flexGrow: 1,
@@ -321,8 +321,8 @@ const styles = StyleSheet.create({
     width: 68,
     height: 68,
     borderRadius: 18,
-    shadowColor: '#2E7470',
-    shadowOpacity: 0.25,
+    shadowColor: '#111827',
+    shadowOpacity: 0.15,
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 10,
     elevation: 4,
@@ -330,29 +330,29 @@ const styles = StyleSheet.create({
   brandTitle: {
     fontSize: 26,
     fontWeight: '800',
-    color: '#1A1A1A',
+    color: '#111827',
     letterSpacing: 2,
   },
   categoryPill: {
     marginTop: 6,
-    backgroundColor: '#F0ECE4',
+    backgroundColor: 'rgba(0, 106, 99, 0.08)',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
   },
   categoryPillText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#2E7470',
-    letterSpacing: 1,
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#006A63',
+    letterSpacing: 0.8,
   },
   heroCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: 24,
     borderWidth: 1,
-    borderColor: '#ECE6DC',
-    shadowColor: '#000000',
+    borderColor: 'rgba(26, 28, 29, 0.06)',
+    shadowColor: '#111827',
     shadowOpacity: 0.04,
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 16,
@@ -361,14 +361,14 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: '#111827',
     lineHeight: 28,
     marginBottom: 10,
   },
   heroSubtitle: {
     fontSize: 14,
     lineHeight: 21,
-    color: '#656360',
+    color: '#76777D',
     marginBottom: 20,
   },
   featureList: {
@@ -383,14 +383,14 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: '#F3F8F7',
+    backgroundColor: 'rgba(0, 106, 99, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   featureText: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#3D3B39',
+    color: '#374151',
     flex: 1,
   },
   actionSection: {
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E2DED6',
+    borderColor: 'rgba(26, 28, 29, 0.08)',
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginBottom: 12,
@@ -410,7 +410,7 @@ const styles = StyleSheet.create({
   accountBoxLabel: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#7A7875',
+    color: '#76777D',
     letterSpacing: 0.8,
     marginBottom: 4,
   },
@@ -421,7 +421,7 @@ const styles = StyleSheet.create({
   accountTextInput: {
     flex: 1,
     fontSize: 14,
-    color: '#1A1A1A',
+    color: '#111827',
     fontWeight: '600',
     paddingVertical: 2,
   },
@@ -430,14 +430,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#D8D4CC',
+    borderWidth: 1,
+    borderColor: 'rgba(26, 28, 29, 0.10)',
     borderRadius: 18,
     paddingVertical: 16,
     paddingHorizontal: 24,
     width: '100%',
-    shadowColor: '#000000',
-    shadowOpacity: 0.05,
+    shadowColor: '#111827',
+    shadowOpacity: 0.04,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 8,
     elevation: 2,
@@ -447,32 +447,35 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#F6F3ED',
+    backgroundColor: 'rgba(26, 28, 29, 0.04)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   googleButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: '#111827',
   },
   directButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 10,
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 16,
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#D8D4CC',
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#111827',
     width: '100%',
+    shadowColor: '#111827',
+    shadowOpacity: 0.12,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 8,
+    elevation: 3,
   },
   directButtonText: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#5A5855',
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   securityNoteContainer: {
     flexDirection: 'row',
@@ -483,7 +486,7 @@ const styles = StyleSheet.create({
   },
   securityNoteText: {
     fontSize: 12,
-    color: '#7A7875',
+    color: '#76777D',
   },
   privacyLink: {
     marginTop: 10,
@@ -492,12 +495,12 @@ const styles = StyleSheet.create({
   privacyLinkText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#2E7470',
+    color: '#006A63',
     textDecorationLine: 'underline',
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
@@ -508,6 +511,8 @@ const styles = StyleSheet.create({
     padding: 24,
     width: '100%',
     maxHeight: '80%',
+    borderWidth: 1,
+    borderColor: 'rgba(26, 28, 29, 0.06)',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -518,7 +523,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: '#111827',
   },
   modalScroll: {
     marginBottom: 20,
@@ -526,15 +531,15 @@ const styles = StyleSheet.create({
   modalParagraph: {
     fontSize: 14,
     lineHeight: 22,
-    color: '#4A4846',
+    color: '#4B5563',
     marginBottom: 12,
   },
   bold: {
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: '#111827',
   },
   modalCloseButton: {
-    backgroundColor: '#2E7470',
+    backgroundColor: '#111827',
     borderRadius: 14,
     paddingVertical: 12,
     alignItems: 'center',
@@ -550,9 +555,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   creditText: {
-    fontSize: 11.5,
+    fontSize: 11,
     fontWeight: '600',
-    color: '#706D66',
+    color: '#76777D',
     letterSpacing: 0.5,
   },
 });

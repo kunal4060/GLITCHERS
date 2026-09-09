@@ -75,18 +75,19 @@ export const CalendarScreen: React.FC = () => {
             <Text style={styles.syncText}>Google Calendar Connected</Text>
           </View>
           <TouchableOpacity style={styles.syncBtn} onPress={handleSyncGoogleCalendar} activeOpacity={0.82}>
-            <Ionicons name="sync-outline" size={13} color={designTokens.colors.primaryDeep} />
+            <Ionicons name="sync-outline" size={13} color="#006A63" />
             <Text style={styles.syncBtnText}>Sync</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Filter Tabs */}
+        {/* Segmented Filter Tabs */}
         <View style={styles.filterRow}>
           {(['TODAY', 'WEEK', 'MONTH'] as const).map((tab) => (
             <TouchableOpacity
               key={tab}
               style={[styles.filterTab, filter === tab && styles.filterTabActive]}
               onPress={() => setFilter(tab)}
+              activeOpacity={0.8}
             >
               <Text style={[styles.filterText, filter === tab && styles.filterTextActive]}>{tab}</Text>
             </TouchableOpacity>
@@ -97,8 +98,8 @@ export const CalendarScreen: React.FC = () => {
         <ScrollView style={styles.content} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
           {filteredEvents.length === 0 ? (
             <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-              <Ionicons name="calendar-outline" size={40} color={designTokens.colors.textMuted} />
-              <Text style={{ color: designTokens.colors.textSecondary, marginTop: 12, fontSize: 15, fontWeight: '600' }}>
+              <Ionicons name="calendar-outline" size={40} color="#9CA3AF" />
+              <Text style={{ color: '#76777D', marginTop: 12, fontSize: 14, fontWeight: '600' }}>
                 No events found for {filter.toLowerCase()}
               </Text>
             </View>
@@ -113,8 +114,8 @@ export const CalendarScreen: React.FC = () => {
                   </View>
                   <Text style={styles.eventTitle}>{ev.title}</Text>
                   <Text style={styles.eventTime}>{ev.time}</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                    <Ionicons name="location-outline" size={12} color={designTokens.colors.primaryDark} />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5 }}>
+                    <Ionicons name="location-outline" size={12} color="#006A63" />
                     <Text style={styles.eventLoc}>{ev.location}</Text>
                   </View>
                 </View>
@@ -137,70 +138,72 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(41, 51, 50, 0.06)',
+    borderBottomColor: 'rgba(26, 28, 29, 0.06)',
   },
   syncIndicator: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   syncDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: designTokens.colors.primary,
+    backgroundColor: '#006A63',
   },
-  syncText: { color: designTokens.colors.textSecondary, fontSize: 12, fontWeight: '600' },
+  syncText: { color: '#76777D', fontSize: 12, fontWeight: '600' },
   syncBtn: {
-    backgroundColor: designTokens.colors.primarySoft,
+    backgroundColor: 'rgba(0, 106, 99, 0.08)',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: designTokens.radii.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 106, 99, 0.15)',
   },
-  syncBtnText: { color: designTokens.colors.primaryDeep, fontSize: 12, fontWeight: '700' },
+  syncBtnText: { color: '#006A63', fontSize: 11, fontWeight: '700' },
   filterRow: { flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 8 },
   filterTab: {
     flex: 1,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#FFFFFF',
     paddingVertical: 8,
     borderRadius: designTokens.radii.pill,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.08)',
+    borderColor: 'rgba(26, 28, 29, 0.08)',
   },
   filterTabActive: {
-    backgroundColor: designTokens.colors.primaryPill,
-    borderColor: designTokens.colors.primary,
+    backgroundColor: '#111827',
+    borderColor: '#111827',
   },
-  filterText: { fontSize: 11, fontWeight: '700', color: designTokens.colors.textSecondary },
-  filterTextActive: { color: designTokens.colors.textPrimary },
+  filterText: { fontSize: 11, fontWeight: '700', color: '#76777D' },
+  filterTextActive: { color: '#FFFFFF' },
   content: { flex: 1 },
   eventCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: designTokens.radii.card,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.06)',
+    borderColor: 'rgba(26, 28, 29, 0.06)',
     ...designTokens.shadows.card,
   },
   eventLeft: { flex: 1 },
   eventPill: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 8,
+    paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: designTokens.radii.pill,
+    borderRadius: 4,
     marginBottom: 6,
   },
   pillClass: {
-    backgroundColor: designTokens.colors.primarySoft,
+    backgroundColor: 'rgba(0, 106, 99, 0.08)',
   },
   pillTask: {
-    backgroundColor: designTokens.colors.accentPeachCard,
+    backgroundColor: 'rgba(186, 26, 26, 0.08)',
   },
-  pillText: { fontSize: 9, fontWeight: '800' },
-  pillTextClass: { color: designTokens.colors.primaryDeep },
-  pillTextTask: { color: designTokens.colors.accentPeachDeep },
-  eventTitle: { fontSize: 15, fontWeight: '700', color: designTokens.colors.textPrimary, marginBottom: 3 },
-  eventTime: { fontSize: 12, color: designTokens.colors.textSecondary, marginBottom: 2 },
-  eventLoc: { fontSize: 12, color: designTokens.colors.textSecondary },
+  pillText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
+  pillTextClass: { color: '#006A63' },
+  pillTextTask: { color: '#BA1A1A' },
+  eventTitle: { fontSize: 15, fontWeight: '700', color: '#111827' },
+  eventTime: { fontSize: 12, color: '#76777D', marginTop: 3 },
+  eventLoc: { fontSize: 11, color: '#006A63', fontWeight: '500' },
 });

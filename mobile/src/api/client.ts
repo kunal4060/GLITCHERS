@@ -349,6 +349,10 @@ class ApiClient {
     });
   }
 
+  public async completeOnboarding(profileUpdates?: any) {
+    return this.saveOnboardingStep('COMPLETE', profileUpdates, true);
+  }
+
   public async initializeWorkspace(payload: any) {
     return this.post<{
       success: boolean;

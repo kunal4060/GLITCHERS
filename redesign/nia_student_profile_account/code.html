@@ -1,0 +1,297 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
+<title>Student Profile &amp; Account - Nexa OS</title>
+<!-- Tailwind CSS v3 with Plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts Inter -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              teal: '#0ea5e9',
+              emerald: '#10b981',
+              dark: '#0f172a',
+              card: '#ffffff',
+              surface: '#f8fafc',
+              border: '#e2e8f0',
+            }
+          }
+        }
+      }
+    }
+  </script>
+<style data-purpose="custom-scrollbars-and-reset">
+    * {
+      -webkit-tap-highlight-color: transparent;
+      box-sizing: border-box;
+    }
+    body {
+      background-color: #f8fafc;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      color: #0f172a;
+    }
+    /* iOS switch simulation */
+    .ios-switch:checked ~ .switch-dot {
+      transform: translateX(1.25rem);
+      background-color: #ffffff;
+    }
+    .ios-switch:checked ~ .switch-bg {
+      background-color: #0d9488;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-[#f8fafc] text-slate-900 flex justify-center selection:bg-teal-100 selection:text-teal-900">
+<!-- BEGIN: MobileDeviceFrame -->
+<main class="w-full max-w-md min-h-screen bg-[#f8fafc] flex flex-col relative shadow-2xl border-x border-slate-200/70 antialiased" data-purpose="student-account-screen">
+<!-- BEGIN: TopBar -->
+<header class="sticky top-0 z-30 bg-[#f8fafc]/90 backdrop-blur-md px-5 py-4 flex items-center justify-between border-b border-slate-200/50">
+<div class="flex items-center gap-3.5">
+<button aria-label="Go back" class="w-9 h-9 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-700 hover:text-slate-950 hover:bg-slate-50 active:scale-95 transition-all" type="button">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+<path d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<h1 class="text-lg font-bold text-slate-900 tracking-tight">Student Profile &amp; Account</h1>
+</div>
+<div class="flex items-center">
+<!-- Status dot badge indicating online cloud status -->
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
+          Fall '26
+        </span>
+</div>
+</header>
+<!-- END: TopBar -->
+<!-- Scrollable Content Area -->
+<div class="flex-1 px-5 pt-5 space-y-6 pb-8">
+<!-- BEGIN: HeroProfileCard -->
+<section class="flex flex-col items-center text-center pt-2 pb-1" data-purpose="hero-profile">
+<!-- Avatar with Overlay Metric Badges -->
+<div class="relative mb-4 group">
+<!-- Circular Frame -->
+<div class="w-32 h-32 rounded-full p-1.5 bg-gradient-to-tr from-teal-500 via-emerald-400 to-amber-400 shadow-md">
+<div class="w-full h-full rounded-full overflow-hidden bg-white border-2 border-white relative shadow-inner">
+<!-- Provided Cat/Student Avatar Placeholder -->
+<img alt="Student Profile Photo" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC_3U7P5M-qcqeJfTeyABd4qXTBICOw13sS0sugLIxTGTNXyn3z3giwOlRcxvgvMAtDG6GfyTnKC_z4EG4l7tnV2_58uBivw9on-ZOQFLfX4Y_lMCXD0IOK4Dsvo8AFeY-pKrN6RcAbAQzKWOjppW_Edc7nbu6Q42DH-SCung8HMKoIzl9Ynos3G159BRw4g31Dr60II2xyFr0CcwpFyZ-pyG95etElFLy7HNINepnFgU_rvkTsUJTG4Q">
+</div>
+</div>
+<!-- Top-Left Floating Badge: CGPA 8.71 -->
+<div class="absolute -top-1 -left-2 bg-gradient-to-br from-amber-500 to-amber-600 text-white rounded-full px-2.5 py-1 shadow-md border-2 border-white flex flex-col items-center leading-none">
+<span class="text-xs font-black tracking-tight">8.71</span>
+<span class="text-[9px] font-medium tracking-wider uppercase opacity-90">cgpa</span>
+</div>
+<!-- Bottom-Right Floating Badge: Credits 42 -->
+<div class="absolute -bottom-1 -right-1 bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-full px-2.5 py-1 shadow-md border-2 border-white flex flex-col items-center leading-none">
+<span class="text-xs font-black tracking-tight">42</span>
+<span class="text-[9px] font-medium tracking-wider uppercase opacity-90">credits</span>
+</div>
+<!-- Camera Badge Action -->
+<button aria-label="Take or change profile photo" class="absolute bottom-1 left-2 bg-slate-900 text-white p-1.5 rounded-full border-2 border-white shadow-md hover:bg-slate-800 transition active:scale-95" type="button">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+<path d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" stroke-linecap="round" stroke-linejoin="round"></path>
+<path d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+<!-- Student Identification Info -->
+<h2 class="text-base font-extrabold tracking-tight text-slate-900 uppercase">
+          KUNAL BALKRUSHN UGALE
+        </h2>
+<div class="mt-0.5 inline-flex items-center gap-1.5 text-xs font-mono font-semibold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-md">
+<span class="">REG:</span>
+<span class="text-slate-900">25BCE7607</span>
+</div>
+<!-- Upload from gallery button -->
+<div class="mt-3.5">
+<button class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-slate-300/80 bg-white text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50 hover:border-slate-400 active:scale-95 transition" type="button">
+<svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+            Upload Photo from Gallery
+          </button>
+</div>
+<!-- Metric Badges Row -->
+<div class="mt-4 flex items-center justify-center gap-3 w-full">
+<div class="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-white rounded-xl border border-slate-200/80 shadow-sm">
+<div class="p-1 rounded-md bg-amber-50 text-amber-600">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342M6.75 15a.75.75 0 100-1.5.75.75 0 000 1.5zm0 0v-3.675A55.378 55.378 0 0112 8.443m-7.007 11.55A5.981 5.981 0 006.75 15.75v-1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div class="text-left leading-tight">
+<span class="text-[10px] text-slate-400 font-semibold tracking-wider uppercase">CGPA</span>
+<p class="text-sm font-bold text-slate-800">8.71</p>
+</div>
+</div>
+<div class="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-white rounded-xl border border-slate-200/80 shadow-sm">
+<div class="p-1 rounded-md bg-teal-50 text-teal-600">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.504-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007-4.494a5.992 5.992 0 00-6.007-6.006 5.992 5.992 0 00-6.006 6.006 5.992 5.992 0 006.006 6.007 5.992 5.992 0 006.007-6.007z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div class="text-left leading-tight">
+<span class="text-[10px] text-slate-400 font-semibold tracking-wider uppercase">Credits</span>
+<p class="text-sm font-bold text-slate-800">42</p>
+</div>
+</div>
+</div>
+<!-- Academic Term Selector -->
+<div class="mt-4 flex flex-col items-center gap-1.5">
+<div class="px-3.5 py-1.5 rounded-full bg-teal-50 border border-teal-200/70 text-teal-900 text-xs font-bold tracking-wide shadow-xs">
+            FALL SEMESTER 2026-27
+          </div>
+<button class="text-xs font-semibold text-teal-700 hover:text-teal-900 transition underline underline-offset-2" type="button">
+            Change semester
+          </button>
+</div>
+</section>
+<!-- END: HeroProfileCard -->
+<!-- BEGIN: AccountSettingsSection -->
+<section class="space-y-2" data-purpose="account-settings-group">
+<div class="px-1 flex items-center justify-between">
+<h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-400">Account</h3>
+</div>
+<div class="bg-white rounded-2xl border border-slate-200 shadow-sm divide-y divide-slate-100 overflow-hidden">
+<!-- Profile Item -->
+<a class="flex items-center justify-between px-4 py-3.5 hover:bg-slate-50 transition active:bg-slate-100" href="#profile">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<span class="text-sm font-semibold text-slate-800">Profile</span>
+</div>
+<svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M8.25 4.5l7.5 7.5-7.5 7.5" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</a>
+<!-- Manage Credentials -->
+<a class="flex items-center justify-between px-4 py-3.5 hover:bg-slate-50 transition active:bg-slate-100" href="#credentials">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<span class="text-sm font-semibold text-slate-800">Manage Credentials</span>
+</div>
+<svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M8.25 4.5l7.5 7.5-7.5 7.5" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</a>
+<!-- Sync with Cloud -->
+<a class="flex items-center justify-between px-4 py-3.5 hover:bg-slate-50 transition active:bg-slate-100" href="#sync">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<span class="text-sm font-semibold text-slate-800">Sync with Cloud</span>
+</div>
+<svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M8.25 4.5l7.5 7.5-7.5 7.5" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</a>
+</div>
+</section>
+<!-- END: AccountSettingsSection -->
+<!-- BEGIN: PreferencesAndDevice -->
+<section class="space-y-2" data-purpose="preferences-group">
+<div class="px-1 flex items-center justify-between">
+<h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-400">Preferences &amp; Device</h3>
+</div>
+<div class="bg-white rounded-2xl border border-slate-200 shadow-sm divide-y divide-slate-100">
+<!-- Quiet Hours Toggle -->
+<div class="flex items-center justify-between px-4 py-3.5">
+<div class="space-y-0.5 max-w-[78%]">
+<p class="text-sm font-bold text-slate-800">Quiet Hours Mode</p>
+<p class="text-xs text-slate-500 font-normal">Mute non-critical notices from 11 PM to 7 AM</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer select-none">
+<input checked="" class="sr-only ios-switch" type="checkbox">
+<div class="switch-bg w-11 h-6 bg-slate-200 rounded-full transition-colors duration-200 ease-in-out"></div>
+<div class="switch-dot absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full transition-transform duration-200 ease-in-out shadow"></div>
+</label>
+</div>
+<!-- Floating AI Assistant Toggle -->
+<div class="flex items-center justify-between px-4 py-3.5">
+<div class="space-y-0.5 max-w-[78%]">
+<div class="flex items-center gap-1.5">
+<p class="text-sm font-bold text-slate-800">Floating AI Assistant (NIA)</p>
+<span class="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-teal-50 text-teal-700 border border-teal-200">ACTIVE</span>
+</div>
+<p class="text-xs text-slate-500 font-normal">Quick-access NIA floating gem over other apps</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer select-none">
+<input checked="" class="sr-only ios-switch" type="checkbox">
+<div class="switch-bg w-11 h-6 bg-slate-200 rounded-full transition-colors duration-200 ease-in-out"></div>
+<div class="switch-dot absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full transition-transform duration-200 ease-in-out shadow"></div>
+</label>
+</div>
+</div>
+</section>
+<!-- END: PreferencesAndDevice -->
+<!-- BEGIN: ActionButtonsGroup -->
+<section class="space-y-3 pt-2" data-purpose="actions-group">
+<!-- Re-open Onboarding Button -->
+<button class="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-white border border-slate-200 text-slate-700 text-sm font-bold shadow-sm hover:bg-slate-50 active:scale-[0.99] transition" type="button">
+<svg class="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+          Re-open Onboarding Setup
+        </button>
+<!-- Log Out Button -->
+<button class="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-rose-50/50 border border-rose-200/70 text-rose-600 text-sm font-bold shadow-xs hover:bg-rose-100/50 active:scale-[0.99] transition" type="button">
+<svg class="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+          Log Out
+        </button>
+</section>
+<!-- END: ActionButtonsGroup -->
+</div>
+<!-- BEGIN: NiaFloatingGemButton -->
+<!-- Floating AI Gem Widget in the bottom right corner -->
+<div class="fixed bottom-6 right-6 z-40 max-w-md pointer-events-auto" data-purpose="nia-floating-gem">
+<button aria-label="Open Nia Assistant" class="group relative w-14 h-14 rounded-full bg-white border border-slate-200/80 shadow-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-transform duration-200" title="Open Nia Assistant" type="button">
+<!-- Outer Glow Ring -->
+<span class="absolute inset-0 rounded-full bg-teal-400/20 blur-sm group-hover:bg-teal-400/40 transition"></span>
+<!-- Multi-faceted 3D Gem Avatar Icon / Polygon Simulation -->
+<div class="relative w-9 h-9 flex items-center justify-center">
+<svg class="w-full h-full drop-shadow-sm" fill="none" viewBox="0 0 36 36">
+<!-- Facet Geometry -->
+<polygon fill="#0d9488" points="18,2 32,10 32,26 18,34 4,26 4,10" stroke="#042f2e" stroke-width="1"></polygon>
+<polygon fill="#14b8a6" points="18,2 26,18 18,34 10,18"></polygon>
+<polygon fill="#2dd4bf" points="18,2 32,10 26,18"></polygon>
+<polygon fill="#0f766e" points="32,10 32,26 26,18"></polygon>
+<polygon fill="#115e59" points="32,26 18,34 26,18"></polygon>
+<polygon fill="#0f766e" points="18,34 4,26 10,18"></polygon>
+<polygon fill="#134e4a" points="4,26 4,10 10,18"></polygon>
+<polygon fill="#5eead4" points="4,10 18,2 10,18"></polygon>
+<!-- Center Core Sparkle -->
+<circle cx="18" cy="18" fill="#ffffff" opacity="0.9" r="3"></circle>
+</svg>
+</div>
+</button>
+</div>
+<!-- END: NiaFloatingGemButton -->
+<!-- BEGIN: BottomNavigationHomeIndicator -->
+
+<!-- END: BottomNavigationHomeIndicator -->
+</main>
+<!-- END: MobileDeviceFrame -->
+
+
+</body></html>

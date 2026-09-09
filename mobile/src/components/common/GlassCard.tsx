@@ -50,8 +50,8 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   if (isHero) {
     const heroContent = (
       <LinearGradient
-        colors={['#C88E72', '#A27766', '#6F8484', '#4A6B70']}
-        locations={[0, 0.35, 0.72, 1]}
+        colors={['#111827', '#1F2937', '#0F172A']}
+        locations={[0, 0.5, 1]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.baseCard, styles.heroCard, baseStyle, style]}
@@ -93,38 +93,39 @@ const styles = StyleSheet.create({
   baseCard: {
     borderRadius: designTokens.radii.card,
     borderWidth: 1,
-    borderColor: designTokens.colors.surfaceBorder,
+    borderColor: 'rgba(26, 28, 29, 0.06)',
     overflow: 'hidden',
     ...designTokens.shadows.card,
   },
   defaultCard: {
-    backgroundColor: designTokens.colors.surfaceCard,
+    backgroundColor: '#FFFFFF',
   },
   elevatedCard: {
     backgroundColor: '#FFFFFF',
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.05,
     shadowRadius: 14,
+    borderColor: 'rgba(26, 28, 29, 0.06)',
   },
   tealCard: {
-    backgroundColor: designTokens.colors.primarySoft, // #D2E5E3
-    borderColor: 'rgba(117, 167, 165, 0.20)',
+    backgroundColor: 'rgba(0, 106, 99, 0.06)',
+    borderColor: 'rgba(0, 106, 99, 0.15)',
   },
   peachCard: {
-    backgroundColor: designTokens.colors.accentPeachCard, // #EEDFD3
-    borderColor: 'rgba(232, 173, 142, 0.22)',
+    backgroundColor: 'rgba(186, 26, 26, 0.05)',
+    borderColor: 'rgba(186, 26, 26, 0.12)',
   },
   creamCard: {
-    backgroundColor: designTokens.colors.accentSand, // #E3EAE7
-    borderColor: 'rgba(41, 51, 50, 0.06)',
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(26, 28, 29, 0.06)',
   },
   heroCard: {
     borderWidth: 0,
-    shadowColor: '#2D201A',
-    shadowOpacity: 0.14,
-    shadowRadius: 14,
-    elevation: 4,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 5,
   },
   activeBorder: {
-    borderColor: designTokens.colors.primary,
+    borderColor: '#006A63',
   },
 });

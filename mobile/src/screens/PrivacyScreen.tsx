@@ -4,6 +4,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAuthStore } from '../store/authStore';
 import { designTokens } from '../theme/designTokens';
 
+import { confirmAction, showAlert } from '../utils/alertUtils';
+
 export const PrivacyScreen: React.FC = () => {
   const { user, gmailConnected, calendarConnected, setGoogleConnections, logout } = useAuthStore();
 
@@ -37,20 +39,14 @@ export const PrivacyScreen: React.FC = () => {
   };
 
   const handleDeleteAccount = () => {
-    Alert.alert(
+    confirmAction(
       'Delete Account Permanently',
       'Are you sure? This will delete all your timetable entries, tasks, financial records, email metadata, and revoke OAuth tokens from the server.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete Everything',
-          style: 'destructive',
-          onPress: () => {
-            logout();
-            Alert.alert('Account Deleted', 'All student data has been wiped.');
-          },
-        },
-      ]
+      () => {
+        logout();
+        showAlert('Account Deleted', 'All student data has been wiped.');
+      },
+      'Delete Everything'
     );
   };
 
@@ -132,23 +128,23 @@ export const PrivacyScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FAF7F2' },
+  container: { flex: 1, backgroundColor: '#F9F9FB' },
   content: { padding: 16, paddingBottom: 100 },
-  sectionHeader: { fontSize: 11, fontWeight: '700', color: designTokens.colors.textSecondary, letterSpacing: 1, marginBottom: 10, marginTop: 6 },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(41, 51, 50, 0.08)' },
+  sectionHeader: { fontSize: 10, fontWeight: '800', color: '#76777D', letterSpacing: 0.8, marginBottom: 10, marginTop: 6 },
+  card: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(26, 28, 29, 0.06)', ...designTokens.shadows.card },
   serviceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
   serviceLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 10 },
-  serviceTitle: { fontSize: 14, color: designTokens.colors.textPrimary, fontWeight: '700' },
-  serviceSub: { fontSize: 12, color: designTokens.colors.textSecondary, marginTop: 2 },
-  verifiedBadge: { backgroundColor: '#E8F5E9', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  verifiedBadgeText: { fontSize: 11, color: '#1B5E20', fontWeight: '700' },
-  connectedBtn: { backgroundColor: '#E6F4EA', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: '#A8D5BA' },
-  connectedBtnText: { fontSize: 11, color: '#1E7E34', fontWeight: '700' },
-  connectBtn: { backgroundColor: designTokens.colors.primary, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
+  serviceTitle: { fontSize: 14, color: '#111827', fontWeight: '700' },
+  serviceSub: { fontSize: 12, color: '#76777D', marginTop: 2 },
+  verifiedBadge: { backgroundColor: 'rgba(0, 106, 99, 0.08)', paddingHorizontal: 9, paddingVertical: 3, borderRadius: 20 },
+  verifiedBadgeText: { fontSize: 10, color: '#006A63', fontWeight: '800' },
+  connectedBtn: { backgroundColor: 'rgba(0, 106, 99, 0.08)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(0, 106, 99, 0.20)' },
+  connectedBtnText: { fontSize: 11, color: '#006A63', fontWeight: '700' },
+  connectBtn: { backgroundColor: '#111827', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
   connectBtnText: { fontSize: 11, color: '#FFFFFF', fontWeight: '700' },
-  divider: { height: 1, backgroundColor: 'rgba(41, 51, 50, 0.06)', marginVertical: 6 },
-  btnSecondary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F6F3ED', padding: 14, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(41, 51, 50, 0.08)' },
-  btnSecondaryText: { color: designTokens.colors.primaryDark, fontWeight: '700', fontSize: 13 },
-  btnDanger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FEF2F2', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#FECACA' },
-  btnDangerText: { color: '#DC2626', fontWeight: '700', fontSize: 13 },
+  divider: { height: 1, backgroundColor: 'rgba(26, 28, 29, 0.05)', marginVertical: 6 },
+  btnSecondary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', padding: 14, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(26, 28, 29, 0.08)' },
+  btnSecondaryText: { color: '#111827', fontWeight: '700', fontSize: 13 },
+  btnDanger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(186, 26, 26, 0.06)', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(186, 26, 26, 0.15)' },
+  btnDangerText: { color: '#BA1A1A', fontWeight: '700', fontSize: 13 },
 });

@@ -608,18 +608,21 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
     <GradientBackground>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <View style={styles.container}>
-        {/* Header */}
+        {/* Minimalist Top Bar */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <AIGemSymbol size={34} />
+            <View style={styles.sparkBadgeBox}>
+              <Ionicons name="sparkles" size={16} color="#FFFFFF" />
+              <View style={styles.sparkOnlineDot} />
+            </View>
             <View>
-              <Text style={styles.headerTitle}>NIA</Text>
-              <View style={styles.statusRow}>
-                <View style={[styles.onlineDot, aiMode === 'OFFLINE' && { backgroundColor: '#F59E0B' }]} />
-                <Text style={styles.statusText}>
-                  {aiMode === 'OFFLINE' ? '100% Offline (HF Engine)' : 'Nexa Intelligent Assistance'}
-                </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                <Text style={styles.headerTitle}>NIA</Text>
+                <View style={styles.proBadge}>
+                  <Text style={styles.proBadgeText}>PRO</Text>
+                </View>
               </View>
+              <Text style={styles.headerSubtitleText}>Nexa Intelligent Assistance</Text>
             </View>
           </View>
 
@@ -636,10 +639,10 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
                     ]);
                   }
                 }}
-                style={[styles.modelPillBtn, { paddingHorizontal: 8 }]}
+                style={styles.clearChatCircleBtn}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Ionicons name="trash-outline" size={14} color={designTokens.colors.textSecondary} />
+                <Ionicons name="trash-outline" size={14} color="#76777D" />
               </TouchableOpacity>
             )}
 
@@ -647,18 +650,13 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
             <TouchableOpacity
               style={[styles.modelPillBtn, aiMode === 'OFFLINE' && styles.modelPillBtnOffline]}
               onPress={() => setModelModalVisible(true)}
-              activeOpacity={0.7}
-              hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+              activeOpacity={0.8}
             >
-              <Ionicons
-                name={aiMode === 'OFFLINE' ? 'flash' : aiMode === 'AUTO' ? 'sync' : 'cloud'}
-                size={14}
-                color={aiMode === 'OFFLINE' ? '#B45309' : designTokens.colors.primaryDark}
-              />
-              <Text style={[styles.modelPillText, aiMode === 'OFFLINE' && { color: '#B45309' }]}>
-                {aiMode === 'OFFLINE' ? 'Offline (HF)' : aiMode === 'AUTO' ? 'Auto (HF/Cloud)' : 'Gemini Cloud'}
+              <View style={[styles.modelDot, { backgroundColor: aiMode === 'OFFLINE' ? '#D97706' : '#10B981' }]} />
+              <Text style={[styles.modelPillText, aiMode === 'OFFLINE' && { color: '#D97706' }]}>
+                {aiMode === 'OFFLINE' ? 'Offline (HF)' : aiMode === 'AUTO' ? 'Auto (HF)' : 'Gemini Cloud'}
               </Text>
-              <Ionicons name="chevron-down" size={12} color={designTokens.colors.textSecondary} />
+              <Ionicons name="chevron-down" size={12} color="#76777D" />
             </TouchableOpacity>
           </View>
         </View>
@@ -830,17 +828,29 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
           disabled={loading}
           activeOpacity={0.7}
         >
-          <Ionicons name="camera-outline" size={20} color={designTokens.colors.primaryDark} />
+          <Ionicons name="camera-outline" size={20} color="#45464C" />
         </TouchableOpacity>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Ask math, problem photo, or study tips..."
-          placeholderTextColor="#64748B"
-          value={input}
-          onChangeText={setInput}
-          onSubmitEditing={() => handleSend()}
-        />
+        <View style={styles.inputWrapper}>
+          <TextInput
+            style={styles.input}
+            placeholder="Ask Nia anything or scan notes..."
+            placeholderTextColor="#8C9692"
+            value={input}
+            onChangeText={setInput}
+            onSubmitEditing={() => handleSend()}
+            returnKeyType="send"
+          />
+          {input.trim().length > 0 && (
+            <TouchableOpacity
+              style={styles.inputClearBtn}
+              onPress={() => setInput('')}
+            >
+              <Ionicons name="close-circle" size={16} color="#8C9692" />
+            </TouchableOpacity>
+          )}
+        </View>
+
         <TouchableOpacity
           style={[styles.sendBtn, !input.trim() && styles.sendBtnDisabled]}
           onPress={() => handleSend()}
@@ -1113,6 +1123,53 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: designTokens.spacing.md,
   },
+  sparkBadgeBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: '#111827',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  sparkOnlineDot: {
+    position: 'absolute',
+    bottom: -1,
+    right: -1,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#006A63',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  proBadge: {
+    backgroundColor: 'rgba(0, 106, 99, 0.12)',
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 4,
+  },
+  proBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#006A63',
+    letterSpacing: 0.5,
+  },
+  headerSubtitleText: {
+    fontSize: 10,
+    color: '#76777D',
+    fontWeight: '500',
+  },
+  clearChatCircleBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(26, 28, 29, 0.08)',
+  },
   aiAvatar: {
     width: 36,
     height: 36,
@@ -1181,19 +1238,19 @@ const styles = StyleSheet.create({
     paddingVertical: designTokens.spacing.md,
   },
   userBubble: {
-    backgroundColor: designTokens.colors.primary,
+    backgroundColor: '#111827',
     borderBottomRightRadius: 4,
   },
   assistantBubble: {
     backgroundColor: '#FFFFFF',
     borderBottomLeftRadius: 4,
     borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.08)',
+    borderColor: 'rgba(26, 28, 29, 0.06)',
     ...designTokens.shadows.card,
   },
   bubbleText: { ...designTokens.typography.bodyMedium, lineHeight: 20 },
   userBubbleText: { color: '#FFFFFF' },
-  assistantBubbleText: { color: designTokens.colors.textPrimary },
+  assistantBubbleText: { color: '#111827' },
   msgTime: {
     ...designTokens.typography.micro,
     color: designTokens.colors.textMuted,
@@ -1202,8 +1259,8 @@ const styles = StyleSheet.create({
   },
   actionCard: {
     marginTop: designTokens.spacing.md,
-    backgroundColor: '#FAF7F2',
-    borderColor: 'rgba(117, 167, 165, 0.25)',
+    backgroundColor: '#F9F9FB',
+    borderColor: 'rgba(0, 106, 99, 0.25)',
     padding: designTokens.spacing.md,
   },
   cardHeaderRow: {
@@ -1212,14 +1269,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
   },
-  cardActionTitle: { ...designTokens.typography.cardTitle, fontSize: 13, color: designTokens.colors.textPrimary },
+  cardActionTitle: { ...designTokens.typography.cardTitle, fontSize: 13, color: '#111827' },
   cardBadge: {
-    backgroundColor: designTokens.colors.primarySoft,
+    backgroundColor: 'rgba(0, 106, 99, 0.10)',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: designTokens.radii.xs,
   },
-  cardBadgeText: { ...designTokens.typography.micro, color: designTokens.colors.primaryDeep, fontWeight: '800', fontSize: 9 },
+  cardBadgeText: { ...designTokens.typography.micro, color: '#006A63', fontWeight: '800', fontSize: 9 },
   cardSub: { ...designTokens.typography.body, fontSize: 12, marginBottom: designTokens.spacing.sm },
   cardValuesRow: {
     flexDirection: 'row',
@@ -1227,10 +1284,10 @@ const styles = StyleSheet.create({
     gap: designTokens.spacing.sm,
     marginBottom: designTokens.spacing.sm,
   },
-  cardPrimaryVal: { ...designTokens.typography.cardTitle, fontSize: 16, color: designTokens.colors.primaryDark },
+  cardPrimaryVal: { ...designTokens.typography.cardTitle, fontSize: 16, color: '#006A63' },
   cardSecondaryVal: { ...designTokens.typography.micro, color: designTokens.colors.textMuted },
   cardNavBtn: {
-    backgroundColor: designTokens.colors.primary,
+    backgroundColor: '#111827',
     paddingVertical: 6,
     borderRadius: designTokens.radii.sm,
     alignItems: 'center',
@@ -1244,7 +1301,7 @@ const styles = StyleSheet.create({
   loadingText: { ...designTokens.typography.body, fontSize: 12, color: designTokens.colors.textSecondary },
   chipsBar: {
     borderTopWidth: 1,
-    borderTopColor: 'rgba(41, 51, 50, 0.06)',
+    borderTopColor: 'rgba(26, 28, 29, 0.06)',
     paddingVertical: designTokens.spacing.xs + 2,
   },
   chipsContent: {
@@ -1257,46 +1314,54 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: designTokens.radii.pill,
     borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.08)',
+    borderColor: 'rgba(26, 28, 29, 0.08)',
   },
-  chipText: { ...designTokens.typography.micro, color: designTokens.colors.textSecondary, fontWeight: '600' },
+  chipText: { ...designTokens.typography.micro, color: '#111827', fontWeight: '600' },
   inputBar: {
     flexDirection: 'row',
     paddingHorizontal: designTokens.spacing.lg,
-    paddingVertical: designTokens.spacing.sm,
-    backgroundColor: '#FAF7F2',
+    paddingVertical: 8,
+    backgroundColor: '#F9F9FB',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(41, 51, 50, 0.08)',
+    borderTopColor: 'rgba(26, 28, 29, 0.08)',
     alignItems: 'center',
     gap: designTokens.spacing.sm,
-    marginBottom: 8,
+    marginBottom: Platform.OS === 'ios' ? 94 : 84,
   },
   attachBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.12)',
+    borderColor: 'rgba(26, 28, 29, 0.12)',
+  },
+  inputWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: designTokens.radii.pill,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(26, 28, 29, 0.12)',
   },
   input: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: designTokens.radii.pill,
-    paddingHorizontal: designTokens.spacing.lg,
-    paddingVertical: 10,
-    color: designTokens.colors.textPrimary,
+    paddingVertical: 9,
+    color: '#111827',
     fontSize: 13,
-    borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.10)',
+  },
+  inputClearBtn: {
+    padding: 4,
   },
   sendBtn: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: designTokens.colors.primary,
+    backgroundColor: '#111827',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1320,6 +1385,11 @@ const styles = StyleSheet.create({
     borderRadius: designTokens.radii.pill,
     borderWidth: 1,
     borderColor: 'rgba(41, 51, 50, 0.12)',
+  },
+  modelDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   modelPillBtnOffline: {
     backgroundColor: '#FEF3C7',
@@ -1371,7 +1441,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContainer: {
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#F9F9FB',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: designTokens.spacing.lg,
@@ -1555,7 +1625,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   customRepoInput: {
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#F9F9FB',
     borderRadius: designTokens.radii.xs,
     paddingHorizontal: 10,
     paddingVertical: 8,
@@ -1707,7 +1777,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: '#F9F9FB',
     borderWidth: 1,
     borderColor: designTokens.colors.primary,
     paddingHorizontal: 10,

@@ -8,7 +8,7 @@ import { StatusBadge } from '../components/common/StatusBadge';
 import { useDashboardStore } from '../store/dashboardStore';
 import { getNextUpcomingClass } from '../utils/timetableTimeUtils';
 
-export const NotificationsScreen: React.FC = () => {
+export const NotificationsScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const { classes, tasks, emails, dismissedNoticeIds } = useDashboardStore();
   const now = new Date();
 
@@ -19,6 +19,7 @@ export const NotificationsScreen: React.FC = () => {
     message: string;
     time: string;
     priority: 'CRITICAL' | 'HIGH' | 'NORMAL';
+    targetScreen?: string;
   }> = [];
 
   // 1. Next / Ongoing class notification
@@ -31,6 +32,7 @@ export const NotificationsScreen: React.FC = () => {
       message: `Room ${c.room || 'AB1-204'} • ${c.faculty || 'Faculty'} (${c.startTime} - ${c.endTime})`,
       time: nextClassInfo.isOngoing ? 'Right now' : 'Upcoming',
       priority: nextClassInfo.isOngoing ? 'HIGH' : 'NORMAL',
+      targetScreen: 'Timetable',
     });
   }
 
@@ -46,6 +48,7 @@ export const NotificationsScreen: React.FC = () => {
         message: `Priority: ${t.priority.replace('_', ' ')} • Tap to manage in Tasks`,
         time: 'Pending',
         priority: t.priority === 'EXTREMELY_IMPORTANT' ? 'CRITICAL' : 'HIGH',
+        targetScreen: 'Tasks',
       });
     });
 
@@ -61,6 +64,7 @@ export const NotificationsScreen: React.FC = () => {
         message: e.summary,
         time: 'University Notice',
         priority: e.importance === 'CRITICAL' ? 'CRITICAL' : 'HIGH',
+        targetScreen: 'Email',
       });
     });
 
@@ -72,6 +76,7 @@ export const NotificationsScreen: React.FC = () => {
       message: 'No immediate upcoming classes or urgent task deadlines. Keep up the great work!',
       time: 'Just now',
       priority: 'NORMAL',
+      targetScreen: 'Timetable',
     });
   }
 
@@ -79,9 +84,19 @@ export const NotificationsScreen: React.FC = () => {
     <GradientBackground>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+          {/* Top Header */}
+          <View style={styles.topHeader}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <View style={styles.topHeaderDot} />
+              <Text style={styles.topHeaderTag}>ACADEMIC DISPATCH</Text>
+            </View>
+            <Text style={styles.screenTitle}>Notifications</Text>
+            <Text style={styles.screenSub}>Real-time campus radar & lecture schedule alerts</Text>
+          </View>
+
           <View style={styles.quietHoursCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-              <Ionicons name="moon-outline" size={14} color={designTokens.colors.primaryDeep} />
+              <Ionicons name="moon" size={14} color="#006A63" />
               <Text style={styles.quietHoursTitle}>Quiet Hours Active (11:00 PM – 7:00 AM)</Text>
             </View>
             <Text style={styles.quietHoursSub}>Non-urgent notifications are muted during study & sleep hours.</Text>
@@ -90,7 +105,20 @@ export const NotificationsScreen: React.FC = () => {
           <Text style={styles.header}>LIVE NOTIFICATIONS</Text>
 
           {dynamicNotifs.map((n) => (
-            <TouchableOpacity key={n.id} style={styles.notifCard} activeOpacity={0.82}>
+            <TouchableOpacity
+              key={n.id}
+              style={styles.notifCard}
+              activeOpacity={0.82}
+              onPress={() => {
+                if (n.targetScreen && navigation) {
+                  if (n.targetScreen === 'Timetable' || n.targetScreen === 'Tasks') {
+                    navigation.navigate('MainTabs', { screen: n.targetScreen });
+                  } else {
+                    navigation.navigate(n.targetScreen);
+                  }
+                }
+              }}
+            >
               <View style={styles.row}>
                 <Text style={styles.title}>{n.title}</Text>
                 <Text style={styles.time}>{n.time}</Text>
@@ -116,35 +144,39 @@ export const NotificationsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: designTokens.spacing.lg, paddingBottom: 100 },
+  topHeader: { marginBottom: 16 },
+  topHeaderDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#006A63' },
+  topHeaderTag: { fontSize: 10, fontWeight: '800', color: '#76777D', letterSpacing: 0.8 },
+  screenTitle: { fontSize: 22, fontWeight: '800', color: '#111827', letterSpacing: -0.3 },
+  screenSub: { fontSize: 12, color: '#76777D', marginTop: 3 },
   quietHoursCard: {
-    backgroundColor: '#D8E8E7',
-    borderRadius: designTokens.radii.card,
-    padding: 16,
+    backgroundColor: 'rgba(0, 106, 99, 0.06)',
+    borderRadius: 14,
+    padding: 14,
     marginBottom: designTokens.spacing.lg,
     borderWidth: 1,
-    borderColor: 'rgba(117, 167, 165, 0.20)',
-    ...designTokens.shadows.card,
+    borderColor: 'rgba(0, 106, 99, 0.12)',
   },
-  quietHoursTitle: { fontSize: 13, fontWeight: '700', color: designTokens.colors.textPrimary },
-  quietHoursSub: { fontSize: 12, color: designTokens.colors.textSecondary },
+  quietHoursTitle: { fontSize: 12.5, fontWeight: '700', color: '#006A63' },
+  quietHoursSub: { fontSize: 11.5, color: '#4B5563', marginTop: 2 },
   header: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: designTokens.colors.textPrimary,
-    letterSpacing: 0.6,
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#76777D',
+    letterSpacing: 0.8,
     marginBottom: 12,
   },
   notifCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: designTokens.radii.card,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.06)',
+    borderColor: 'rgba(26, 28, 29, 0.06)',
     ...designTokens.shadows.card,
   },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { fontSize: 14, fontWeight: '700', color: designTokens.colors.textPrimary, flex: 1 },
-  time: { fontSize: 11, color: designTokens.colors.textMuted, marginLeft: 8 },
-  message: { fontSize: 12, color: designTokens.colors.textSecondary, marginTop: 4, lineHeight: 17 },
+  title: { fontSize: 14, fontWeight: '700', color: '#111827', flex: 1 },
+  time: { fontSize: 11, color: '#76777D', marginLeft: 8 },
+  message: { fontSize: 12, color: '#4B5563', marginTop: 4, lineHeight: 17 },
 });

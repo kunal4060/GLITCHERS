@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXA / NIA Academic OS - Interactive UI Preview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+    }
+    .device-shell {
+      width: 412px;
+      height: 860px;
+      background: #f9f9fb;
+      border-radius: 44px;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 0 10px #1e293b, 0 0 0 12px #334155;
+      overflow: hidden;
+      position: relative;
+    }
+    .device-shell iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #f9f9fb;
+    }
+    .tab-btn.active {
+      background: #006a63;
+      color: #ffffff;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-6 select-none">
+  <!-- Top Control Bar -->
+  <header class="w-full max-w-4xl flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-400 flex items-center justify-center shadow-lg shadow-teal-500/20">
+        <span class="material-symbols-outlined text-white text-[22px]">auto_awesome</span>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+          NIA Academic OS
+          <span class="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30">Executive Preview</span>
+        </h1>
+        <p class="text-xs text-slate-400">Minimalist academic luxury design system for GLICHERS</p>
+      </div>
+    </div>
+
+    <!-- Screen Switcher Tabs -->
+    <div class="flex items-center gap-1.5 p-1.5 bg-slate-800/90 backdrop-blur rounded-2xl border border-slate-700/60 shadow-xl overflow-x-auto max-w-full">
+      <button onclick="switchScreen('nia_home/code.html', this)" class="tab-btn active px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 transition-all flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-[16px]">home</span>
+        <span>Home</span>
+      </button>
+      <button onclick="switchScreen('nia_schedule/code.html', this)" class="tab-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 transition-all flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-[16px]">calendar_today</span>
+        <span>Schedule</span>
+      </button>
+      <button onclick="switchScreen('nia_tasks/code.html', this)" class="tab-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 transition-all flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-[16px]">check_box</span>
+        <span>Tasks</span>
+      </button>
+      <button onclick="switchScreen('nia_finance/code.html', this)" class="tab-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 transition-all flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-[16px]">account_balance_wallet</span>
+        <span>Finance</span>
+      </button>
+      <button onclick="switchScreen('nia_ai_assistant_minimalist/code.html', this)" class="tab-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 transition-all flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-[16px]">auto_awesome</span>
+        <span>Nia AI</span>
+      </button>
+      <button onclick="switchScreen('nia_student_profile_account/code.html', this)" class="tab-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 transition-all flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-[16px]">person</span>
+        <span>Profile</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Interactive Mobile Device Frame -->
+  <main class="relative flex items-center justify-center">
+    <div class="device-shell">
+      <!-- Camera Punch-Hole Mockup -->
+      <div class="absolute top-3 left-1/2 -translate-x-1/2 w-28 h-5 bg-black rounded-full z-50 flex items-center justify-center pointer-events-none">
+        <div class="w-3 h-3 rounded-full bg-slate-900 ml-auto mr-3"></div>
+      </div>
+
+      <!-- Active Screen Iframe -->
+      <iframe id="screenFrame" src="nia_home/code.html" title="Screen Preview"></iframe>
+    </div>
+  </main>
+
+  <footer class="mt-6 text-center text-xs text-slate-500">
+    Designed for GLICHERS • Tap the screen buttons or bottom dock inside the frame to navigate
+  </footer>
+
+  <script>
+    const frame = document.getElementById('screenFrame');
+    const tabButtons = document.querySelectorAll('.tab-btn');
+
+    function switchScreen(src, btn) {
+      frame.src = src;
+      tabButtons.forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+    }
+
+    // Intercept navigation clicks from inside iframes to seamlessly switch screens
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'NAVIGATE') {
+        const path = event.data.path;
+        if (path === 'home') switchScreen('nia_home/code.html', tabButtons[0]);
+        else if (path === 'schedule') switchScreen('nia_schedule/code.html', tabButtons[1]);
+        else if (path === 'tasks') switchScreen('nia_tasks/code.html', tabButtons[2]);
+        else if (path === 'finance') switchScreen('nia_finance/code.html', tabButtons[3]);
+        else if (path === 'nia-ai') switchScreen('nia_ai_assistant_minimalist/code.html', tabButtons[4]);
+        else if (path === 'profile') switchScreen('nia_student_profile_account/code.html', tabButtons[5]);
+      }
+    });
+
+    frame.onload = () => {
+      try {
+        const doc = frame.contentDocument || frame.contentWindow.document;
+        // Listen to bottom nav links
+        const navLinks = doc.querySelectorAll('nav a, [data-path], button[aria-label="Student Profile"]');
+        navLinks.forEach(link => {
+          link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const path = link.getAttribute('data-path');
+            if (path === 'home') switchScreen('nia_home/code.html', tabButtons[0]);
+            else if (path === 'schedule') switchScreen('nia_schedule/code.html', tabButtons[1]);
+            else if (path === 'tasks') switchScreen('nia_tasks/code.html', tabButtons[2]);
+            else if (path === 'finance') switchScreen('nia_finance/code.html', tabButtons[3]);
+            else if (path === 'nia-ai') switchScreen('nia_ai_assistant_minimalist/code.html', tabButtons[4]);
+            else if (link.getAttribute('aria-label') === 'Student Profile') switchScreen('nia_student_profile_account/code.html', tabButtons[5]);
+          });
+        });
+
+        // Back button on profile
+        const backBtn = doc.querySelector('button[aria-label="Go back"]');
+        if (backBtn) {
+          backBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            switchScreen('nia_home/code.html', tabButtons[0]);
+          });
+        }
+      } catch (err) {
+        // Cross-origin fallback
+      }
+    };
+  </script>
+</body>
+</html>

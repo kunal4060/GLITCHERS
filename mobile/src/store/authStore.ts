@@ -24,6 +24,8 @@ interface AuthState {
   setAvatarUrl: (avatarUrl: string | null) => void;
   setOnboardingStep: (step: OnboardingStep, data?: Record<string, any>) => void;
   completeOnboarding: (profileUpdates?: Partial<UserProfile>) => void;
+  resetOnboarding: () => void;
+  setIsOnboardingComplete: (status: boolean) => void;
   loginWithGoogle: (email?: string, name?: string, token?: string) => Promise<void>;
   checkSession: () => Promise<void>;
   logout: () => void;
@@ -70,17 +72,28 @@ export const useAuthStore = create<AuthState>()(
       },
 
       completeOnboarding: (profileUpdates?: Partial<UserProfile>) => {
-        set((s) => ({
+        // Persist completion flag to backend
+        apiClient.completeOnboarding(profileUpdates).catch(() => null);
+        set((state) => ({
           isOnboardingComplete: true,
           currentOnboardingStep: 'COMPLETE',
-          user: s.user
+          user: state.user
             ? {
-                ...s.user,
+                ...state.user,
                 ...(profileUpdates || {}),
                 isOnboardingComplete: true,
               }
             : null,
         }));
+      },
+
+      setIsOnboardingComplete: (isOnboardingComplete: boolean) => set({ isOnboardingComplete }),
+
+      resetOnboarding: () => {
+        set({
+          isOnboardingComplete: false,
+          currentOnboardingStep: 'GOOGLE_SERVICES',
+        });
       },
 
       loginWithGoogle: async (email?: string, name?: string, token?: string) => {

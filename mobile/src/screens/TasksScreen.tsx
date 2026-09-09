@@ -1,10 +1,17 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, Alert } from 'react-native';
-import { designTokens } from '../theme/designTokens';
-import { GlassCard } from '../components/common/GlassCard';
-import { StatusBadge } from '../components/common/StatusBadge';
-import { GradientBackground } from '../components/common/GradientBackground';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Modal,
+  Alert,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { designTokens } from '../theme/designTokens';
 import { useDashboardStore } from '../store/dashboardStore';
 import { useAuthStore } from '../store/authStore';
 import type { Task } from '@glitchers/shared';
@@ -17,7 +24,8 @@ export const TasksScreen: React.FC = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newPriority, setNewPriority] = useState<Task['priority']>('NORMAL');
-  const [newDue, setNewDue] = useState('Tomorrow');
+  const [starredTaskIds, setStarredTaskIds] = useState<string[]>([]);
+  const [isDecomposing, setIsDecomposing] = useState(false);
 
   const todayDateStr = new Date().toISOString().slice(0, 10);
 
@@ -25,7 +33,7 @@ export const TasksScreen: React.FC = () => {
   const filteredTasks = tasks.filter((t) => {
     if (selectedFilter === 'Completed') return t.status === 'COMPLETED';
     if (selectedFilter === 'Important') {
-      return t.status === 'TODO' && (t.priority === 'EXTREMELY_IMPORTANT' || t.priority === 'HIGH');
+      return t.status === 'TODO' && (t.priority === 'EXTREMELY_IMPORTANT' || t.priority === 'HIGH' || starredTaskIds.includes(t.id));
     }
     if (selectedFilter === 'Today') {
       if (t.status !== 'TODO') return false;
@@ -39,6 +47,23 @@ export const TasksScreen: React.FC = () => {
     }
     return true; // All
   });
+
+  const toggleStar = (taskId: string) => {
+    setStarredTaskIds((prev) =>
+      prev.includes(taskId) ? prev.filter((id) => id !== taskId) : [...prev, taskId]
+    );
+  };
+
+  const handleDecomposeMilestones = () => {
+    setIsDecomposing(true);
+    setTimeout(() => {
+      setIsDecomposing(false);
+      Alert.alert(
+        'Cognitive Load Optimizer',
+        'Nia AI analyzed your assignments and split them into 15-minute milestones across your study blocks.'
+      );
+    }, 1200);
+  };
 
   const handleCreateTask = () => {
     if (!newTitle.trim()) {
@@ -57,124 +82,232 @@ export const TasksScreen: React.FC = () => {
     addTask(newTask);
     setNewTitle('');
     setModalVisible(false);
-    Alert.alert('Task Created', `"${newTask.title}" added with ${newTask.priority} priority.`);
+    Alert.alert('Task Created', `"${newTask.title}" added to your workspace.`);
   };
 
   return (
-    <GradientBackground>
-      <View style={styles.container}>
-      {/* Top Header */}
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      {/* Header Bar */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>Tasks & Deadlines</Text>
-          <Text style={styles.headerSubtitle}>
-            {tasks.filter((t) => t.status === 'TODO').length} pending actions
-          </Text>
+          <View style={styles.headerFocusRow}>
+            <View style={styles.tealPip} />
+            <Text style={styles.headerFocusLabel}>WORKSPACE FOCUS</Text>
+          </View>
+          <View style={styles.headerTitleRow}>
+            <Text style={styles.headerTitle}>Tasks & Deadlines</Text>
+            <Text style={styles.headerPendingCount}>
+              ({tasks.filter((t) => t.status === 'TODO').length} pending)
+            </Text>
+          </View>
         </View>
 
-        <TouchableOpacity style={styles.addBtn} onPress={() => setModalVisible(true)}>
+        <TouchableOpacity
+          style={styles.newTaskBtn}
+          onPress={() => setModalVisible(true)}
+          activeOpacity={0.85}
+        >
           <Ionicons name="add" size={16} color="#FFFFFF" />
-          <Text style={styles.addBtnText}>New Task</Text>
+          <Text style={styles.newTaskBtnText}>New Task</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Filter Chips Bar */}
-      <View style={styles.filterBar}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContent}>
-          {FILTERS.map((f) => {
-            const isActive = f === selectedFilter;
-            return (
-              <TouchableOpacity
-                key={f}
-                style={[styles.filterChip, isActive && styles.filterChipActive]}
-                onPress={() => setSelectedFilter(f)}
-              >
-                <Text style={[styles.filterText, isActive && styles.filterTextActive]}>{f}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      {/* Task List */}
-      <ScrollView contentContainerStyle={styles.taskList}>
-        {filteredTasks.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="checkmark-done-circle-outline" size={36} color="#34D399" style={{ marginBottom: 8 }} />
-            <Text style={styles.emptyTitle}>You're all clear</Text>
-            <Text style={styles.emptySub}>No pending tasks found under {selectedFilter}.</Text>
-          </View>
-        ) : (
-          filteredTasks.map((t) => {
-            const isDone = t.status === 'COMPLETED';
-            let priorityBadge = <StatusBadge label="NORMAL" variant="safe" />;
-            if (t.priority === 'EXTREMELY_IMPORTANT') {
-              priorityBadge = <StatusBadge label="EXTREMELY_IMPORTANT" variant="extremely_important" />;
-            } else if (t.priority === 'HIGH') {
-              priorityBadge = <StatusBadge label="HIGH" variant="high" />;
-            }
-
-            return (
-              <GlassCard key={t.id} variant="teal" style={styles.taskCard}>
-                <View style={styles.taskCardRow}>
-                  <TouchableOpacity
-                    style={styles.checkbox}
-                    onPress={() => completeTask(t.id)}
-                  >
-                    <Ionicons
-                      name={isDone ? 'checkmark-circle' : 'ellipse-outline'}
-                      size={22}
-                      color={isDone ? designTokens.colors.primaryDark : designTokens.colors.textSecondary}
-                    />
-                  </TouchableOpacity>
-
-                  <View style={styles.taskContent}>
-                    <View style={styles.badgeRow}>
-                      {priorityBadge}
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                        <Ionicons name="time-outline" size={11} color="#64748B" />
-                        <Text style={styles.deadlineTag}>Due tomorrow</Text>
-                      </View>
-                    </View>
-
-                    <Text style={[styles.taskTitle, isDone && styles.taskTitleDone]}>
-                      {t.title}
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Segmented Control Bar */}
+        <View style={styles.filterBar}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+            {FILTERS.map((f) => {
+              const isActive = f === selectedFilter;
+              return (
+                <TouchableOpacity
+                  key={f}
+                  style={[styles.filterTab, isActive && styles.filterTabActive]}
+                  onPress={() => setSelectedFilter(f)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.filterTabText, isActive && styles.filterTabTextActive]}>
+                    {f}
+                  </Text>
+                  {f === 'All' && (
+                    <Text style={[styles.filterTabCount, isActive && { color: '#1A1C1D' }]}>
+                      {tasks.filter((t) => t.status === 'TODO').length}
                     </Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
 
-                    {t.description && (
-                      <Text style={styles.taskDesc} numberOfLines={2}>{t.description}</Text>
-                    )}
+        {/* Cognitive Load Optimizer Card (AI Decomposition) */}
+        <View style={styles.optimizerCard}>
+          <View style={styles.optimizerLeft}>
+            <View style={styles.optimizerIconBox}>
+              <Ionicons name="sparkles" size={18} color="#006A63" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={styles.optimizerHeaderRow}>
+                <Text style={styles.optimizerTitle}>COGNITIVE LOAD OPTIMIZER</Text>
+                <View style={styles.nexaTag}>
+                  <Text style={styles.nexaTagText}>NIA AI</Text>
+                </View>
+              </View>
+              <Text style={styles.optimizerDesc}>
+                Split complex assignments into actionable 15-minute telemetry milestones.
+              </Text>
+              <View style={styles.optimizerActionsRow}>
+                <TouchableOpacity
+                  style={styles.breakDownBtn}
+                  onPress={handleDecomposeMilestones}
+                  disabled={isDecomposing}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="git-merge-outline" size={14} color="#1A1C1D" />
+                  <Text style={styles.breakDownBtnText}>
+                    {isDecomposing ? 'Decomposing...' : 'Break Down Tasks'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
 
-                    <View style={styles.taskFooter}>
-                      <View style={styles.aiTag}>
-                        <Ionicons name="sparkles" size={10} color={designTokens.colors.accentPeachDeep} />
-                        <Text style={styles.aiTagText}>AI Suggested</Text>
+        {/* Task Cards List */}
+        <View style={styles.tasksList}>
+          {filteredTasks.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Ionicons name="checkmark-done-circle-outline" size={36} color="#006A63" style={{ marginBottom: 8 }} />
+              <Text style={styles.emptyTitle}>Workspace Clear</Text>
+              <Text style={styles.emptySub}>No pending tasks found under {selectedFilter}. Great work!</Text>
+            </View>
+          ) : (
+            filteredTasks.map((task) => {
+              const isDone = task.status === 'COMPLETED';
+              const isHigh = task.priority === 'EXTREMELY_IMPORTANT' || task.priority === 'HIGH';
+              const isStarred = starredTaskIds.includes(task.id);
+
+              return (
+                <View key={task.id} style={styles.taskCard}>
+                  <View style={styles.taskCardRow}>
+                    {/* Checkbox */}
+                    <TouchableOpacity
+                      style={[styles.taskCheckbox, isDone && styles.taskCheckboxDone]}
+                      onPress={() => completeTask(task.id)}
+                      activeOpacity={0.8}
+                    >
+                      {isDone ? (
+                        <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                      ) : (
+                        <View style={styles.checkboxInnerHole} />
+                      )}
+                    </TouchableOpacity>
+
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      {/* Priority Badges & Star */}
+                      <View style={styles.taskTopMeta}>
+                        <View style={styles.badgeGroup}>
+                          <View
+                            style={[
+                              styles.priorityBadge,
+                              { backgroundColor: isHigh ? '#FFDADA' : '#EEEEF0' },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.priorityBadgeText,
+                                { color: isHigh ? '#920028' : '#45464C' },
+                              ]}
+                            >
+                              {task.priority === 'EXTREMELY_IMPORTANT' ? 'HIGH' : task.priority}
+                            </Text>
+                          </View>
+
+                          <View style={styles.aiPill}>
+                            <Ionicons name="sparkles" size={10} color="#006A63" />
+                            <Text style={styles.aiPillText}>AI Suggested</Text>
+                          </View>
+                        </View>
+
+                        <TouchableOpacity
+                          onPress={() => toggleStar(task.id)}
+                          style={styles.starBtn}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons
+                            name={isStarred ? 'star' : 'star-outline'}
+                            size={18}
+                            color={isStarred ? '#D97706' : '#76777D'}
+                          />
+                        </TouchableOpacity>
                       </View>
 
-                      <View style={styles.taskActions}>
-                        <TouchableOpacity
-                          onPress={() =>
-                            updateTaskPriority(
-                              t.id,
-                              t.priority === 'EXTREMELY_IMPORTANT' ? 'NORMAL' : 'EXTREMELY_IMPORTANT'
-                            )
-                          }
-                        >
-                          <Text style={styles.priorityToggle}>
-                            {t.priority === 'EXTREMELY_IMPORTANT' ? 'Lower Priority' : 'Prioritize'}
+                      {/* Task Title */}
+                      <Text
+                        style={[styles.taskTitleText, isDone && styles.taskTitleDone]}
+                        numberOfLines={2}
+                      >
+                        {task.title}
+                      </Text>
+
+                      {task.description && (
+                        <Text style={styles.taskDescText} numberOfLines={2}>
+                          {task.description}
+                        </Text>
+                      )}
+
+                      {/* Footer Row: Due Date & Actions */}
+                      <View style={styles.taskFooterRow}>
+                        <View style={styles.dueRow}>
+                          <Ionicons
+                            name="time-outline"
+                            size={13}
+                            color={isHigh ? '#BA1A1A' : '#76777D'}
+                          />
+                          <Text
+                            style={[
+                              styles.dueText,
+                              isHigh && { color: '#BA1A1A', fontWeight: '600' },
+                            ]}
+                          >
+                            Due tomorrow, 11:59 PM
                           </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => deleteTask(t.id)} style={{ padding: 2 }}>
-                          <Ionicons name="trash-outline" size={15} color={designTokens.colors.textSecondary} />
-                        </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.actionsRight}>
+                          <TouchableOpacity
+                            onPress={() =>
+                              updateTaskPriority(
+                                task.id,
+                                task.priority === 'EXTREMELY_IMPORTANT' ? 'NORMAL' : 'EXTREMELY_IMPORTANT'
+                              )
+                            }
+                            activeOpacity={0.75}
+                          >
+                            <Text style={styles.prioritizeBtnText}>
+                              {task.priority === 'EXTREMELY_IMPORTANT' ? 'Deprioritize' : 'Prioritize →'}
+                            </Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            onPress={() => deleteTask(task.id)}
+                            style={{ padding: 3 }}
+                            activeOpacity={0.7}
+                          >
+                            <Ionicons name="trash-outline" size={14} color="#76777D" />
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     </View>
                   </View>
                 </View>
-              </GlassCard>
-            );
-          })
-        )}
+              );
+            })
+          )}
+        </View>
       </ScrollView>
 
       {/* New Task Modal */}
@@ -185,8 +318,8 @@ export const TasksScreen: React.FC = () => {
 
             <TextInput
               style={styles.modalInput}
-              placeholder="Task Title (e.g. Complete AI Assignment 3)"
-              placeholderTextColor="#64748B"
+              placeholder="Task Title (e.g. Complete Lab Report)"
+              placeholderTextColor="#76777D"
               value={newTitle}
               onChangeText={setNewTitle}
             />
@@ -200,7 +333,7 @@ export const TasksScreen: React.FC = () => {
                   onPress={() => setNewPriority(p)}
                 >
                   <Text style={[styles.priorityPillText, newPriority === p && styles.priorityPillTextActive]}>
-                    {p === 'EXTREMELY_IMPORTANT' ? 'Urgent' : p}
+                    {p === 'EXTREMELY_IMPORTANT' ? 'CRITICAL' : p}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -220,192 +353,415 @@ export const TasksScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
-    </View>
-  </GradientBackground>
-);
+    </SafeAreaView>
+  );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'transparent' },
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#F9F9FB',
+  },
   header: {
     flexDirection: 'row',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: designTokens.spacing.lg,
-    paddingTop: designTokens.spacing.lg,
-    paddingBottom: designTokens.spacing.sm,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(226, 226, 228, 0.6)',
+    backgroundColor: 'rgba(249, 249, 251, 0.95)',
   },
-  headerTitle: { ...designTokens.typography.hero, fontSize: 22 },
-  headerSubtitle: { ...designTokens.typography.micro, color: designTokens.colors.textSecondary, marginTop: 2 },
-  addBtn: {
-    backgroundColor: designTokens.colors.primary,
+  headerFocusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 2,
+  },
+  tealPip: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#006A63',
+  },
+  headerFocusLabel: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: '#006A63',
+    letterSpacing: 1,
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1A1C1D',
+    letterSpacing: -0.3,
+  },
+  headerPendingCount: {
+    fontSize: 12,
+    color: '#76777D',
+    fontWeight: '500',
+  },
+  newTaskBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: designTokens.spacing.md,
-    paddingVertical: designTokens.spacing.xs + 2,
-    borderRadius: designTokens.radii.pill,
+    backgroundColor: '#111827',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 9999,
   },
-  addBtnText: {
-    ...designTokens.typography.cardTitle,
+  newTaskBtnText: {
     fontSize: 12,
+    fontWeight: '700',
     color: '#FFFFFF',
   },
+  container: {
+    flex: 1,
+    backgroundColor: '#F9F9FB',
+  },
+  content: {
+    padding: 20,
+    paddingBottom: 96,
+    gap: 14,
+  },
   filterBar: {
-    marginBottom: designTokens.spacing.md,
+    marginHorizontal: -20,
   },
-  filterContent: {
-    paddingHorizontal: designTokens.spacing.lg,
-    gap: designTokens.spacing.sm,
-    paddingBottom: designTokens.spacing.xs,
+  filterScroll: {
+    paddingHorizontal: 20,
+    gap: 6,
   },
-  filterChip: {
-    paddingHorizontal: designTokens.spacing.md,
-    paddingVertical: designTokens.spacing.xs + 3,
-    borderRadius: designTokens.radii.pill,
-    backgroundColor: '#FAF7F2',
-    borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.08)',
+  filterTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 9999,
+    backgroundColor: '#EEEEF0',
   },
-  filterChipActive: {
-    backgroundColor: designTokens.colors.primaryPill,
-    borderColor: designTokens.colors.primary,
+  filterTabActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 3,
+    elevation: 1,
   },
-  filterText: {
-    ...designTokens.typography.bodyMedium,
+  filterTabText: {
     fontSize: 12,
-    color: designTokens.colors.textSecondary,
+    fontWeight: '600',
+    color: '#76777D',
   },
-  filterTextActive: {
-    color: designTokens.colors.textPrimary,
+  filterTabTextActive: {
+    color: '#1A1C1D',
     fontWeight: '700',
   },
-  taskList: {
-    paddingHorizontal: designTokens.spacing.lg,
-    paddingBottom: 110,
-    gap: designTokens.spacing.sm,
+  filterTabCount: {
+    fontSize: 10,
+    color: '#76777D',
+    fontWeight: '500',
+  },
+  optimizerCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(26, 28, 29, 0.06)',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.02,
+    shadowRadius: 8,
+    elevation: 1,
+  },
+  optimizerLeft: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  optimizerIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(0, 106, 99, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optimizerHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  optimizerTitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#006A63',
+    letterSpacing: 0.8,
+  },
+  nexaTag: {
+    backgroundColor: '#F3F3F5',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 9999,
+  },
+  nexaTagText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#76777D',
+  },
+  optimizerDesc: {
+    fontSize: 12.5,
+    color: '#45464C',
+    lineHeight: 18,
+  },
+  optimizerActionsRow: {
+    marginTop: 10,
+  },
+  breakDownBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#EEEEF0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  breakDownBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1A1C1D',
+  },
+  tasksList: {
+    gap: 10,
   },
   taskCard: {
-    padding: designTokens.spacing.md,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(26, 28, 29, 0.06)',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.02,
+    shadowRadius: 6,
+    elevation: 1,
   },
   taskCardRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    gap: 12,
   },
-  checkbox: {
-    width: 24,
-    height: 24,
+  taskCheckbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: '#C6C6CD',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 2,
-    marginRight: designTokens.spacing.md,
   },
-  checkboxDone: {
-    opacity: 0.6,
+  taskCheckboxDone: {
+    backgroundColor: '#006A63',
+    borderColor: '#006A63',
   },
-  checkIcon: {
-    fontSize: 18,
-    color: designTokens.colors.textMuted,
+  checkboxInnerHole: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
-  taskContent: { flex: 1 },
-  badgeRow: {
+  taskTopMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: designTokens.spacing.sm,
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  badgeGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  priorityBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  priorityBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  aiPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(0, 106, 99, 0.08)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  aiPillText: {
+    fontSize: 9.5,
+    fontWeight: '600',
+    color: '#006A63',
+  },
+  starBtn: {
+    padding: 2,
+  },
+  taskTitleText: {
+    fontSize: 14.5,
+    fontWeight: '700',
+    color: '#1A1C1D',
+    letterSpacing: -0.2,
+    lineHeight: 20,
+  },
+  taskTitleDone: {
+    textDecorationLine: 'line-through',
+    color: '#76777D',
+  },
+  taskDescText: {
+    fontSize: 12,
+    color: '#76777D',
+    marginTop: 3,
+    lineHeight: 16,
+  },
+  taskFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F3F5',
+  },
+  dueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  dueText: {
+    fontSize: 11.5,
+    color: '#76777D',
+  },
+  actionsRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  prioritizeBtnText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#006A63',
+  },
+  emptyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(26, 28, 29, 0.06)',
+  },
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1A1C1D',
     marginBottom: 4,
   },
-  deadlineTag: { ...designTokens.typography.micro, color: designTokens.colors.textSecondary },
-  taskTitle: { ...designTokens.typography.cardTitle, fontSize: 14 },
-  taskTitleDone: { textDecorationLine: 'line-through', color: designTokens.colors.textMuted },
-  taskDesc: { ...designTokens.typography.body, fontSize: 12, marginTop: 4 },
-  taskFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: designTokens.spacing.sm,
-    paddingTop: designTokens.spacing.xs,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.04)',
+  emptySub: {
+    fontSize: 12,
+    color: '#76777D',
+    textAlign: 'center',
   },
-  aiTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  aiTagText: { ...designTokens.typography.micro, color: designTokens.colors.aiSecondary, fontSize: 10 },
-  taskActions: { flexDirection: 'row', alignItems: 'center', gap: designTokens.spacing.md },
-  priorityToggle: { ...designTokens.typography.micro, color: '#60A5FA', fontWeight: '700' },
-  deleteText: { color: designTokens.colors.textMuted, fontSize: 13, padding: 2 },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: designTokens.spacing.hero,
-  },
-  emptyIcon: { fontSize: 32, marginBottom: designTokens.spacing.sm },
-  emptyTitle: { ...designTokens.typography.sectionTitle, fontSize: 16 },
-  emptySub: { ...designTokens.typography.body, marginTop: 4 },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(35, 45, 43, 0.45)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   modalSheet: {
-    backgroundColor: '#FAF7F2',
-    borderTopLeftRadius: designTokens.radii.xl,
-    borderTopRightRadius: designTokens.radii.xl,
-    padding: designTokens.spacing.xl,
-    paddingBottom: 36,
-    gap: designTokens.spacing.md,
-  },
-  modalHeading: { ...designTokens.typography.sectionTitle, fontSize: 18 },
-  modalInput: {
     backgroundColor: '#FFFFFF',
-    borderRadius: designTokens.radii.md,
-    paddingHorizontal: designTokens.spacing.md,
-    paddingVertical: designTokens.spacing.md,
-    color: designTokens.colors.textPrimary,
-    fontSize: 13,
-    borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.10)',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    gap: 12,
   },
-  inputLabel: { ...designTokens.typography.label, marginTop: 4 },
+  modalHeading: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1A1C1D',
+  },
+  modalInput: {
+    backgroundColor: '#F9F9FB',
+    borderWidth: 1,
+    borderColor: '#E2E2E4',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#1A1C1D',
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#76777D',
+    marginTop: 4,
+  },
   prioritySelector: {
     flexDirection: 'row',
-    gap: designTokens.spacing.sm,
+    gap: 8,
   },
   priorityPill: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    paddingVertical: designTokens.spacing.sm,
-    borderRadius: designTokens.radii.pill,
+    paddingVertical: 8,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.08)',
+    borderRadius: 8,
+    backgroundColor: '#F3F3F5',
   },
   priorityPillActive: {
-    backgroundColor: designTokens.colors.primaryPill,
-    borderColor: designTokens.colors.primary,
+    backgroundColor: '#111827',
   },
-  priorityPillText: { ...designTokens.typography.micro, color: designTokens.colors.textSecondary, fontWeight: '700' },
-  priorityPillTextActive: { color: designTokens.colors.textPrimary },
+  priorityPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#45464C',
+  },
+  priorityPillTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
   modalActionRow: {
     flexDirection: 'row',
-    gap: designTokens.spacing.md,
-    marginTop: designTokens.spacing.sm,
+    gap: 12,
+    marginTop: 8,
   },
   modalCancelBtn: {
     flex: 1,
-    backgroundColor: '#EAE5DB',
-    paddingVertical: designTokens.spacing.md,
-    borderRadius: designTokens.radii.md,
+    paddingVertical: 12,
     alignItems: 'center',
+    borderRadius: 12,
+    backgroundColor: '#F3F3F5',
   },
-  modalCancelText: { ...designTokens.typography.cardTitle, fontSize: 13, color: designTokens.colors.textSecondary },
+  modalCancelText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#76777D',
+  },
   modalSaveBtn: {
     flex: 1,
-    backgroundColor: designTokens.colors.primary,
-    paddingVertical: designTokens.spacing.md,
-    borderRadius: designTokens.radii.md,
+    paddingVertical: 12,
     alignItems: 'center',
+    borderRadius: 12,
+    backgroundColor: '#111827',
   },
-  modalSaveText: { ...designTokens.typography.cardTitle, fontSize: 13, color: '#FFFFFF' },
+  modalSaveText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
 });

@@ -1,67 +1,116 @@
 export const designTokens = {
   colors: {
-    // Warm Ivory / Off-White Canvas (Reference Source of Truth)
-    background: '#F7F4EE',
+    // Nia Academic OS Canvas Tokens (Reference Source of Truth: DESIGN.md)
+    background: '#F9F9FB', // Pure porcelain canvas
+    surface: '#F9F9FB',
+    surfaceDim: '#D9DADC',
+    surfaceBright: '#F9F9FB',
+    surfaceContainerLowest: '#FFFFFF', // Elevated cards & modules
+    surfaceContainerLow: '#F3F3F5',
+    surfaceContainer: '#EEEEF0',
+    surfaceContainerHigh: '#E8E8EA',
+    surfaceContainerHighest: '#E2E2E4',
     backgroundElevated: '#FFFFFF',
-    surface: '#FFFFFF',
-    surfaceSecondary: '#F2EFE8',
     surfaceCard: '#FFFFFF',
     surfaceElevated: '#FFFFFF',
-    surfaceSubtle: '#EDE8DF',
-    surfaceBorder: 'rgba(41, 51, 50, 0.07)',
-    surfaceBorderActive: '#75A7A5',
+    surfaceSecondary: '#F3F3F5',
+    surfaceSubtle: '#EEEEF0',
 
-    // Primary Palette (Muted Teal / Blue-Green)
-    primary: '#75A7A5',
-    primaryDark: '#5D8D8B',
-    primaryMuted: '#6F9F9D',
-    primaryLight: '#86B4B1',
-    primarySoft: '#D2E5E3', // Soft mint/teal for cards
-    primaryPill: '#BFD9D8', // Active tab pill
-    primaryDeep: '#4A6B70', // Hero card gradient end
-    primaryGlow: 'rgba(117, 167, 165, 0.15)',
-    primarySubtle: 'rgba(117, 167, 165, 0.12)',
+    // Hairline Optical Borders
+    surfaceBorder: 'rgba(26, 28, 29, 0.06)',
+    surfaceBorderActive: '#006A63',
+    outline: '#76777D',
+    outlineVariant: '#C6C6CD',
 
-    // Secondary Pastel Accents
-    accentPeach: '#E8AD8E', // Warm peach / terracotta
-    accentPeachDeep: '#C88E72', // Hero card gradient start
-    accentPeachDot: '#D4856A', // Notification dot & status dot
-    accentPeachCard: '#EEDFD3', // Stat card 2 tint
-    accentCream: '#F1E5D5',
-    accentSand: '#E3EAE7', // Stat card 3 tint
-    accentSage: '#B8C9B9',
-    accentWine: '#8A2E3B', // EXTREMELY_IMPORTANT crimson/wine badge
+    // Obsidian Ink (Primary High-Contrast Foundation)
+    primary: '#111827', // Obsidian Ink
+    primaryContainer: '#141B2B',
+    onPrimary: '#FFFFFF',
+    onPrimaryContainer: '#7D8497',
+    primaryDark: '#0B0F19',
+    primaryMuted: '#2D3748',
+    primaryLight: '#374151',
+    primarySoft: '#E2E8F0',
+    primaryPill: '#111827',
+    primaryDeep: '#111827',
+    primaryGlow: 'rgba(0, 106, 99, 0.15)',
+    primarySubtle: 'rgba(0, 106, 99, 0.08)',
+
+    // Muted Eucalyptus / Academic Teal (Secondary Academic Mastery)
+    secondary: '#006A63', // Muted Eucalyptus
+    secondaryContainer: '#99EFE5',
+    onSecondaryContainer: '#006F67',
+    secondaryFixed: '#9CF2E8',
+    secondaryFixedDim: '#80D5CB',
+    onSecondaryFixed: '#00201D',
+    onSecondaryFixedVariant: '#00504A',
+    onSecondary: '#FFFFFF',
+
+    // Terracotta Ember / Urgent Priority (Tertiary Alert)
+    tertiary: '#BA1A1A', // Terracotta Ember
+    tertiaryContainer: '#40000C',
+    onTertiaryContainer: '#F83256',
+    tertiaryFixed: '#FFDADA',
+    tertiaryFixedDim: '#FFB3B6',
+    onTertiaryFixedVariant: '#920028',
+    error: '#BA1A1A',
+    errorContainer: '#FFDAD6',
+    onErrorContainer: '#93000A',
+
+    // Legacy / Pastel Semantic Accents (Aligned with Nia palette)
+    accentPeach: '#E8AD8E',
+    accentPeachDeep: '#111827',
+    accentPeachDot: '#006A63',
+    accentPeachCard: '#F3F3F5',
+    accentCream: '#F9F9FB',
+    accentSand: '#EEEEF0',
+    accentSage: '#80D5CB',
+    accentWine: '#BA1A1A',
 
     // AI Visual Identity
-    aiPrimary: '#75A7A5',
-    aiSecondary: '#D4856A',
-    aiGlow: 'rgba(212, 133, 106, 0.20)',
-    aiSubtle: 'rgba(117, 167, 165, 0.08)',
-    aiBorder: 'rgba(117, 167, 165, 0.25)',
+    aiPrimary: '#006A63',
+    aiSecondary: '#80D5CB',
+    aiGlow: 'rgba(0, 106, 99, 0.18)',
+    aiSubtle: 'rgba(0, 106, 99, 0.06)',
+    aiBorder: 'rgba(0, 106, 99, 0.20)',
 
-    // Semantic Accents (Muted, Academic, Non-Neon)
-    success: '#6B9E82',
-    successSoft: '#D6E8DE',
-    warning: '#D4856A',
-    warningSoft: '#F7E4DC',
-    danger: '#8A2E3B',
-    dangerSoft: '#F5D7DC',
+    // Semantic States
+    success: '#006A63',
+    successSoft: '#D8EFEA',
+    warning: '#D97706',
+    warningSoft: '#FEF3C7',
+    danger: '#BA1A1A',
+    dangerSoft: '#FFDAD6',
 
     // Typography Hierarchy
-    textPrimary: '#232D2B', // Dark warm charcoal
-    textSecondary: '#6D7470', // Muted gray-green / warm slate
-    textMuted: '#8C9692', // Subtle metadata
-    textSubtle: '#A2ACA8',
-    textLight: '#FFFFFF', // High-contrast text on dark/gradient surfaces
-    textPeach: '#F3D7C8', // Hero card "NEXT CLASS" label
+    textPrimary: '#1A1C1D', // High-contrast Charcoal/Obsidian
+    textSecondary: '#45464C', // Slate muted secondary
+    textMuted: '#76777D', // Subtle metadata
+    textSubtle: '#9E9EA4',
+    textLight: '#FFFFFF',
+    textPeach: '#80D5CB',
+    onSurface: '#1A1C1D',
+    onSurfaceVariant: '#45464C',
 
-    // Specific Badges
-    cgpaBadge: '#D4856A',
-    creditsBadge: '#75A7A5',
+    // Badges
+    cgpaBadge: '#D97706',
+    creditsBadge: '#006A63',
   },
 
-  // Spacing Scale: 4, 8, 12, 16, 20, 24, 32
+  // Spacing Scale (8pt disciplined rhythm)
   spacing: {
+    space3xs: 2,
+    space2xs: 4,
+    spaceXs: 8,
+    spaceSm: 12,
+    spaceMd: 16,
+    spaceLg: 24,
+    spaceXl: 32,
+    space2xl: 48,
+    space3xl: 64,
+    marginMobile: 20,
+
+    // Legacy keys
     xs: 4,
     sm: 8,
     md: 12,
@@ -71,44 +120,55 @@ export const designTokens = {
     hero: 32,
   },
 
-  // Radii Tokens (Rounded, Organic, 16-24px mobile standard)
+  // Curvature Taxonomy (Apple squircle elegance)
   radii: {
     xs: 6,
-    sm: 10,
-    md: 14,
-    lg: 18,
-    xl: 22,
-    card: 20,
-    pill: 999,
+    sm: 8,
+    md: 12,
+    lg: 16,
+    xl: 20,
+    xxl: 24,
+    card: 18,
+    pill: 9999,
   },
 
-  // Typography Hierarchy
+  // Typography Hierarchy (Inter based)
   typography: {
-    hero: { fontSize: 24, fontWeight: '800' as const, color: '#232D2B', letterSpacing: -0.4 },
-    displayNumber: { fontSize: 28, fontWeight: '800' as const, color: '#232D2B', letterSpacing: -0.5 },
-    sectionTitle: { fontSize: 16, fontWeight: '700' as const, color: '#232D2B', letterSpacing: -0.2 },
-    cardTitle: { fontSize: 15, fontWeight: '700' as const, color: '#232D2B' },
-    body: { fontSize: 13, fontWeight: '400' as const, color: '#6D7470', lineHeight: 18 },
-    bodyMedium: { fontSize: 13, fontWeight: '500' as const, color: '#232D2B' },
-    label: { fontSize: 11, fontWeight: '700' as const, color: '#8C9692', textTransform: 'uppercase' as const, letterSpacing: 0.6 },
-    micro: { fontSize: 11, fontWeight: '500' as const, color: '#8C9692' },
+    display: { fontSize: 32, fontWeight: '600' as const, color: '#1A1C1D', letterSpacing: -0.8 },
+    hero: { fontSize: 24, fontWeight: '600' as const, color: '#1A1C1D', letterSpacing: -0.5 },
+    displayNumber: { fontSize: 28, fontWeight: '600' as const, color: '#1A1C1D', letterSpacing: -0.6 },
+    sectionTitle: { fontSize: 16, fontWeight: '600' as const, color: '#1A1C1D', letterSpacing: -0.3 },
+    cardTitle: { fontSize: 15, fontWeight: '600' as const, color: '#1A1C1D', letterSpacing: -0.2 },
+    body: { fontSize: 13, fontWeight: '400' as const, color: '#45464C', lineHeight: 18 },
+    bodyMedium: { fontSize: 13, fontWeight: '500' as const, color: '#1A1C1D' },
+    label: { fontSize: 10, fontWeight: '600' as const, color: '#76777D', textTransform: 'uppercase' as const, letterSpacing: 0.8 },
+    labelCaps: { fontSize: 10, fontWeight: '600' as const, color: '#76777D', textTransform: 'uppercase' as const, letterSpacing: 0.8 },
+    micro: { fontSize: 11, fontWeight: '500' as const, color: '#76777D' },
+    statNumeric: { fontSize: 22, fontWeight: '600' as const, color: '#1A1C1D', letterSpacing: -0.4 },
   },
 
-  // Soft Warm Shadows
+  // Soft Ambient Shadows & Depth Hierarchy
   shadows: {
     card: {
-      shadowColor: '#3D352E',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.05,
-      shadowRadius: 10,
+      shadowColor: '#0F172A',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.03,
+      shadowRadius: 8,
       elevation: 2,
     },
     floating: {
-      shadowColor: '#3D352E',
-      shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: 0.12,
-      shadowRadius: 16,
-      elevation: 6,
+      shadowColor: '#0F172A',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.08,
+      shadowRadius: 24,
+      elevation: 8,
+    },
+    dock: {
+      shadowColor: '#0F172A',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.08,
+      shadowRadius: 28,
+      elevation: 10,
     },
   },
 };
