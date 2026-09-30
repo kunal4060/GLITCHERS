@@ -1,49 +1,62 @@
-name: GLITCHERS CI/CD Pipeline
+name: CI
+
+# Playbook Layer 7b — fast automated checks on every push/PR.
+# Two independent jobs (fail fast): backend (typecheck + jest) and mobile (typecheck).
+# Both use the workspace-aware root install: the monorepo has a single root
+# package-lock.json and backend/mobile link @glitchers/shared via npm workspaces,
+# so `npm ci` must run at the repo root — installing inside backend/ or mobile/
+# alone would fail to resolve the workspace package.
 
 on:
   push:
-    branches: [ main ]
+    branches: [nia-redesign, main]
   pull_request:
-    branches: [ main ]
+    branches: [nia-redesign, main]
 
 jobs:
-  validate-and-test:
-    name: Build, Lint & Automated Tests
+  backend:
+    name: Backend — typecheck & tests
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
+          node-version-file: backend/.node-version
+          cache: npm
 
-      - name: Install Monorepo Dependencies
+      - name: Install dependencies (workspaces)
         run: npm ci
 
-      - name: Build Shared Types Package
-        run: |
-          cd shared
-          npm run build
+      - name: Typecheck
+        run: npm run typecheck --workspace=@glitchers/backend
 
-      - name: Mobile TypeScript Validation
-        run: |
-          cd mobile
-          npx tsc --noEmit
-
-      - name: Backend Build & Typecheck
-        run: |
-          cd backend
-          npm run build
-
-      - name: Run Backend Automated Test Suites
-        run: |
-          cd backend
-          npm test
+      - name: Run jest tests
+        run: npm test --workspace=@glitchers/backend
         env:
           NODE_ENV: test
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'test-mock-key' }}
+          # Dummy values — the backend zod env schema has defaults for
+          # everything, tests must not depend on real credentials.
+          GEMINI_API_KEY: test-mock-key
           JWT_SECRET: ci-test-secret-key-32-chars-long
+
+  mobile:
+    name: Mobile — typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install dependencies (workspaces)
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck --workspace=@glitchers/mobile
