@@ -30,6 +30,13 @@ jobs:
       - name: Install dependencies (workspaces)
         run: npm ci
 
+      - name: Build shared workspace
+        # @glitchers/shared ships types via dist/index.d.ts (see its package.json
+        # "types" field); backend tsconfig has no paths mapping, so dist must be
+        # built before backend typecheck/jest can resolve the workspace package.
+        # Same order as backend/Dockerfile ("Build shared first, then backend").
+        run: npm run build --workspace=@glitchers/shared
+
       - name: Typecheck
         run: npm run typecheck --workspace=@glitchers/backend
 
