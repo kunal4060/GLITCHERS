@@ -1,786 +1,529 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Modal,
+  ActivityIndicator,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { designTokens } from '../theme/designTokens';
-import { GlassCard } from '../components/common/GlassCard';
-import { StatCard } from '../components/common/StatCard';
-import { StatusBadge } from '../components/common/StatusBadge';
-import { NinjaAvatar } from '../components/NinjaAvatar';
-import { GradientBackground } from '../components/common/GradientBackground';
-import { AIGemSymbol } from '../components/common/AIGemSymbol';
 import { useDashboardStore } from '../store/dashboardStore';
 import { useAuthStore } from '../store/authStore';
 import { apiClient } from '../api/client';
-import {
-  getNextUpcomingClass,
-  getDayIndex,
-  parseTimeToMinutes,
-} from '../utils/timetableTimeUtils';
+import { getNextUpcomingClass, parseTimeToMinutes, getDayIndex } from '../utils/timetableTimeUtils';
+import { NiaHeader, LabelCaps, StatusPill, NiaCard } from '../components/nia';
+import { timeAgo, greeting, firstName, termLabel, formatDue } from '../utils/niaFormat';
+
+const C = designTokens.colors;
+
+const ALL_CLEAR = 'All university circulars and notices have been acknowledged & cleared!';
+
+function dayOfTerm(d: Date = new Date()): number {
+  const m = d.getMonth();
+  const startMonth = m >= 7 ? 7 : m >= 0 && m <= 4 ? 0 : 5;
+  const start = new Date(d.getFullYear(), startMonth, 1);
+  return Math.max(1, Math.floor((d.getTime() - start.getTime()) / 86400000) + 1);
+}
 
 export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
   const {
     classes,
     tasks,
-    expenses,
-    budget,
     emails,
     emailBullets,
-    setEmailBullets,
     dismissedNoticeIds,
-    isLoading,
-    avatarUrl,
+    expenses,
+    budget,
+    cgpa,
     syncWithBackend,
+    setEmailBullets,
     completeTask,
   } = useDashboardStore();
-  const { gmailConnected, user } = useAuthStore();
+  const { user } = useAuthStore();
 
-  const [isSummarizingEmails, setIsSummarizingEmails] = useState(false);
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [quickAddVisible, setQuickAddVisible] = useState(false);
+  const hashRef = useRef('');
 
   const activeEmails = emails.filter((e) => !e.isDismissed && !dismissedNoticeIds.includes(e.id));
   const urgentEmail = activeEmails.find((e) => e.importance === 'CRITICAL' || e.importance === 'HIGH');
-  const lastActiveHashRef = useRef<string>('');
+  const pendingTasks = tasks.filter((t) => t.status === 'TODO');
+  const urgentTasks = pendingTasks.filter((t) => t.priority === 'HIGH' || t.priority === 'EXTREMELY_IMPORTANT');
 
-  const handleSummarizeEmails = async () => {
-    if (activeEmails.length === 0) {
-      setEmailBullets(['All university circulars and notices have been acknowledged & cleared! 🎉']);
+  const now = new Date();
+  const curMinutes = now.getHours() * 60 + now.getMinutes();
+  const todayClasses = classes.filter((c) => getDayIndex(c.day) === now.getDay() && !c.isCancelled);
+  const doneClasses = todayClasses.filter((c) => parseTimeToMinutes(c.endTime) <= curMinutes);
+  const nextInfo = getNextUpcomingClass(classes, now);
+  const nextClass = nextInfo.nextClass;
+
+  // ---- email briefing ----
+  const summarize = async (list: typeof activeEmails) => {
+    if (list.length === 0) {
+      setEmailBullets([ALL_CLEAR]);
       return;
     }
-    setIsSummarizingEmails(true);
+    setIsSummarizing(true);
     try {
-      const res = await apiClient.summarizeEmails(activeEmails);
-      if (res?.bullets && res.bullets.length > 0) {
-        const cleanBullets = res.bullets.filter(
-          (b) =>
-            !b.includes('Semester End Examination') &&
-            !b.includes('Continuous Internal Assessment') &&
-            !b.includes('Annual University Hackathon')
-        );
-        if (cleanBullets.length > 0) {
-          setEmailBullets(cleanBullets);
-          return;
-        }
-      }
-    } catch (err) {
-      console.warn('Email summarize error:', err);
-    } finally {
-      setIsSummarizingEmails(false);
-    }
-
-    if (activeEmails.length > 0) {
-      const cleanActive = activeEmails.filter(
-        (e) =>
-          !e.subject.includes('Semester End Examination') &&
-          !e.subject.includes('Continuous Internal Assessment') &&
-          !e.subject.includes('Annual University Hackathon')
+      const res = await apiClient.summarizeEmails(list);
+      const clean = (res?.bullets || []).filter(
+        (b) =>
+          !b.includes('Semester End Examination') &&
+          !b.includes('Continuous Internal Assessment') &&
+          !b.includes('Annual University Hackathon')
       );
-      if (cleanActive.length > 0) {
-        setEmailBullets(
-          cleanActive.slice(0, 4).map((e) => {
-            const imp = e.importance === 'HIGH' || e.importance === 'CRITICAL' ? `[${e.importance}] ` : '';
-            return `• ${imp}${e.subject}: ${e.summary}`;
-          })
-        );
-      } else {
-        setEmailBullets(['All university circulars and notices have been acknowledged & cleared! 🎉']);
+      if (clean.length > 0) {
+        setEmailBullets(clean);
+        return;
       }
-    } else {
-      setEmailBullets(['All university circulars and notices have been acknowledged & cleared! 🎉']);
+    } catch {
+      /* offline fallback below */
+    } finally {
+      setIsSummarizing(false);
     }
+    const cleanActive = list.filter(
+      (e) =>
+        !e.subject.includes('Semester End Examination') &&
+        !e.subject.includes('Continuous Internal Assessment') &&
+        !e.subject.includes('Annual University Hackathon')
+    );
+    setEmailBullets(
+      cleanActive.length > 0
+        ? cleanActive.slice(0, 4).map((e) => `• ${e.subject}: ${e.summary}`)
+        : [ALL_CLEAR]
+    );
   };
 
   useEffect(() => {
-    syncWithBackend().then(() => {
-      if (activeEmails.length > 0) {
-        handleSummarizeEmails();
-      } else {
-        setEmailBullets(['All university circulars and notices have been acknowledged & cleared! 🎉']);
-      }
-    });
+    syncWithBackend().then(() => summarize(useDashboardStore.getState().emails.filter(
+      (e) => !e.isDismissed && !useDashboardStore.getState().dismissedNoticeIds.includes(e.id)
+    )));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    const activeHash = activeEmails.map((e) => e.id).sort().join(',');
-    if (activeEmails.length > 0) {
-      if (lastActiveHashRef.current !== activeHash) {
-        lastActiveHashRef.current = activeHash;
-        handleSummarizeEmails();
-      }
-    } else {
-      lastActiveHashRef.current = '';
-      setEmailBullets(['All university circulars and notices have been acknowledged & cleared! 🎉']);
+    const h = activeEmails.map((e) => e.id).sort().join(',');
+    if (h !== hashRef.current) {
+      hashRef.current = h;
+      summarize(activeEmails);
     }
-  }, [activeEmails.length, activeEmails.map((e) => e.id).join(',')]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeEmails.length]);
 
-  const pendingTasks = tasks.filter((t) => t.status === 'TODO');
+  const onTrack = urgentTasks.length === 0;
+  const topTasks = [...pendingTasks]
+    .sort((a, b) => {
+      const pw = (p?: string) => (p === 'EXTREMELY_IMPORTANT' ? 0 : p === 'HIGH' ? 1 : p === 'NORMAL' ? 2 : 3);
+      return pw(a.priority) - pw(b.priority);
+    })
+    .slice(0, 3);
 
-  // Real-time dynamic timetable calculations
-  const now = new Date();
-  const currentDayIdx = now.getDay();
-  const curMinutes = now.getHours() * 60 + now.getMinutes();
-  const todayClasses = classes.filter((c) => getDayIndex(c.day) === currentDayIdx && !c.isCancelled);
-  const upcomingCount = todayClasses.filter((c) => parseTimeToMinutes(c.startTime) > curMinutes).length;
-
-  const nextClassInfo = getNextUpcomingClass(classes, now);
-  const nextClass = nextClassInfo.nextClass || {
-    id: 'placeholder',
-    userId: user?.id || 'offline-user',
-    subjectName: 'No Classes Scheduled',
-    day: 'MONDAY' as const,
-    startTime: '--:--',
-    endTime: '--:--',
-    room: 'Free Period',
-    faculty: 'Academic Schedule Clear',
-    classType: 'LECTURE' as const,
-    isCancelled: false,
-  };
-
-  // Spending calculations
-  const totalSpent = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
-  const monthlyLimit = budget?.monthlyLimit || 10000;
-  const budgetPct = Math.min(100, Math.round((totalSpent / monthlyLimit) * 100));
+  const quickActions = [
+    { icon: 'checkbox-outline', label: 'New Task', desc: 'Capture a deadline', go: () => navigation?.navigate('Tasks') },
+    { icon: 'cash-outline', label: 'Log Expense', desc: 'Track spending', go: () => navigation?.navigate('Finance') },
+    { icon: 'sparkles-outline', label: 'Ask NIA', desc: 'AI assistance', go: () => navigation?.navigate('NIA') },
+  ];
 
   return (
-    <GradientBackground>
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-        <ScrollView
-          style={styles.container}
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={isLoading}
-              onRefresh={syncWithBackend}
-              tintColor={designTokens.colors.primary}
-            />
-          }
-        >
-          {/* 1. Top App Bar: Title "Home" & Header Action Icons */}
-          <View style={styles.topBar}>
-            <Text style={styles.screenTitle}>Home</Text>
+    <View style={styles.root}>
+      <SafeAreaView style={styles.root} edges={['top']}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+          <NiaHeader title="Home" navigation={navigation} />
 
-            <View style={styles.topActions}>
-              <TouchableOpacity
-                style={styles.iconBtn}
-                onPress={() => navigation?.navigate('Search')}
-                accessibilityLabel="Search"
-              >
-                <Ionicons name="search-outline" size={22} color={designTokens.colors.textPrimary} />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.iconBtn}
-                onPress={() => navigation?.navigate('Alerts')}
-                accessibilityLabel="Notifications"
-              >
-                <Ionicons name="notifications-outline" size={22} color={designTokens.colors.textPrimary} />
-                <View style={styles.notifDot} />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.iconBtn}
-                onPress={() => navigation?.navigate('Account')}
-                accessibilityLabel="Settings"
-              >
-                <Ionicons name="settings-outline" size={22} color={designTokens.colors.textPrimary} />
-              </TouchableOpacity>
+          {/* Status row */}
+          <View style={styles.statusRow}>
+            <View style={styles.statusLeft}>
+              <StatusPill label={onTrack ? 'On Track' : 'Action Needed'} tone={onTrack ? 'success' : 'danger'} />
+              <Text style={styles.gpaText}>GPA {cgpa || '—'}</Text>
             </View>
-          </View>
-
-          {/* 2. Greeting Profile Section */}
-          <TouchableOpacity
-            style={styles.profileRow}
-            activeOpacity={0.85}
-            onPress={() => navigation?.navigate('Account')}
-          >
-            <NinjaAvatar size="small" showBadges={false} customImageUri={avatarUrl} />
-            <View style={styles.profileTextCol}>
-              <Text style={styles.greetingTitle}>
-                {new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening'}, {user?.fullName ? user.fullName.trim().split(' ')[0] : 'Student'}
-              </Text>
-              <Text style={styles.semesterSubtitle}>
-                {user?.university || 'University Life'} • {user?.semester ? `Semester ${user.semester}` : 'Active Semester'}
-              </Text>
-            </View>
-          </TouchableOpacity>
-
-          {/* 3. Three Pastel Information Cards */}
-          <View style={styles.statsRow}>
-            <StatCard
-              variant="teal"
-              title={`${todayClasses.length} ${todayClasses.length === 1 ? 'Class' : 'Classes'}\nToday`}
-              subtext={upcomingCount > 0 ? `${upcomingCount} Upcoming` : todayClasses.length > 0 ? 'All Done' : 'No Classes'}
-              icon={<Ionicons name="calendar-outline" size={20} color={designTokens.colors.textPrimary} />}
-              onPress={() => navigation?.navigate('Timetable')}
-            />
-            <View style={{ width: 10 }} />
-            <StatCard
-              variant="peach"
-              title={`${pendingTasks.length} Pending\n${pendingTasks.length === 1 ? 'Task' : 'Tasks'}`}
-              subtext={
-                pendingTasks.filter((t) => t.priority === 'EXTREMELY_IMPORTANT' || t.priority === 'HIGH').length > 0
-                  ? `${pendingTasks.filter((t) => t.priority === 'EXTREMELY_IMPORTANT' || t.priority === 'HIGH').length} Urgent`
-                  : 'On Track'
-              }
-              hasDot={pendingTasks.length > 0}
-              dotColor={designTokens.colors.accentPeachDot}
-              icon={<Ionicons name="checkbox-outline" size={20} color={designTokens.colors.textPrimary} />}
-              onPress={() => navigation?.navigate('Tasks')}
-            />
-            <View style={{ width: 10 }} />
-            <StatCard
-              variant="cream"
-              title={`${urgentEmail ? 1 : 0} Important\nNotice`}
-              subtext={gmailConnected ? (urgentEmail ? 'Official' : `${activeEmails.length} unread`) : 'Not linked'}
-              icon={<Ionicons name="mail-outline" size={20} color={designTokens.colors.textPrimary} />}
-              onPress={() => navigation?.navigate('Email')}
-            />
-          </View>
-
-          {/* 4. Large Next Class Feature Card */}
-          {todayClasses.length === 0 ? (
-            <GlassCard
-              variant="hero"
-              style={styles.heroCard}
-              onPress={() => navigation?.navigate('Timetable')}
-            >
-              <View style={styles.heroTopRow}>
-                <Text style={styles.heroLabel}>DAY OFF</Text>
-                <StatusBadge label="Schedule Clear 🌴" variant="safe" />
+            <View style={styles.statusRight}>
+              <View style={styles.dayRow}>
+                <Ionicons name="sunny-outline" size={14} color={C.textMuted} />
+                <Text style={styles.dayText}>DAY {dayOfTerm()}</Text>
               </View>
-
-              <Text style={styles.heroSubjectTitle}>
-                Day is Off • No Classes Today
-              </Text>
-
-              <Text style={styles.heroMetaText}>
-                No academic lectures scheduled for today. Enjoy your free time or catch up on project work!
-              </Text>
-            </GlassCard>
-          ) : (
-            <GlassCard
-              variant="hero"
-              style={styles.heroCard}
-              onPress={() => navigation?.navigate('Timetable')}
-            >
-              <View style={styles.heroTopRow}>
-                <Text style={styles.heroLabel}>
-                  {nextClassInfo.isOngoing ? 'CURRENT CLASS' : nextClassInfo.isToday ? 'NEXT CLASS' : 'UPCOMING CLASS'}
-                </Text>
-                <StatusBadge label={nextClassInfo.statusLabel} variant={nextClassInfo.badgeVariant} />
-              </View>
-
-              <Text style={styles.heroSubjectTitle}>
-                {nextClass.subjectName.replace('\\n', '\n')}
-              </Text>
-
-              <Text style={styles.heroMetaText}>
-                {nextClass.startTime} – {nextClass.endTime} • Room: {nextClass.room || 'AB1-204'}
-              </Text>
-              <Text style={styles.heroFacultyText}>
-                Faculty: {nextClass.faculty || 'Faculty'}
-              </Text>
-            </GlassCard>
-          )}
-
-        {/* 5. Priority Deadlines Section */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionHeading}>PRIORITY DEADLINES</Text>
-          <TouchableOpacity onPress={() => navigation?.navigate('Tasks')}>
-            <Text style={styles.viewAllText}>View All →</Text>
-          </TouchableOpacity>
-        </View>
-
-        {tasks.length === 0 ? (
-          <GlassCard variant="teal" style={styles.taskCard} onPress={() => navigation?.navigate('Tasks')}>
-            <View style={{ paddingVertical: 10, alignItems: 'center' }}>
-              <Text style={{ fontSize: 13, color: '#7A7875', fontWeight: '500' }}>
-                No pending tasks. Tap to add your first deadline! ✨
-              </Text>
+              <Text style={styles.termText}>{termLabel()}</Text>
             </View>
-          </GlassCard>
-        ) : (
-          tasks.slice(0, 3).map((task, idx) => {
-            const variantMap: Record<string, any> = {
-              EXTREMELY_IMPORTANT: 'extremely_important',
-              HIGH: 'high',
-              NORMAL: 'normal',
-              LOW: 'low',
-            };
-            const dueText = task.dueDate
-              ? new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-              : 'Pending';
-            return (
-              <GlassCard
-                key={task.id || String(idx)}
-                variant="teal"
-                style={styles.taskCard}
-                onPress={() => navigation?.navigate('Tasks')}
-              >
-                <View style={styles.taskCardRow}>
-                  <Text style={styles.taskIndexNumber}>{idx + 1}</Text>
-                  <View style={styles.taskMainCol}>
-                    <Text style={styles.taskTitleText}>{task.title}</Text>
-                    <View style={styles.taskBadgeRow}>
-                      <StatusBadge label={task.priority} variant={variantMap[task.priority] || 'normal'} />
-                    </View>
-                  </View>
-                  <Text style={styles.taskDueText}>{dueText}</Text>
-                </View>
-              </GlassCard>
-            );
-          })
-        )}
-
-        {/* 6. Spending Snapshot */}
-        <View style={styles.spendingSection}>
-          <View style={styles.spendingHeaderRow}>
-            <Text style={styles.spendingHeading}>Spending Snapshot</Text>
           </View>
-          <Text style={styles.spendingStatusText}>
-            ₹{totalSpent.toLocaleString()} / ₹{monthlyLimit.toLocaleString()} (On Track)
+
+          {/* Greeting */}
+          <Text style={styles.greeting}>
+            {greeting()}, {firstName(user?.fullName)}
+          </Text>
+          <Text style={styles.greetingSub} numberOfLines={1}>
+            {[user?.email, user?.semester ? `Semester ${user.semester}` : null, user?.course]
+              .filter(Boolean)
+              .join(' • ')}
           </Text>
 
-          <View style={styles.progressTrack}>
-            <View
-              style={[
-                styles.progressFill,
-                { width: `${Math.max(8, budgetPct)}%` },
-              ]}
-            />
-          </View>
-        </View>
-
-        {/* 7. AI Email Summarization with Gemini (Bottom of Home Screen) */}
-        <View style={styles.emailDigestSection}>
-          <View style={styles.emailDigestHeaderRow}>
-            <View style={styles.emailDigestTitleGroup}>
-              <AIGemSymbol size={22} />
-              <Text style={styles.emailDigestHeading}>NIA EMAIL SUMMARY</Text>
-            </View>
-            <View style={styles.geminiBadge}>
-              <Text style={styles.geminiBadgeText}>Gemini 3.6 Flash</Text>
-            </View>
-          </View>
-
-          <GlassCard variant="cream" style={styles.emailDigestCard}>
-            {!gmailConnected ? (
-              <View style={{ alignItems: 'center', paddingVertical: 18, paddingHorizontal: 12 }}>
-                <Ionicons name="mail-unread-outline" size={32} color={designTokens.colors.primaryDark} style={{ marginBottom: 8 }} />
-                <Text style={{ fontSize: 14, fontWeight: '700', color: designTokens.colors.textPrimary, marginBottom: 4 }}>
-                  University Gmail Not Linked
-                </Text>
-                <Text style={{ fontSize: 12, color: designTokens.colors.textSecondary, textAlign: 'center', lineHeight: 17, marginBottom: 12 }}>
-                  Link your university Google account in Settings to automatically scan circulars, exam dates, and notices.
-                </Text>
-                <TouchableOpacity
-                  style={{
-                    backgroundColor: designTokens.colors.primary,
-                    paddingHorizontal: 14,
-                    paddingVertical: 7,
-                    borderRadius: designTokens.radii.pill,
-                  }}
-                  onPress={() => navigation?.navigate('Account')}
-                  activeOpacity={0.8}
-                >
-                  <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>Connect in Settings</Text>
-                </TouchableOpacity>
+          {/* Stat cards */}
+          <View style={styles.statRow}>
+            <NiaCard style={styles.statCard}>
+              <View style={styles.statTop}>
+                <LabelCaps>Classes</LabelCaps>
+                <Ionicons name="checkmark-circle" size={16} color={C.eucalyptus} />
               </View>
-            ) : (
-              <>
-                <View style={styles.emailCardTop}>
-                  <Text style={styles.emailCardSub}>
-                    Executive briefing from university circulars & notices:
-                  </Text>
-                  <TouchableOpacity
-                    onPress={handleSummarizeEmails}
-                    disabled={isSummarizingEmails}
-                    style={[styles.refreshIconBtn, isSummarizingEmails && { opacity: 0.6 }]}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons
-                      name="sparkles"
-                      size={14}
-                      color={designTokens.colors.primaryDark}
-                    />
-                    <Text style={styles.refreshBtnText}>
-                      {isSummarizingEmails ? 'Summarizing...' : 'Re-summarize'}
-                    </Text>
-                  </TouchableOpacity>
+              <Text style={styles.statNum}>{doneClasses.length} Done</Text>
+              <Text style={[styles.statSub, { color: C.eucalyptus }]}>
+                {todayClasses.length - doneClasses.length > 0
+                  ? `${todayClasses.length - doneClasses.length} upcoming today`
+                  : 'Complete today'}
+              </Text>
+            </NiaCard>
+            <NiaCard style={styles.statCard}>
+              <View style={styles.statTop}>
+                <LabelCaps>Tasks</LabelCaps>
+                {urgentTasks.length > 0 && <View style={styles.dot} />}
+              </View>
+              <Text style={styles.statNum}>{pendingTasks.length} Due</Text>
+              <Text style={[styles.statSub, urgentTasks.length > 0 && { color: C.terracotta }]}>
+                {urgentTasks.length > 0 ? `${urgentTasks.length} urgent today` : 'All clear'}
+              </Text>
+            </NiaCard>
+            <TouchableOpacity style={styles.statCardTouch} onPress={() => navigation?.navigate('Alerts')} activeOpacity={0.85}>
+              <NiaCard style={styles.statCardInner}>
+                <View style={styles.statTop}>
+                  <LabelCaps>Notices</LabelCaps>
+                  {activeEmails.length > 0 && <View style={[styles.dot, { backgroundColor: C.eucalyptus }]} />}
                 </View>
+                <Text style={styles.statNum}>{activeEmails.length} New</Text>
+                <Text style={styles.statSub} numberOfLines={1}>
+                  {activeEmails[0]?.subject || 'Dean Circular'}
+                </Text>
+              </NiaCard>
+            </TouchableOpacity>
+          </View>
 
-                {isSummarizingEmails ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="small" color={designTokens.colors.primaryDark} />
-                    <Text style={styles.loadingText}>NIA is extracting key deadlines & notices...</Text>
-                  </View>
-                ) : emailBullets.length > 0 ? (
-                  <View style={styles.bulletsList}>
-                    {emailBullets.map((bullet, idx) => (
-                      <View key={idx} style={styles.bulletItem}>
-                        <Text style={styles.bulletDot}>•</Text>
-                        <Text style={styles.bulletText}>{bullet.replace(/^[•\-\*]\s*/, '').replace(/\*\*/g, '')}</Text>
-                      </View>
-                    ))}
-                  </View>
+          {/* NIA priority notice */}
+          <NiaCard style={styles.noticeCard}>
+            <View style={styles.noticeTop}>
+              <View style={styles.niaIconSm}>
+                <Ionicons name="sparkles" size={16} color="#FFFFFF" />
+              </View>
+              <LabelCaps color={C.eucalyptus}>NIA AI • Nexa Intelligent System</LabelCaps>
+              <Text style={styles.noticeTime}>{timeAgo(urgentEmail?.receivedAt) || 'just now'}</Text>
+            </View>
+            <Text style={styles.noticeText}>
+              {urgentEmail
+                ? `Analyzed ${activeEmails.length} campus ${activeEmails.length === 1 ? 'advisory' : 'advisories'}. Priority note: `
+                : 'Campus advisory scan complete. '}
+              {urgentEmail ? (
+                <Text style={styles.noticeBold}>{urgentEmail.subject}</Text>
+              ) : (
+                <Text style={styles.noticeBold}>No priority advisories right now.</Text>
+              )}
+            </Text>
+            <View style={styles.noticeActions}>
+              <TouchableOpacity style={styles.readBtn} onPress={() => navigation?.navigate('Email')} activeOpacity={0.8}>
+                <Text style={styles.readBtnText}>Read Circular</Text>
+                <Ionicons name="arrow-forward" size={14} color={C.ink} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => navigation?.navigate('Calendar')} activeOpacity={0.7}>
+                <Text style={styles.linkText}>Add to Calendar</Text>
+              </TouchableOpacity>
+            </View>
+          </NiaCard>
+
+          {/* Next class — dark telemetry card */}
+          <NiaCard dark style={styles.nextCard}>
+            <View style={styles.nextTop}>
+              <View style={styles.nextCodeRow}>
+                {nextClass ? (
+                  <>
+                    <Text style={styles.nextCode}>{nextClass.subjectName.split(' ')[0].toUpperCase().slice(0, 8)}</Text>
+                    <View style={styles.nextDot} />
+                    <Text style={styles.nextWhen}>
+                      {nextInfo.isOngoing ? 'NOW' : (nextInfo.statusLabel || '').toUpperCase()}
+                      {nextClass.startTime ? ` • ${nextClass.startTime.slice(0, 5)}` : ''}
+                    </Text>
+                  </>
                 ) : (
-                  <View style={{ paddingVertical: 14, alignItems: 'center' }}>
-                    <Text style={{ fontSize: 13, color: designTokens.colors.textSecondary }}>
-                      No unread circulars from your university. You're all caught up!
-                    </Text>
-                  </View>
+                  <Text style={styles.nextWhen}>SCHEDULE CLEAR</Text>
                 )}
-
-                <View style={styles.emailCardBottomRow}>
-                  <TouchableOpacity
-                    style={styles.viewNoticesBtn}
-                    onPress={() => navigation?.navigate('Email')}
-                    activeOpacity={0.75}
-                  >
-                    <Text style={styles.viewNoticesBtnText}>View All University Notices ({activeEmails.length}) →</Text>
-                  </TouchableOpacity>
+              </View>
+              <Ionicons name="ellipsis-horizontal" size={18} color="rgba(255,255,255,0.5)" />
+            </View>
+            <Text style={styles.nextTitle}>
+              {nextClass ? nextClass.subjectName : 'No more classes today'}
+            </Text>
+            <View style={styles.nextMeta}>
+              <Ionicons name="time-outline" size={14} color="rgba(255,255,255,0.7)" />
+              <Text style={styles.nextMetaText}>
+                {nextClass ? `${nextClass.startTime?.slice(0, 5)} – ${nextClass.endTime?.slice(0, 5)}` : 'Deep work block'}
+              </Text>
+              <View style={styles.nextDot} />
+              <Ionicons name="location-outline" size={14} color="rgba(255,255,255,0.7)" />
+              <Text style={styles.nextMetaText}>Room {nextClass?.room || '—'}</Text>
+            </View>
+            <View style={styles.nextBottom}>
+              <View style={styles.nextFaculty}>
+                <View style={styles.facultyAvatar}>
+                  <Ionicons name="school-outline" size={14} color="rgba(255,255,255,0.8)" />
                 </View>
-              </>
-            )}
-          </GlassCard>
-        </View>
+                <Text style={styles.nextFacultyText}>{nextClass?.faculty || 'NIA Schedule'}</Text>
+              </View>
+              <TouchableOpacity style={styles.slidesBtn} onPress={() => navigation?.navigate('Docs')} activeOpacity={0.8}>
+                <Ionicons name="cloud-download-outline" size={14} color="#FFFFFF" />
+                <Text style={styles.slidesBtnText}>Get Slides</Text>
+              </TouchableOpacity>
+            </View>
+          </NiaCard>
 
-        {/* Ideation Credit */}
-        <View style={styles.creditContainer}>
-          <Text style={styles.creditText}>Ideated by Kartiki More</Text>
-        </View>
+          {/* Priority deadlines */}
+          <View style={styles.sectionHead}>
+            <View style={styles.sectionHeadLeft}>
+              <Text style={styles.sectionTitle}>Priority Deadlines</Text>
+              <StatusPill label={`${pendingTasks.length} Active`} tone="neutral" />
+            </View>
+            <TouchableOpacity onPress={() => navigation?.navigate('Tasks')} style={styles.allTasks} activeOpacity={0.7}>
+              <Text style={styles.allTasksText}>ALL TASKS</Text>
+              <Ionicons name="chevron-forward" size={14} color={C.eucalyptus} />
+            </TouchableOpacity>
+          </View>
 
-        {/* Space at bottom for navigation and floating gem */}
-        <View style={{ height: 80 }} />
+          {topTasks.length === 0 ? (
+            <NiaCard style={{ marginHorizontal: 20 }}>
+              <Text style={styles.emptyText}>No pending deadlines. Enjoy the calm.</Text>
+            </NiaCard>
+          ) : (
+            topTasks.map((t) => {
+              const due = formatDue(t.dueDate);
+              const high = t.priority === 'HIGH' || t.priority === 'EXTREMELY_IMPORTANT';
+              return (
+                <View key={t.id} style={styles.taskRow}>
+                  <TouchableOpacity
+                    onPress={() => t.id && completeTask(t.id)}
+                    style={styles.checkbox}
+                    activeOpacity={0.7}
+                    accessibilityRole="checkbox"
+                    accessibilityLabel={`Complete ${t.title}`}
+                  >
+                    <Ionicons name="checkmark" size={14} color={C.eucalyptus} />
+                  </TouchableOpacity>
+                  <View style={styles.taskMain}>
+                    <View style={styles.taskTitleRow}>
+                      <Text style={styles.taskTitle} numberOfLines={1}>{t.title}</Text>
+                      <StatusPill label={high ? 'High' : t.priority === 'NORMAL' ? 'Normal' : 'Low'} tone={high ? 'danger' : 'neutral'} />
+                    </View>
+                    {!!t.description && <Text style={styles.taskSub} numberOfLines={1}>{t.description}</Text>}
+                    <Text style={[styles.taskDue, due.urgent && { color: C.terracotta }]}>{due.text}</Text>
+                  </View>
+                  <Ionicons name="reorder-three-outline" size={18} color={C.textSubtle} />
+                </View>
+              );
+            })
+          )}
+
+          {/* NIA email summary */}
+          <NiaCard style={styles.summaryCard}>
+            <View style={styles.summaryTop}>
+              <View style={styles.summaryLabelRow}>
+                <Ionicons name="sparkles" size={14} color={C.eucalyptus} />
+                <LabelCaps>NIA Email Summary</LabelCaps>
+              </View>
+              <StatusPill label="Gemini 1.5 Flash" tone="success" />
+            </View>
+            <Text style={styles.summaryIntro}>Executive briefing from university circulars & notices:</Text>
+            <View style={styles.summaryBody}>
+              {isSummarizing ? (
+                <ActivityIndicator size="small" color={C.eucalyptus} />
+              ) : (
+                emailBullets.slice(0, 3).map((b, i) => (
+                  <Text key={i} style={styles.summaryBullet} numberOfLines={2}>{b}</Text>
+                ))
+              )}
+            </View>
+            <TouchableOpacity onPress={() => navigation?.navigate('Email')} style={styles.viewAll} activeOpacity={0.7}>
+              <Text style={styles.viewAllText}>VIEW ALL UNIVERSITY NOTICES ({activeEmails.length})</Text>
+              <Ionicons name="arrow-forward" size={14} color={C.eucalyptus} />
+            </TouchableOpacity>
+          </NiaCard>
+
+          {/* Campus spaces */}
+          <View style={styles.sectionHead}>
+            <Text style={styles.sectionTitle}>Campus Spaces</Text>
+            <LabelCaps>Real-time status</LabelCaps>
+          </View>
+          <View style={styles.spacesRow}>
+            {[
+              { name: 'Turing Reading Room', sub: 'Library 3rd Floor • Silent', pill: '85% Open', icon: 'book-outline' },
+              { name: 'Central Tech Hub', sub: 'Innovation Quad • Group', pill: 'Active Now', icon: 'people-outline' },
+            ].map((s) => (
+              <NiaCard key={s.name} style={styles.spaceCard}>
+                <View style={styles.spaceTile}>
+                  <Ionicons name={s.icon as any} size={28} color={C.eucalyptus} />
+                  <StatusPill label={s.pill} tone="success" style={styles.spacePill} />
+                </View>
+                <Text style={styles.spaceName}>{s.name}</Text>
+                <Text style={styles.spaceSub}>{s.sub}</Text>
+              </NiaCard>
+            ))}
+          </View>
+
+          <View style={{ height: 8 }} />
         </ScrollView>
+
+        {/* FAB */}
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={() => setQuickAddVisible(true)}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Quick add"
+        >
+          <Ionicons name="add" size={28} color="#FFFFFF" />
+        </TouchableOpacity>
+
+        {/* Quick-add sheet */}
+        <Modal visible={quickAddVisible} transparent animationType="fade" onRequestClose={() => setQuickAddVisible(false)}>
+          <TouchableOpacity style={styles.sheetOverlay} activeOpacity={1} onPress={() => setQuickAddVisible(false)}>
+            <View style={styles.sheet}>
+              <LabelCaps style={styles.sheetLabel}>Quick Add</LabelCaps>
+              {quickActions.map((a) => (
+                <TouchableOpacity
+                  key={a.label}
+                  style={styles.sheetRow}
+                  onPress={() => { setQuickAddVisible(false); a.go(); }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.sheetIcon}>
+                    <Ionicons name={a.icon as any} size={20} color={C.obsidian} />
+                  </View>
+                  <View>
+                    <Text style={styles.sheetTitle}>{a.label}</Text>
+                    <Text style={styles.sheetDesc}>{a.desc}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={C.textSubtle} style={{ marginLeft: 'auto' }} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          </TouchableOpacity>
+        </Modal>
       </SafeAreaView>
-    </GradientBackground>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: 'transparent',
+  root: { flex: 1, backgroundColor: C.porcelain },
+  content: { paddingBottom: 120 },
+  statusRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, marginBottom: 10,
   },
-  content: {
-    paddingHorizontal: designTokens.spacing.lg,
-    paddingTop: 12,
-    paddingBottom: 24,
+  statusLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  gpaText: { fontSize: 12, fontWeight: '600', color: C.textSecondary, letterSpacing: 0.4 },
+  statusRight: { alignItems: 'flex-end' },
+  dayRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  dayText: { fontSize: 11, fontWeight: '700', color: C.textSecondary, letterSpacing: 0.8 },
+  termText: { fontSize: 11, color: C.textMuted, marginTop: 2 },
+  greeting: {
+    fontSize: 27, fontWeight: '700', color: C.ink, letterSpacing: -0.6, paddingHorizontal: 20,
   },
-
-  // 1. Top App Bar
-  topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: designTokens.spacing.lg,
+  greetingSub: { fontSize: 12, color: C.textMuted, paddingHorizontal: 20, marginTop: 4, marginBottom: 14 },
+  statRow: { flexDirection: 'row', paddingHorizontal: 20, gap: 10, marginBottom: 14 },
+  statCard: { flex: 1, padding: 12, borderRadius: 16 },
+  statCardTouch: { flex: 1 },
+  statCardInner: { padding: 12, borderRadius: 16, flex: 1 },
+  statTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  dot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: C.terracotta },
+  statNum: { fontSize: 20, fontWeight: '700', color: C.ink, letterSpacing: -0.4 },
+  statSub: { fontSize: 11, fontWeight: '500', color: C.textMuted, marginTop: 3 },
+  noticeCard: { marginHorizontal: 20, marginBottom: 14 },
+  noticeTop: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  niaIconSm: {
+    width: 28, height: 28, borderRadius: 14, backgroundColor: C.obsidian,
+    alignItems: 'center', justifyContent: 'center',
   },
-  screenTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: designTokens.colors.textPrimary,
-    letterSpacing: -0.5,
+  noticeTime: { fontSize: 11, color: C.textMuted, marginLeft: 'auto' },
+  noticeText: { fontSize: 13.5, color: C.textSecondary, lineHeight: 20 },
+  noticeBold: { fontWeight: '700', color: C.ink },
+  noticeActions: { flexDirection: 'row', alignItems: 'center', gap: 18, marginTop: 12 },
+  readBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#F1F1F4', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8,
   },
-  topActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
+  readBtnText: { fontSize: 12, fontWeight: '700', color: C.ink },
+  linkText: { fontSize: 12, fontWeight: '600', color: C.textSecondary },
+  nextCard: { marginHorizontal: 20, marginBottom: 18, padding: 18 },
+  nextTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  nextCodeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  nextCode: { fontSize: 11, fontWeight: '700', color: '#FFFFFF', letterSpacing: 0.6 },
+  nextDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: 'rgba(255,255,255,0.4)' },
+  nextWhen: { fontSize: 11, fontWeight: '700', color: C.eucalyptus, letterSpacing: 0.8 },
+  nextTitle: { fontSize: 22, fontWeight: '700', color: '#FFFFFF', letterSpacing: -0.5, marginBottom: 10 },
+  nextMeta: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 14 },
+  nextMetaText: { fontSize: 12.5, color: 'rgba(255,255,255,0.85)', fontWeight: '500' },
+  nextBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  nextFaculty: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  facultyAvatar: {
+    width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center', justifyContent: 'center',
   },
-  iconBtn: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
+  nextFacultyText: { fontSize: 12.5, color: 'rgba(255,255,255,0.85)', fontWeight: '500' },
+  slidesBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9,
   },
-  notifDot: {
-    position: 'absolute',
-    top: 3,
-    right: 4,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: designTokens.colors.accentPeachDot,
+  slidesBtnText: { fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
+  sectionHead: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, marginBottom: 10, marginTop: 4,
   },
-
-  // 2. Greeting Profile
-  profileRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: designTokens.spacing.lg,
+  sectionHeadLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  sectionTitle: { fontSize: 17, fontWeight: '700', color: C.ink, letterSpacing: -0.3 },
+  allTasks: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  allTasksText: { fontSize: 11, fontWeight: '700', color: C.eucalyptus, letterSpacing: 0.8 },
+  taskRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: C.hairline,
+    padding: 14, marginHorizontal: 20, marginBottom: 8,
   },
-  profileTextCol: {
-    justifyContent: 'center',
+  checkbox: {
+    width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: C.hairline,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF',
   },
-  greetingTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: designTokens.colors.textPrimary,
-    letterSpacing: -0.2,
+  taskMain: { flex: 1 },
+  taskTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
+  taskTitle: { fontSize: 14.5, fontWeight: '600', color: C.ink, flex: 1 },
+  taskSub: { fontSize: 12, color: C.textMuted, marginBottom: 3 },
+  taskDue: { fontSize: 11.5, fontWeight: '600', color: C.textSecondary },
+  emptyText: { fontSize: 13, color: C.textMuted, textAlign: 'center', paddingVertical: 8 },
+  summaryCard: { marginHorizontal: 20, marginTop: 12, marginBottom: 6 },
+  summaryTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  summaryLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  summaryIntro: { fontSize: 13, color: C.textSecondary, marginBottom: 8 },
+  summaryBody: { backgroundColor: C.porcelain, borderRadius: 12, padding: 12, marginBottom: 10 },
+  summaryBullet: { fontSize: 12.5, color: C.textSecondary, lineHeight: 18, marginBottom: 6 },
+  viewAll: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  viewAllText: { fontSize: 11, fontWeight: '700', color: C.eucalyptus, letterSpacing: 0.8 },
+  spacesRow: { flexDirection: 'row', paddingHorizontal: 20, gap: 10, marginBottom: 10 },
+  spaceCard: { flex: 1, padding: 12 },
+  spaceTile: {
+    height: 86, borderRadius: 12, backgroundColor: C.eucalyptusFaint,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 10,
   },
-  semesterSubtitle: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: designTokens.colors.textSecondary,
-    marginTop: 2,
+  spacePill: { position: 'absolute', top: 8, alignSelf: 'center' },
+  spaceName: { fontSize: 13.5, fontWeight: '700', color: C.ink, marginBottom: 2 },
+  spaceSub: { fontSize: 11, color: C.textMuted },
+  fab: {
+    position: 'absolute', right: 20, bottom: 104,
+    width: 58, height: 58, borderRadius: 29, backgroundColor: C.obsidian,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#0F172A', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25,
+    shadowRadius: 16, elevation: 8,
   },
-
-  // 3. Three Pastel Cards
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: designTokens.spacing.lg,
+  sheetOverlay: { flex: 1, backgroundColor: 'rgba(17,24,39,0.35)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 36 },
+  sheetLabel: { marginBottom: 12 },
+  sheetRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+  sheetIcon: {
+    width: 44, height: 44, borderRadius: 22, backgroundColor: C.porcelain,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.hairline,
   },
-
-  // 4. Next Class Hero Card
-  heroCard: {
-    marginBottom: designTokens.spacing.xl,
-    padding: 20,
-  },
-  heroTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  heroLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#F3D7C8',
-    letterSpacing: 0.8,
-  },
-  heroSubjectTitle: {
-    fontSize: 21,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    lineHeight: 26,
-    marginBottom: 8,
-    letterSpacing: -0.3,
-  },
-  heroMetaText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#F0ECE7',
-    marginBottom: 2,
-  },
-  heroFacultyText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#E3DDD5',
-  },
-
-  // 5. Priority Deadlines
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  sectionHeading: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: designTokens.colors.textPrimary,
-    letterSpacing: 0.5,
-  },
-  viewAllText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: designTokens.colors.textPrimary,
-  },
-
-  // Task Cards
-  taskCard: {
-    marginBottom: 10,
-    padding: 14,
-    borderRadius: 16,
-  },
-  taskCardRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  taskIndexNumber: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#6D7470',
-    width: 20,
-  },
-  taskMainCol: {
-    flex: 1,
-    paddingRight: 8,
-  },
-  taskTitleText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: designTokens.colors.textPrimary,
-    marginBottom: 4,
-  },
-  taskBadgeRow: {
-    flexDirection: 'row',
-  },
-  taskDueText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#63706D',
-  },
-
-  // 6. Spending Snapshot
-  spendingSection: {
-    marginTop: 12,
-    marginBottom: designTokens.spacing.lg,
-  },
-  spendingHeaderRow: {
-    marginBottom: 4,
-  },
-  spendingHeading: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: designTokens.colors.textPrimary,
-  },
-  spendingStatusText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#232D2B',
-    marginBottom: 8,
-  },
-  progressTrack: {
-    height: 6,
-    backgroundColor: '#E6E0D4',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: designTokens.colors.primary,
-    borderRadius: 3,
-  },
-
-  // 7. AI Email Summarization
-  emailDigestSection: {
-    marginTop: 8,
-    marginBottom: designTokens.spacing.lg,
-  },
-  emailDigestHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  emailDigestTitleGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  emailDigestHeading: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: designTokens.colors.textPrimary,
-    letterSpacing: 0.6,
-  },
-  geminiBadge: {
-    backgroundColor: '#E7ECE9',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: designTokens.radii.pill,
-    borderWidth: 1,
-    borderColor: 'rgba(117, 167, 165, 0.25)',
-  },
-  geminiBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: designTokens.colors.primaryDark,
-  },
-  emailDigestCard: {
-    padding: 16,
-    borderRadius: designTokens.radii.card,
-  },
-  emailCardTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  emailCardSub: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: designTokens.colors.textSecondary,
-    flex: 1,
-    paddingRight: 8,
-  },
-  refreshIconBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: designTokens.radii.pill,
-    borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.1)',
-  },
-  refreshBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: designTokens.colors.primaryDark,
-  },
-  loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 14,
-  },
-  loadingText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: designTokens.colors.primaryDark,
-  },
-  bulletsList: {
-    gap: 8,
-    marginBottom: 12,
-  },
-  bulletItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-  },
-  bulletDot: {
-    fontSize: 15,
-    color: designTokens.colors.primaryDark,
-    lineHeight: 18,
-    fontWeight: '800',
-  },
-  bulletText: {
-    fontSize: 13,
-    color: designTokens.colors.textPrimary,
-    lineHeight: 19,
-    flex: 1,
-    fontWeight: '500',
-  },
-  emailCardBottomRow: {
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(41, 51, 50, 0.08)',
-    paddingTop: 10,
-    alignItems: 'flex-end',
-  },
-  viewNoticesBtn: {
-    paddingVertical: 2,
-  },
-  viewNoticesBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: designTokens.colors.primaryDark,
-  },
-  creditContainer: {
-    marginTop: 20,
-    marginBottom: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  creditText: {
-    fontSize: 11.5,
-    fontWeight: '600',
-    color: designTokens.colors.textSecondary,
-    letterSpacing: 0.5,
-  },
+  sheetTitle: { fontSize: 15, fontWeight: '700', color: C.ink },
+  sheetDesc: { fontSize: 12, color: C.textMuted, marginTop: 2 },
 });

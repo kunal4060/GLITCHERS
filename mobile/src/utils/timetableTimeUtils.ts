@@ -210,3 +210,16 @@ export function getNextUpcomingClass(
     isToday: false,
   };
 }
+
+/**
+ * "09:00" (24h) -> "9:00 AM"
+ */
+export function formatTime12h(timeStr: string): string {
+  if (!timeStr) return '';
+  const mins = parseTimeToMinutes(timeStr);
+  const h24 = Math.floor(mins / 60) % 24;
+  const m = mins % 60;
+  const ampm = h24 >= 12 ? 'PM' : 'AM';
+  const h = h24 % 12 || 12;
+  return `${h}:${String(m).padStart(2, '0')} ${ampm}`;
+}

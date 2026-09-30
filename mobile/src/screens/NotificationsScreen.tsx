@@ -3,53 +3,64 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { designTokens } from '../theme/designTokens';
-import { GradientBackground } from '../components/common/GradientBackground';
-import { StatusBadge } from '../components/common/StatusBadge';
 import { useDashboardStore } from '../store/dashboardStore';
 import { getNextUpcomingClass } from '../utils/timetableTimeUtils';
+import { NiaHeader, LabelCaps, StatusPill, NiaCard } from '../components/nia';
 
-export const NotificationsScreen: React.FC = () => {
-  const { classes, tasks, emails, dismissedNoticeIds } = useDashboardStore();
+const C = designTokens.colors;
+
+type Priority = 'CRITICAL' | 'HIGH' | 'NORMAL';
+
+interface DynNotif {
+  id: string;
+  title: string;
+  message: string;
+  time: string;
+  priority: Priority;
+}
+
+/** Quiet hours = 11 PM – 7 AM local. */
+function isQuietNow(d: Date = new Date()): boolean {
+  const h = d.getHours();
+  return h >= 23 || h < 7;
+}
+
+export const NotificationsScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
+  const { classes, tasks, emails, dismissedNoticeIds, quietHours, setQuietHours } = useDashboardStore();
   const now = new Date();
+  const quietActive = quietHours && isQuietNow(now);
 
-  // Dynamic notification generation
-  const dynamicNotifs: Array<{
-    id: string;
-    title: string;
-    message: string;
-    time: string;
-    priority: 'CRITICAL' | 'HIGH' | 'NORMAL';
-  }> = [];
+  const dynamicNotifs: DynNotif[] = [];
 
-  // 1. Next / Ongoing class notification
+  // 1. Next / ongoing class
   const nextClassInfo = getNextUpcomingClass(classes, now);
   if (nextClassInfo.nextClass) {
     const c = nextClassInfo.nextClass;
     dynamicNotifs.push({
       id: 'class-' + c.id,
       title: `${c.subjectName} • ${nextClassInfo.statusLabel}`,
-      message: `Room ${c.room || 'AB1-204'} • ${c.faculty || 'Faculty'} (${c.startTime} - ${c.endTime})`,
+      message: `Room ${c.room || '—'} • ${c.faculty || 'Faculty'} (${c.startTime?.slice(0, 5)} – ${c.endTime?.slice(0, 5)})`,
       time: nextClassInfo.isOngoing ? 'Right now' : 'Upcoming',
       priority: nextClassInfo.isOngoing ? 'HIGH' : 'NORMAL',
     });
   }
 
-  // 2. Urgent / High priority tasks
-  const pendingTasks = tasks.filter((t) => t.status === 'TODO');
-  pendingTasks
+  // 2. Urgent tasks
+  tasks
+    .filter((t) => t.status === 'TODO')
     .filter((t) => t.priority === 'EXTREMELY_IMPORTANT' || t.priority === 'HIGH')
     .slice(0, 3)
     .forEach((t) => {
       dynamicNotifs.push({
         id: 'task-' + t.id,
         title: `${t.title} (Action Required)`,
-        message: `Priority: ${t.priority.replace('_', ' ')} • Tap to manage in Tasks`,
+        message: `Priority: ${String(t.priority).replace('_', ' ')} • Tap to manage in Tasks`,
         time: 'Pending',
         priority: t.priority === 'EXTREMELY_IMPORTANT' ? 'CRITICAL' : 'HIGH',
       });
     });
 
-  // 3. Important University notices (only active, unticked notices)
+  // 3. Important university notices
   emails
     .filter((e) => !e.isDismissed && !dismissedNoticeIds.includes(e.id))
     .filter((e) => e.importance === 'CRITICAL' || e.importance === 'HIGH')
@@ -64,87 +75,134 @@ export const NotificationsScreen: React.FC = () => {
       });
     });
 
-  // Fallback if user has cleared everything
-  if (dynamicNotifs.length === 0) {
-    dynamicNotifs.push({
-      id: 'all-clear',
-      title: 'Academic Schedule Clear',
-      message: 'No immediate upcoming classes or urgent task deadlines. Keep up the great work!',
-      time: 'Just now',
-      priority: 'NORMAL',
-    });
-  }
+  // Quiet hours: mute NORMAL priority, keep CRITICAL + HIGH
+  const mutedCount = quietActive ? dynamicNotifs.filter((n) => n.priority === 'NORMAL').length : 0;
+  const visibleNotifs = quietActive ? dynamicNotifs.filter((n) => n.priority !== 'NORMAL') : dynamicNotifs;
+
+  const shown: DynNotif[] =
+    visibleNotifs.length > 0
+      ? visibleNotifs
+      : [
+          {
+            id: 'all-clear',
+            title: 'All Clear',
+            message: quietActive
+              ? `${mutedCount} routine ${mutedCount === 1 ? 'notice is' : 'notices are'} being held until 7 AM. Critical alerts still come through.`
+              : 'No immediate classes or urgent deadlines. Keep up the great work!',
+            time: 'Just now',
+            priority: 'NORMAL' as Priority,
+          },
+        ];
+
+  const pillTone = (p: Priority): 'danger' | 'success' | 'neutral' =>
+    p === 'CRITICAL' ? 'danger' : p === 'HIGH' ? 'success' : 'neutral';
 
   return (
-    <GradientBackground>
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-          <View style={styles.quietHoursCard}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-              <Ionicons name="moon-outline" size={14} color={designTokens.colors.primaryDeep} />
-              <Text style={styles.quietHoursTitle}>Quiet Hours Active (11:00 PM – 7:00 AM)</Text>
+    <View style={styles.root}>
+      <SafeAreaView style={styles.root} edges={['top']}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+          <NiaHeader title="Notifications" navigation={navigation} />
+
+          {/* Quiet hours card — live status */}
+          <NiaCard style={[styles.quietCard, !quietHours && styles.quietCardOff]}>
+            <View style={styles.quietRow}>
+              <View style={styles.quietIcon}>
+                <Ionicons name="moon-outline" size={16} color={quietHours ? C.eucalyptus : C.textMuted} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.quietTitle}>
+                  {quietHours
+                    ? quietActive
+                      ? 'Quiet Hours Active'
+                      : 'Quiet Hours On (11 PM – 7 AM)'
+                    : 'Quiet Hours Off'}
+                </Text>
+                <Text style={styles.quietSub}>
+                  {quietHours
+                    ? quietActive
+                      ? `Muting ${mutedCount} routine ${mutedCount === 1 ? 'notice' : 'notices'} right now. Critical alerts still come through.`
+                      : 'Non-critical notices are muted between 11 PM and 7 AM.'
+                    : 'Notices arrive as usual, day and night.'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.quietToggle, quietHours && styles.quietToggleOn]}
+                onPress={() => setQuietHours(!quietHours)}
+                activeOpacity={0.8}
+                accessibilityRole="switch"
+                accessibilityLabel="Toggle quiet hours"
+              >
+                <Text style={[styles.quietToggleText, quietHours && styles.quietToggleTextOn]}>
+                  {quietHours ? 'ON' : 'OFF'}
+                </Text>
+              </TouchableOpacity>
             </View>
-            <Text style={styles.quietHoursSub}>Non-urgent notifications are muted during study & sleep hours.</Text>
+          </NiaCard>
+
+          <View style={styles.sectionHead}>
+            <Text style={styles.sectionTitle}>Live Notifications</Text>
+            <LabelCaps>{shown.length} items</LabelCaps>
           </View>
 
-          <Text style={styles.header}>LIVE NOTIFICATIONS</Text>
-
-          {dynamicNotifs.map((n) => (
-            <TouchableOpacity key={n.id} style={styles.notifCard} activeOpacity={0.82}>
+          {shown.map((n) => (
+            <TouchableOpacity
+              key={n.id}
+              style={styles.notifCard}
+              activeOpacity={0.85}
+              onPress={() => {
+                if (n.id.startsWith('task-')) navigation?.navigate('Tasks');
+                else if (n.id.startsWith('email-')) navigation?.navigate('Email');
+                else if (n.id.startsWith('class-')) navigation?.navigate('Schedule');
+              }}
+            >
               <View style={styles.row}>
-                <Text style={styles.title}>{n.title}</Text>
+                <Text style={styles.title} numberOfLines={2}>{n.title}</Text>
                 <Text style={styles.time}>{n.time}</Text>
               </View>
-              <Text style={styles.message}>{n.message}</Text>
-              <View style={{ marginTop: 8 }}>
-                {n.priority === 'CRITICAL' ? (
-                  <StatusBadge label="CRITICAL" variant="extremely_important" />
-                ) : n.priority === 'HIGH' ? (
-                  <StatusBadge label="HIGH" variant="high" />
-                ) : (
-                  <StatusBadge label="ACTIVE" variant="safe" />
-                )}
+              <Text style={styles.message} numberOfLines={3}>{n.message}</Text>
+              <View style={{ marginTop: 9 }}>
+                <StatusPill label={n.priority === 'NORMAL' ? 'Active' : n.priority} tone={pillTone(n.priority)} />
               </View>
             </TouchableOpacity>
           ))}
         </ScrollView>
       </SafeAreaView>
-    </GradientBackground>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: designTokens.spacing.lg, paddingBottom: 100 },
-  quietHoursCard: {
-    backgroundColor: '#D8E8E7',
-    borderRadius: designTokens.radii.card,
-    padding: 16,
-    marginBottom: designTokens.spacing.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(117, 167, 165, 0.20)',
-    ...designTokens.shadows.card,
+  root: { flex: 1, backgroundColor: C.porcelain },
+  content: { paddingBottom: 120 },
+  quietCard: { marginHorizontal: 20, marginBottom: 18, backgroundColor: C.eucalyptusFaint, borderColor: '#A7F3D0' },
+  quietCardOff: { backgroundColor: '#FFFFFF', borderColor: C.hairline },
+  quietRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  quietIcon: {
+    width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFFFFF',
+    borderWidth: 1, borderColor: C.hairline, alignItems: 'center', justifyContent: 'center',
   },
-  quietHoursTitle: { fontSize: 13, fontWeight: '700', color: designTokens.colors.textPrimary },
-  quietHoursSub: { fontSize: 12, color: designTokens.colors.textSecondary },
-  header: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: designTokens.colors.textPrimary,
-    letterSpacing: 0.6,
-    marginBottom: 12,
+  quietTitle: { fontSize: 14, fontWeight: '700', color: C.ink, marginBottom: 2 },
+  quietSub: { fontSize: 11.5, color: C.textSecondary, lineHeight: 16 },
+  quietToggle: {
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: C.hairline,
+    borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7,
   },
+  quietToggleOn: { backgroundColor: C.eucalyptus, borderColor: C.eucalyptus },
+  quietToggleText: { fontSize: 11, fontWeight: '800', color: C.textSecondary, letterSpacing: 0.6 },
+  quietToggleTextOn: { color: '#FFFFFF' },
+  sectionHead: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, marginBottom: 10,
+  },
+  sectionTitle: { fontSize: 17, fontWeight: '700', color: C.ink, letterSpacing: -0.3 },
   notifCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: designTokens.radii.card,
-    padding: 16,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.06)',
-    ...designTokens.shadows.card,
+    backgroundColor: '#FFFFFF', borderRadius: 18, borderWidth: 1, borderColor: C.hairline,
+    padding: 15, marginHorizontal: 20, marginBottom: 10,
+    shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04,
+    shadowRadius: 10, elevation: 2,
   },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { fontSize: 14, fontWeight: '700', color: designTokens.colors.textPrimary, flex: 1 },
-  time: { fontSize: 11, color: designTokens.colors.textMuted, marginLeft: 8 },
-  message: { fontSize: 12, color: designTokens.colors.textSecondary, marginTop: 4, lineHeight: 17 },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
+  title: { fontSize: 14.5, fontWeight: '700', color: C.ink, flex: 1, lineHeight: 19 },
+  time: { fontSize: 11, color: C.textMuted, marginTop: 2 },
+  message: { fontSize: 12.5, color: C.textSecondary, marginTop: 5, lineHeight: 18 },
 });

@@ -1,63 +1,84 @@
+// NIA Academic OS — Design System Tokens
+// Palette: porcelain canvas, obsidian ink, muted eucalyptus, terracotta ember.
+// All legacy token NAMES are preserved so existing screens keep compiling;
+// their values are remapped to the new palette.
+
 export const designTokens = {
   colors: {
-    // Warm Ivory / Off-White Canvas (Reference Source of Truth)
-    background: '#F7F4EE',
+    // Porcelain Canvas
+    background: '#f9f9fb',
     backgroundElevated: '#FFFFFF',
     surface: '#FFFFFF',
-    surfaceSecondary: '#F2EFE8',
+    surfaceSecondary: '#f3f3f5',
     surfaceCard: '#FFFFFF',
     surfaceElevated: '#FFFFFF',
-    surfaceSubtle: '#EDE8DF',
-    surfaceBorder: 'rgba(41, 51, 50, 0.07)',
-    surfaceBorderActive: '#75A7A5',
+    surfaceSubtle: '#eeeef0',
+    surfaceBorder: '#E5E5EB',
+    surfaceBorderActive: '#0F766E',
 
-    // Primary Palette (Muted Teal / Blue-Green)
-    primary: '#75A7A5',
-    primaryDark: '#5D8D8B',
-    primaryMuted: '#6F9F9D',
-    primaryLight: '#86B4B1',
-    primarySoft: '#D2E5E3', // Soft mint/teal for cards
-    primaryPill: '#BFD9D8', // Active tab pill
-    primaryDeep: '#4A6B70', // Hero card gradient end
-    primaryGlow: 'rgba(117, 167, 165, 0.15)',
-    primarySubtle: 'rgba(117, 167, 165, 0.12)',
+    // Primary (Obsidian — primary actions, headlines)
+    primary: '#111827',
+    primaryDark: '#0B0F16',
+    primaryMuted: '#374151',
+    primaryLight: '#6B7280',
+    primarySoft: '#F3F4F6', // Soft neutral for cards
+    primaryPill: '#111827', // Active tab pill
+    primaryDeep: '#111827', // Dark card end
+    primaryGlow: 'rgba(17, 24, 39, 0.08)',
+    primarySubtle: 'rgba(17, 24, 39, 0.06)',
 
-    // Secondary Pastel Accents
-    accentPeach: '#E8AD8E', // Warm peach / terracotta
-    accentPeachDeep: '#C88E72', // Hero card gradient start
-    accentPeachDot: '#D4856A', // Notification dot & status dot
-    accentPeachCard: '#EEDFD3', // Stat card 2 tint
-    accentCream: '#F1E5D5',
-    accentSand: '#E3EAE7', // Stat card 3 tint
-    accentSage: '#B8C9B9',
-    accentWine: '#8A2E3B', // EXTREMELY_IMPORTANT crimson/wine badge
+    // Urgent / Ember Accents (Terracotta)
+    accentPeach: '#E11D48',
+    accentPeachDeep: '#BE123C',
+    accentPeachDot: '#E11D48', // Notification dot & status dot
+    accentPeachCard: 'rgba(225, 29, 72, 0.08)', // Urgent card tint
+    accentCream: '#f9f9fb',
+    accentSand: '#eeeef0',
+    accentSage: '#0F766E',
+    accentWine: '#920028', // EXTREMELY_IMPORTANT deep badge
 
-    // AI Visual Identity
-    aiPrimary: '#75A7A5',
-    aiSecondary: '#D4856A',
-    aiGlow: 'rgba(212, 133, 106, 0.20)',
-    aiSubtle: 'rgba(117, 167, 165, 0.08)',
-    aiBorder: 'rgba(117, 167, 165, 0.25)',
+    // AI Visual Identity (NIA)
+    aiPrimary: '#0F766E',
+    aiSecondary: '#E11D48',
+    aiGlow: 'rgba(15, 118, 110, 0.15)',
+    aiSubtle: 'rgba(15, 118, 110, 0.08)',
+    aiBorder: 'rgba(15, 118, 110, 0.25)',
 
     // Semantic Accents (Muted, Academic, Non-Neon)
-    success: '#6B9E82',
-    successSoft: '#D6E8DE',
-    warning: '#D4856A',
-    warningSoft: '#F7E4DC',
-    danger: '#8A2E3B',
-    dangerSoft: '#F5D7DC',
+    success: '#0F766E',
+    successSoft: 'rgba(15, 118, 110, 0.10)',
+    warning: '#B45309',
+    warningSoft: 'rgba(180, 83, 9, 0.08)',
+    danger: '#E11D48',
+    dangerSoft: 'rgba(225, 29, 72, 0.08)',
 
     // Typography Hierarchy
-    textPrimary: '#232D2B', // Dark warm charcoal
-    textSecondary: '#6D7470', // Muted gray-green / warm slate
-    textMuted: '#8C9692', // Subtle metadata
-    textSubtle: '#A2ACA8',
-    textLight: '#FFFFFF', // High-contrast text on dark/gradient surfaces
-    textPeach: '#F3D7C8', // Hero card "NEXT CLASS" label
+    textPrimary: '#1a1c1d', // Obsidian ink
+    textSecondary: '#45464c',
+    textMuted: '#76777d', // Subtle metadata
+    textSubtle: '#A7ABB3',
+    textLight: '#FFFFFF', // High-contrast text on dark surfaces
+    textPeach: '#FDA4AF', // Light ember label on dark cards
 
     // Specific Badges
-    cgpaBadge: '#D4856A',
-    creditsBadge: '#75A7A5',
+    cgpaBadge: '#D97706',
+    creditsBadge: '#4F46E5',
+
+    // --- New NIA design-system tokens ---
+    obsidian: '#111827',
+    ink: '#1a1c1d',
+    porcelain: '#f9f9fb',
+    hairline: '#E5E5EB',
+    eucalyptus: '#0F766E',
+    eucalyptusDeep: '#006a63',
+    eucalyptusSoft: 'rgba(15, 118, 110, 0.08)',
+    eucalyptusFaint: 'rgba(15, 118, 110, 0.05)',
+    terracotta: '#E11D48',
+    terracottaDeep: '#BE123C',
+    terracottaSoft: 'rgba(225, 29, 72, 0.08)',
+    darkCard: '#141b2b', // Dark telemetry card
+    darkCardSoft: '#1E293B',
+    dock: 'rgba(255, 255, 255, 0.88)', // Floating frosted dock fill
   },
 
   // Spacing Scale: 4, 8, 12, 16, 20, 24, 32
@@ -71,7 +92,7 @@ export const designTokens = {
     hero: 32,
   },
 
-  // Radii Tokens (Rounded, Organic, 16-24px mobile standard)
+  // Radii Tokens
   radii: {
     xs: 6,
     sm: 10,
@@ -82,33 +103,36 @@ export const designTokens = {
     pill: 999,
   },
 
-  // Typography Hierarchy
+  // Typography Hierarchy (system font approximating Inter)
   typography: {
-    hero: { fontSize: 24, fontWeight: '800' as const, color: '#232D2B', letterSpacing: -0.4 },
-    displayNumber: { fontSize: 28, fontWeight: '800' as const, color: '#232D2B', letterSpacing: -0.5 },
-    sectionTitle: { fontSize: 16, fontWeight: '700' as const, color: '#232D2B', letterSpacing: -0.2 },
-    cardTitle: { fontSize: 15, fontWeight: '700' as const, color: '#232D2B' },
-    body: { fontSize: 13, fontWeight: '400' as const, color: '#6D7470', lineHeight: 18 },
-    bodyMedium: { fontSize: 13, fontWeight: '500' as const, color: '#232D2B' },
-    label: { fontSize: 11, fontWeight: '700' as const, color: '#8C9692', textTransform: 'uppercase' as const, letterSpacing: 0.6 },
-    micro: { fontSize: 11, fontWeight: '500' as const, color: '#8C9692' },
+    hero: { fontSize: 24, fontWeight: '700' as const, color: '#1a1c1d', letterSpacing: -0.4 },
+    displayNumber: { fontSize: 28, fontWeight: '700' as const, color: '#1a1c1d', letterSpacing: -0.5 },
+    sectionTitle: { fontSize: 16, fontWeight: '700' as const, color: '#1a1c1d', letterSpacing: -0.2 },
+    cardTitle: { fontSize: 15, fontWeight: '600' as const, color: '#1a1c1d' },
+    body: { fontSize: 13, fontWeight: '400' as const, color: '#45464c', lineHeight: 18 },
+    bodyMedium: { fontSize: 13, fontWeight: '500' as const, color: '#1a1c1d' },
+    label: { fontSize: 11, fontWeight: '700' as const, color: '#76777d', textTransform: 'uppercase' as const, letterSpacing: 0.6 },
+    micro: { fontSize: 11, fontWeight: '500' as const, color: '#76777d' },
+    // 10px uppercase micro-labels with +0.08em tracking (label-caps)
+    labelCaps: { fontSize: 10, fontWeight: '600' as const, color: '#76777d', letterSpacing: 0.8, textTransform: 'uppercase' as const },
+    statNumeric: { fontSize: 22, fontWeight: '700' as const, color: '#1a1c1d', letterSpacing: -0.4 },
   },
 
-  // Soft Warm Shadows
+  // Soft Shadows
   shadows: {
     card: {
-      shadowColor: '#3D352E',
+      shadowColor: '#0F172A',
       shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.05,
+      shadowOpacity: 0.04,
       shadowRadius: 10,
       elevation: 2,
     },
     floating: {
-      shadowColor: '#3D352E',
-      shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: 0.12,
-      shadowRadius: 16,
-      elevation: 6,
+      shadowColor: '#0F172A',
+      shadowOffset: { width: 0, height: 12 },
+      shadowOpacity: 0.08,
+      shadowRadius: 24,
+      elevation: 8,
     },
   },
 };

@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Text, TouchableOpacity, View, Platform, Linking, Alert, ActivityIndicator } from 'react-native';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { View, Platform, Linking, Alert, ActivityIndicator } from 'react-native';
 
 import { DashboardScreen } from '../screens/DashboardScreen';
 import { TimetableScreen } from '../screens/TimetableScreen';
@@ -26,193 +25,28 @@ import { useAuthStore } from '../store/authStore';
 import { apiClient } from '../api/client';
 
 import { designTokens } from '../theme/designTokens';
+import { NiaDock } from '../components/NiaDock';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-function MainTabs({ navigation }: { navigation: any }) {
+function MainTabs() {
   return (
-    <View style={{ flex: 1, position: 'relative' }}>
-      <Tab.Navigator
-        id="main-tabs"
-        screenOptions={{
-          sceneStyle: { backgroundColor: 'transparent' },
-          headerStyle: { backgroundColor: 'transparent' },
-          headerTintColor: designTokens.colors.textPrimary,
-          headerTitleStyle: { fontWeight: '700' },
-          tabBarStyle: {
-            backgroundColor: '#F6F3ED',
-            borderTopColor: 'rgba(41, 51, 50, 0.08)',
-            borderTopWidth: 1,
-            height: 72,
-            paddingBottom: 10,
-            paddingTop: 8,
-            elevation: 0,
-            shadowColor: '#3D352E',
-            shadowOffset: { width: 0, height: -2 },
-            shadowOpacity: 0.03,
-            shadowRadius: 6,
-          },
-          tabBarActiveTintColor: designTokens.colors.textPrimary,
-          tabBarInactiveTintColor: designTokens.colors.textSecondary,
-          tabBarLabelStyle: { fontSize: 11, fontWeight: '600', marginTop: 2 },
-        }}
-      >
-        <Tab.Screen
-          name="Home"
-          component={DashboardScreen}
-          options={{
-            headerShown: false,
-            tabBarLabel: ({ focused }) => (
-              <View style={{ alignItems: 'center' }}>
-                <Text
-                  style={{
-                    fontSize: 11,
-                    fontWeight: focused ? '700' : '500',
-                    color: focused ? designTokens.colors.textPrimary : designTokens.colors.textSecondary,
-                  }}
-                >
-                  Home
-                </Text>
-                {focused && (
-                  <View
-                    style={{
-                      width: 22,
-                      height: 3,
-                      borderRadius: 1.5,
-                      backgroundColor: designTokens.colors.accentPeachDot, // #D4856A
-                      marginTop: 3,
-                    }}
-                  />
-                )}
-              </View>
-            ),
-            tabBarIcon: ({ focused }) => (
-              <View
-                style={{
-                  width: 52,
-                  height: 30,
-                  borderRadius: 15,
-                  backgroundColor: focused ? designTokens.colors.primaryPill : 'transparent',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Ionicons
-                  name={focused ? 'home' : 'home-outline'}
-                  size={19}
-                  color={focused ? designTokens.colors.textPrimary : designTokens.colors.textSecondary}
-                />
-              </View>
-            ),
-          }}
-        />
-
-        <Tab.Screen
-          name="Timetable"
-          component={TimetableScreen}
-          options={{
-            headerShown: false,
-            tabBarLabel: ({ focused }) => (
-              <Text
-                style={{
-                  fontSize: 11,
-                  fontWeight: focused ? '700' : '500',
-                  color: focused ? designTokens.colors.textPrimary : designTokens.colors.textSecondary,
-                }}
-              >
-                Timetable
-              </Text>
-            ),
-            tabBarIcon: ({ focused }) => (
-              <Ionicons
-                name={focused ? 'calendar' : 'calendar-outline'}
-                size={20}
-                color={focused ? designTokens.colors.primary : designTokens.colors.textSecondary}
-              />
-            ),
-          }}
-        />
-
-        <Tab.Screen
-          name="Tasks"
-          component={TasksScreen}
-          options={{
-            headerShown: false,
-            tabBarLabel: ({ focused }) => (
-              <Text
-                style={{
-                  fontSize: 11,
-                  fontWeight: focused ? '700' : '500',
-                  color: focused ? designTokens.colors.textPrimary : designTokens.colors.textSecondary,
-                }}
-              >
-                Tasks
-              </Text>
-            ),
-            tabBarIcon: ({ focused }) => (
-              <Ionicons
-                name={focused ? 'checkbox' : 'checkbox-outline'}
-                size={20}
-                color={focused ? designTokens.colors.primary : designTokens.colors.textSecondary}
-              />
-            ),
-          }}
-        />
-
-        <Tab.Screen
-          name="Finance"
-          component={FinanceScreen}
-          options={{
-            headerShown: false,
-            tabBarLabel: ({ focused }) => (
-              <Text
-                style={{
-                  fontSize: 11,
-                  fontWeight: focused ? '700' : '500',
-                  color: focused ? designTokens.colors.textPrimary : designTokens.colors.textSecondary,
-                }}
-              >
-                Finance
-              </Text>
-            ),
-            tabBarIcon: ({ focused }) => (
-              <Ionicons
-                name={focused ? 'cash' : 'cash-outline'}
-                size={20}
-                color={focused ? designTokens.colors.primary : designTokens.colors.textSecondary}
-              />
-            ),
-          }}
-        />
-
-        <Tab.Screen
-          name="NIA"
-          component={AIChatScreen}
-          options={{
-            headerShown: false,
-            tabBarLabel: ({ focused }) => (
-              <Text
-                style={{
-                  fontSize: 11,
-                  fontWeight: focused ? '700' : '500',
-                  color: focused ? designTokens.colors.textPrimary : designTokens.colors.textSecondary,
-                }}
-              >
-                NIA
-              </Text>
-            ),
-            tabBarIcon: ({ focused }) => (
-              <Ionicons
-                name={focused ? 'sparkles' : 'sparkles-outline'}
-                size={20}
-                color={focused ? designTokens.colors.primary : designTokens.colors.textSecondary}
-              />
-            ),
-          }}
-        />
-      </Tab.Navigator>
-    </View>
+    <Tab.Navigator
+      id="main-tabs"
+      tabBar={(props) => <NiaDock {...props} />}
+      screenOptions={{
+        headerShown: false,
+        sceneStyle: { backgroundColor: designTokens.colors.porcelain },
+        tabBarHideOnKeyboard: true,
+      }}
+    >
+      <Tab.Screen name="Home" component={DashboardScreen} />
+      <Tab.Screen name="Timetable" component={TimetableScreen} />
+      <Tab.Screen name="Tasks" component={TasksScreen} />
+      <Tab.Screen name="Finance" component={FinanceScreen} />
+      <Tab.Screen name="NIA" component={AIChatScreen} />
+    </Tab.Navigator>
   );
 }
 

@@ -1,831 +1,582 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, Modal, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+  Modal,
+  ActivityIndicator,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
-import { designTokens } from '../theme/designTokens';
-import { GlassCard } from '../components/common/GlassCard';
-import { StatCard } from '../components/common/StatCard';
-import { GradientBackground } from '../components/common/GradientBackground';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { designTokens } from '../theme/designTokens';
 import { useDashboardStore } from '../store/dashboardStore';
 import { useAuthStore } from '../store/authStore';
 import { apiClient } from '../api/client';
-import type { Expense, Debt } from '@glitchers/shared';
+import { NiaHeader, LabelCaps, StatusPill, NiaCard } from '../components/nia';
+import { monthCycleLabel, inr, timeAgo } from '../utils/niaFormat';
 
-export const FinanceScreen: React.FC = () => {
-  const { expenses, budget, debts, addExpense, deleteExpense, markDebtPaid, splitExpense } = useDashboardStore();
+const C = designTokens.colors;
+
+const CATS = ['FOOD', 'TRANSPORT', 'EDUCATION', 'SHOPPING', 'OTHER'] as const;
+
+const CAT_META: Record<string, { icon: string; bg: string }> = {
+  FOOD: { icon: 'fast-food-outline', bg: '#FEF3C7' },
+  TRANSPORT: { icon: 'car-outline', bg: '#E0E7FF' },
+  EDUCATION: { icon: 'book-outline', bg: '#D1FAE5' },
+  SHOPPING: { icon: 'bag-outline', bg: '#FCE7F3' },
+  OTHER: { icon: 'pricetag-outline', bg: '#F1F5F9' },
+};
+
+function catColor(cat: string): string {
+  return cat === 'FOOD'
+    ? '#D97706'
+    : cat === 'TRANSPORT'
+    ? '#4F46E5'
+    : cat === 'EDUCATION'
+    ? C.eucalyptus
+    : cat === 'SHOPPING'
+    ? C.terracotta
+    : C.textSecondary;
+}
+
+export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
+  const {
+    expenses,
+    budget,
+    debts,
+    addExpense,
+    deleteExpense,
+    markDebtPaid,
+    splitExpense,
+  } = useDashboardStore();
 
   const [quickInput, setQuickInput] = useState('');
-  const [previewExpense, setPreviewExpense] = useState<{ amount: number; description: string; category: Expense['category'] } | null>(null);
-  const [splitModalVisible, setSplitModalVisible] = useState(false);
+  const [preview, setPreview] = useState<{ amount: number; description: string; category: string } | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [budgetVisible, setBudgetVisible] = useState(false);
+  const [budgetInput, setBudgetInput] = useState('');
+  const [splitVisible, setSplitVisible] = useState(false);
   const [splitAmount, setSplitAmount] = useState('');
   const [splitPerson, setSplitPerson] = useState('');
   const [splitDesc, setSplitDesc] = useState('');
+  const [addVisible, setAddVisible] = useState(false);
+  const [formAmount, setFormAmount] = useState('');
+  const [formDesc, setFormDesc] = useState('');
+  const [formCat, setFormCat] = useState<string>('FOOD');
 
-  // Bill & Receipt Scanner State
-  const [isScanningBill, setIsScanningBill] = useState(false);
-  const [scannedBillResult, setScannedBillResult] = useState<any | null>(null);
-
-  const handleScanBill = async () => {
-    try {
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) {
-        Alert.alert('Permission Needed', 'Please allow gallery access to upload a bill or receipt photo.');
-        return;
-      }
-
-      const res = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        base64: true,
-        quality: 0.85,
-      });
-
-      if (!res.canceled && res.assets && res.assets[0] && res.assets[0].base64) {
-        setIsScanningBill(true);
-        try {
-          const scanRes = await apiClient.scanBill(res.assets[0].base64, res.assets[0].mimeType || 'image/jpeg');
-          if (scanRes && scanRes.success && scanRes.expense) {
-            addExpense(scanRes.expense);
-            setScannedBillResult(scanRes.parsed);
-            Alert.alert(
-              'Bill Scanned & Logged!',
-              `Logged ₹${scanRes.parsed?.total || scanRes.expense.amount} from ${scanRes.parsed?.merchant || 'Merchant'} with ${scanRes.parsed?.items?.length || 1} item(s).`
-            );
-          } else {
-            Alert.alert('Scan Result', 'Could not read receipt details from the photo.');
-          }
-        } catch {
-          Alert.alert('Scan Error', 'Failed to analyze bill image. Please try another clear photo.');
-        } finally {
-          setIsScanningBill(false);
-        }
-      }
-    } catch {
-      Alert.alert('Error', 'Could not open image picker.');
-    }
-  };
-
-  // Calculations
-  const totalSpent = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+  const totalSpent = expenses.reduce((s, e) => s + Number(e.amount), 0);
   const monthlyLimit = budget?.monthlyLimit || 10000;
   const remaining = Math.max(0, monthlyLimit - totalSpent);
-  const progressPct = Math.min(100, Math.round((totalSpent / monthlyLimit) * 100));
+  const progressPct = monthlyLimit > 0 ? Math.min(100, Math.round((totalSpent / monthlyLimit) * 100)) : 0;
 
-  // Category breakdown
-  const categoryTotals: Record<string, number> = {
-    FOOD: 0,
-    TRANSPORT: 0,
-    EDUCATION: 0,
-    SHOPPING: 0,
-    OTHER: 0,
-  };
+  const categoryTotals: Record<string, number> = { FOOD: 0, TRANSPORT: 0, EDUCATION: 0, SHOPPING: 0, OTHER: 0 };
   expenses.forEach((e) => {
     const cat = categoryTotals[e.category] !== undefined ? e.category : 'OTHER';
     categoryTotals[cat] += Number(e.amount);
   });
 
-  // Debts
+  const topCategory = CATS.reduce((a, b) => (categoryTotals[a] >= categoryTotals[b] ? a : b));
+
   const toReceive = debts
     .filter((d) => d.type === 'OWES_ME' && d.status === 'PENDING')
-    .reduce((sum, d) => sum + Number(d.amount - d.paidAmount), 0);
+    .reduce((s, d) => s + Number(d.amount - (d.paidAmount || 0)), 0);
   const toPay = debts
     .filter((d) => d.type === 'I_OWE' && d.status === 'PENDING')
-    .reduce((sum, d) => sum + Number(d.amount - d.paidAmount), 0);
+    .reduce((s, d) => s + Number(d.amount - (d.paidAmount || 0)), 0);
 
-  // Quick entry parser
-  const handleQuickAddPress = () => {
+  const pendingDebts = debts.filter((d) => d.status === 'PENDING').slice(0, 3);
+
+  // ---- scan receipt ----
+  const handleScan = async () => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Permission needed', 'Allow gallery access to scan a receipt.');
+        return;
+      }
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        base64: true,
+        quality: 0.85,
+      });
+      if (!res.canceled && res.assets?.[0]?.base64) {
+        setScanning(true);
+        try {
+          const scanRes = await apiClient.scanBill(res.assets[0].base64, res.assets[0].mimeType || 'image/jpeg');
+          if (scanRes && scanRes.success && scanRes.expense) {
+            addExpense(scanRes.expense);
+            Alert.alert(
+              'Bill scanned & logged',
+              `Logged ${inr(Number(scanRes.parsed?.total || scanRes.expense.amount))} from ${
+                scanRes.parsed?.merchant || 'merchant'
+              }.`
+            );
+          } else {
+            Alert.alert('Scan result', 'Could not read receipt details from the photo.');
+          }
+        } catch {
+          Alert.alert('Scan error', 'Failed to analyze the image. Try a clearer photo.');
+        } finally {
+          setScanning(false);
+        }
+      }
+    } catch {
+      Alert.alert('Error', 'Could not open the image picker.');
+    }
+  };
+
+  // ---- quick add ----
+  const handleQuickAdd = () => {
     if (!quickInput.trim()) return;
     const match = quickInput.match(/(\d+(?:\.\d{1,2})?)/);
     const amount = match ? parseFloat(match[1]) : 150;
     const lower = quickInput.toLowerCase();
-    let category: Expense['category'] = 'OTHER';
-    if (lower.includes('food') || lower.includes('dinner') || lower.includes('lunch') || lower.includes('canteen') || lower.includes('coffee') || lower.includes('tea') || lower.includes('biryani')) {
-      category = 'FOOD';
-    } else if (lower.includes('auto') || lower.includes('cab') || lower.includes('bus') || lower.includes('metro') || lower.includes('travel')) {
-      category = 'TRANSPORT';
-    } else if (lower.includes('book') || lower.includes('print') || lower.includes('xerox') || lower.includes('course') || lower.includes('fee')) {
-      category = 'EDUCATION';
-    } else if (lower.includes('shirt') || lower.includes('shopping') || lower.includes('clothes')) {
-      category = 'SHOPPING';
-    }
-
-    const desc = quickInput.replace(/\d+/g, '').replace(/spent|paid|rs|rupees|on|for/gi, '').trim() || 'Expense';
-    setPreviewExpense({ amount, description: desc, category });
+    let category = 'OTHER';
+    if (/(food|dinner|lunch|canteen|coffee|tea|biryani|snack)/.test(lower)) category = 'FOOD';
+    else if (/(auto|cab|bus|metro|travel|uber|ola)/.test(lower)) category = 'TRANSPORT';
+    else if (/(book|print|xerox|course|fee|stationery)/.test(lower)) category = 'EDUCATION';
+    else if (/(shirt|shopping|clothes|shoes|amazon)/.test(lower)) category = 'SHOPPING';
+    const desc =
+      quickInput
+        .replace(/\d+/g, '')
+        .replace(/spent|paid|rs|rupees|on|for/gi, '')
+        .trim() || 'Expense';
+    setPreview({ amount, description: desc, category });
   };
 
-  const handleConfirmQuickExpense = () => {
-    if (!previewExpense) return;
-    const currentUserId = useAuthStore.getState().user?.id || 'offline-user';
-    const newExp: Expense = {
+  const confirmQuickAdd = () => {
+    if (!preview) return;
+    addExpense({
       id: String(Date.now()),
-      userId: currentUserId,
-      amount: previewExpense.amount,
-      category: previewExpense.category,
-      description: previewExpense.description,
+      userId: useAuthStore.getState().user?.id || 'offline-user',
+      amount: preview.amount,
+      category: preview.category as any,
+      description: preview.description,
       date: new Date().toISOString(),
       type: 'EXPENSE',
-    };
-    addExpense(newExp);
-    setPreviewExpense(null);
+    } as any);
+    setPreview(null);
     setQuickInput('');
-    Alert.alert('Recorded', `₹${newExp.amount} logged under ${newExp.category}.`);
+    Alert.alert('Recorded', `${inr(preview.amount)} logged under ${preview.category}.`);
   };
 
-  const handleSplitBillSubmit = () => {
-    const amt = parseFloat(splitAmount);
-    if (!amt || !splitPerson.trim()) {
-      Alert.alert('Error', 'Please enter amount and friend name');
+  const submitManualAdd = () => {
+    const amt = parseFloat(formAmount);
+    if (!amt || amt <= 0) {
+      Alert.alert('Invalid amount', 'Enter a valid amount.');
       return;
     }
-    splitExpense(amt, splitDesc.trim() || 'Dinner / Bill', splitPerson.trim());
+    addExpense({
+      id: String(Date.now()),
+      userId: useAuthStore.getState().user?.id || 'offline-user',
+      amount: amt,
+      category: formCat as any,
+      description: formDesc.trim() || 'Expense',
+      date: new Date().toISOString(),
+      type: 'EXPENSE',
+    } as any);
+    setFormAmount('');
+    setFormDesc('');
+    setFormCat('FOOD');
+    setAddVisible(false);
+    Alert.alert('Recorded', `${inr(amt)} logged under ${formCat}.`);
+  };
+
+  const submitSplit = () => {
+    const amt = parseFloat(splitAmount);
+    if (!amt || !splitPerson.trim()) {
+      Alert.alert('Missing info', 'Enter the amount and the friend’s name.');
+      return;
+    }
+    splitExpense(amt, splitDesc.trim() || 'Shared bill', splitPerson.trim());
     setSplitAmount('');
     setSplitPerson('');
     setSplitDesc('');
-    setSplitModalVisible(false);
-    Alert.alert('Bill Split', `Split ₹${amt}: recorded your share & ${splitPerson} owes ₹${Math.round(amt / 2)}.`);
+    setSplitVisible(false);
+    Alert.alert('Bill split', `Split ${inr(amt)} — ${splitPerson.trim()} owes ${inr(amt / 2)}.`);
   };
 
+  const handleSetBudget = () => {
+    const v = parseFloat(budgetInput);
+    if (!v || v <= 0) {
+      Alert.alert('Invalid budget', 'Enter a monthly budget amount.');
+      return;
+    }
+    useDashboardStore.getState().setBudget({ monthlyLimit: v } as any);
+    setBudgetInput('');
+    setBudgetVisible(false);
+    Alert.alert('Budget updated', `Monthly budget set to ${inr(v)}.`);
+  };
+
+  const barColor = progressPct >= 90 ? C.terracotta : progressPct >= 70 ? '#F59E0B' : C.eucalyptus;
+
   return (
-    <GradientBackground>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* 1. Header: Balance & Spending */}
-      <View style={styles.balanceHeader}>
-        <Text style={styles.balanceLabel}>REMAINING ALLOWANCE</Text>
-        <Text style={styles.balanceNumber}>₹{remaining.toLocaleString()}</Text>
-        <Text style={styles.balanceSub}>Safe daily burn: ₹{Math.round(remaining / 27)}/day</Text>
-      </View>
+    <View style={styles.root}>
+      <SafeAreaView style={styles.root} edges={['top']}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+          <NiaHeader title="Finance" navigation={navigation} />
 
-      {/* 2. Monthly Budget Progress Card */}
-      <GlassCard elevated style={styles.budgetCard}>
-        <View style={styles.budgetRow}>
-          <Text style={styles.budgetLabel}>Monthly Budget</Text>
-          <Text style={styles.budgetRatio}>
-            ₹{totalSpent.toLocaleString()} <Text style={styles.budgetTotal}>/ ₹{monthlyLimit.toLocaleString()}</Text>
-          </Text>
-        </View>
+          <Text style={styles.title}>Finance</Text>
+          <Text style={styles.sub}>Track every rupee, stay on budget</Text>
 
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
-        </View>
-
-        <Text style={styles.progressSubtext}>{progressPct}% of monthly allowance used</Text>
-      </GlassCard>
-
-      {/* 3. AI Quick Entry Bar */}
-      <GlassCard style={styles.quickEntryCard}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: designTokens.spacing.sm }}>
-          <Ionicons name="sparkles" size={13} color={designTokens.colors.primary} />
-          <Text style={styles.quickEntryTitle}>AI Quick Expense Entry</Text>
-        </View>
-        <View style={styles.quickEntryRow}>
-          <TextInput
-            style={styles.quickInput}
-            placeholder="Spent ₹180 on dinner..."
-            placeholderTextColor="#64748B"
-            value={quickInput}
-            onChangeText={setQuickInput}
-            onSubmitEditing={handleQuickAddPress}
-          />
-          <TouchableOpacity
-            style={[styles.quickAddBtn, !quickInput.trim() && { opacity: 0.5 }]}
-            onPress={handleQuickAddPress}
-            disabled={!quickInput.trim()}
-          >
-            <Ionicons name="arrow-up" size={16} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Confirmation Preview */}
-        {previewExpense && (
-          <View style={styles.previewBox}>
-            <View style={styles.previewHeader}>
-              <Text style={styles.previewTitle}>Confirm Expense</Text>
-              <Text style={styles.previewAmount}>₹{previewExpense.amount}</Text>
-            </View>
-            <Text style={styles.previewDesc}>{previewExpense.description} • {previewExpense.category}</Text>
-            <View style={styles.previewActions}>
-              <TouchableOpacity
-                style={styles.editBtn}
-                onPress={() => setPreviewExpense(null)}
-              >
-                <Text style={styles.editBtnText}>Edit</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.confirmBtn}
-                onPress={handleConfirmQuickExpense}
-              >
-                <Text style={styles.confirmBtnText}>Confirm & Save</Text>
+          {/* Budget card */}
+          <NiaCard dark style={styles.budgetCard}>
+            <View style={styles.budgetTop}>
+              <View>
+                <LabelCaps color="rgba(255,255,255,0.6)">Monthly Budget</LabelCaps>
+                <Text style={styles.budgetTotal}>{inr(monthlyLimit)}</Text>
+                <Text style={styles.budgetCycle}>{monthCycleLabel()}</Text>
+              </View>
+              <TouchableOpacity onPress={() => { setBudgetInput(String(monthlyLimit)); setBudgetVisible(true); }} activeOpacity={0.7}>
+                <View style={styles.editBadge}>
+                  <Ionicons name="pencil-outline" size={13} color="#FFFFFF" />
+                  <Text style={styles.editText}>EDIT</Text>
+                </View>
               </TouchableOpacity>
             </View>
-          </View>
-        )}
-      </GlassCard>
-
-      {/* 3b. Gemini AI Bill & Receipt Scanner Banner */}
-      <TouchableOpacity
-        style={styles.scanBillBanner}
-        onPress={handleScanBill}
-        disabled={isScanningBill}
-        activeOpacity={0.8}
-      >
-        <View style={styles.scanBillLeft}>
-          <View style={styles.scanBillIconCircle}>
-            {isScanningBill ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Ionicons name="camera" size={20} color="#FFFFFF" />
-            )}
-          </View>
-          <View style={styles.scanBillTextCol}>
-            <Text style={styles.scanBillTitle}>
-              {isScanningBill ? 'Gemini is reading receipt items...' : 'Upload Bill Photo (Gemini AI)'}
-            </Text>
-            <Text style={styles.scanBillSub}>
-              {isScanningBill ? 'Extracting merchant, prices & individual items' : 'Snap or pick bill to auto-add all items'}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.scanBillBadge}>
-          <Text style={styles.scanBillBadgeText}>AUTO-LOG</Text>
-        </View>
-      </TouchableOpacity>
-
-      {/* Scanned Bill Breakdown Card */}
-      {scannedBillResult && (
-        <GlassCard variant="cream" style={styles.scannedResultCard}>
-          <View style={styles.scannedHeaderRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.scannedMerchant}>{scannedBillResult.merchant || 'Store Bill'}</Text>
-              <Text style={styles.scannedSummary}>{scannedBillResult.summary || 'Itemized purchase'}</Text>
+            <View style={styles.barBg}>
+              <View style={[styles.barFill, { width: `${progressPct}%`, backgroundColor: barColor }]} />
             </View>
-            <TouchableOpacity onPress={() => setScannedBillResult(null)} style={styles.scannedCloseBtn}>
-              <Ionicons name="close" size={16} color={designTokens.colors.textPrimary} />
+            <View style={styles.budgetRow}>
+              <Text style={styles.budgetStat}>Spent <Text style={styles.budgetStatBold}>{inr(totalSpent)}</Text></Text>
+              <Text style={styles.budgetStat}>Left <Text style={styles.budgetStatBold}>{inr(remaining)}</Text></Text>
+              <Text style={styles.budgetPct}>{progressPct}%</Text>
+            </View>
+          </NiaCard>
+
+          {/* Action row */}
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => setAddVisible(true)} activeOpacity={0.85}>
+              <Ionicons name="add-circle-outline" size={20} color={C.obsidian} />
+              <Text style={styles.actionText}>Add Expense</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionBtn} onPress={handleScan} disabled={scanning} activeOpacity={0.85}>
+              {scanning ? (
+                <ActivityIndicator size="small" color={C.obsidian} />
+              ) : (
+                <Ionicons name="scan-outline" size={20} color={C.obsidian} />
+              )}
+              <Text style={styles.actionText}>Scan Receipt</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => setSplitVisible(true)} activeOpacity={0.85}>
+              <Ionicons name="people-outline" size={20} color={C.obsidian} />
+              <Text style={styles.actionText}>Split Bill</Text>
             </TouchableOpacity>
           </View>
 
-          <View style={styles.scannedItemsTable}>
-            {scannedBillResult.items?.map((item: any, idx: number) => (
-              <View key={idx} style={styles.scannedItemRow}>
-                <Text style={styles.scannedItemName}>{item.name}</Text>
-                <Text style={styles.scannedItemPrice}>₹{item.price}</Text>
-              </View>
-            ))}
+          {/* Quick add */}
+          <View style={styles.quickRow}>
+            <TextInput
+              style={styles.quickInput}
+              placeholder="Quick add — e.g. '450 dinner at canteen'"
+              placeholderTextColor={C.textSubtle}
+              value={quickInput}
+              onChangeText={setQuickInput}
+              onSubmitEditing={handleQuickAdd}
+              returnKeyType="done"
+            />
+            <TouchableOpacity style={styles.quickGo} onPress={handleQuickAdd} activeOpacity={0.8}>
+              <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+            </TouchableOpacity>
           </View>
-
-          <View style={styles.scannedTotalRow}>
-            <Text style={styles.scannedTotalLabel}>Total Amount Logged</Text>
-            <Text style={styles.scannedTotalValue}>₹{scannedBillResult.total}</Text>
-          </View>
-
-          <View style={styles.scannedSuccessBadge}>
-            <Ionicons name="checkmark-circle" size={14} color="#15803D" />
-            <Text style={styles.scannedSuccessText}>All items logged into your Expense Tracker & Budget</Text>
-          </View>
-        </GlassCard>
-      )}
-
-      {/* 4. Borrow / Lend Ledger & Split Action */}
-      <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>Peer Debts & Splits</Text>
-        <TouchableOpacity style={styles.splitBillBtn} onPress={() => setSplitModalVisible(true)}>
-          <Ionicons name="git-branch-outline" size={13} color="#FFFFFF" />
-          <Text style={styles.splitBillText}>Split Bill</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.debtsRow}>
-        <StatCard
-          variant="teal"
-          title="TO RECEIVE"
-          value={`₹${toReceive.toLocaleString()}`}
-          subtext="Friends owe you"
-          icon={<Ionicons name="arrow-down-circle-outline" size={18} color={designTokens.colors.primaryDark} />}
-          accentColor={designTokens.colors.primaryDark}
-        />
-        <View style={{ width: designTokens.spacing.md }} />
-        <StatCard
-          variant="peach"
-          title="TO PAY"
-          value={`₹${toPay.toLocaleString()}`}
-          subtext="You owe friends"
-          icon={<Ionicons name="arrow-up-circle-outline" size={18} color={designTokens.colors.accentPeachDot} />}
-          accentColor={designTokens.colors.accentPeachDot}
-        />
-      </View>
-
-      {debts.length > 0 && (
-        <GlassCard style={styles.debtListCard}>
-          {debts.slice(0, 3).map((d) => (
-            <View key={d.id} style={styles.debtItemRow}>
-              <View>
-                <Text style={styles.debtPerson}>{d.person}</Text>
-                <Text style={styles.debtNotes}>{d.notes || (d.type === 'OWES_ME' ? 'Owes you' : 'You owe')}</Text>
-              </View>
-              <View style={styles.debtRight}>
-                <Text
-                  style={[
-                    styles.debtAmount,
-                    d.type === 'OWES_ME' ? styles.textSuccess : styles.textDanger,
-                  ]}
-                >
-                  {d.type === 'OWES_ME' ? `+₹${d.amount}` : `-₹${d.amount}`}
+          {preview && (
+            <View style={styles.previewRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.previewText}>
+                  {inr(preview.amount)} • {preview.description}
                 </Text>
-                {d.status === 'PENDING' && (
-                  <TouchableOpacity
-                    style={styles.settleBtn}
-                    onPress={() => markDebtPaid(d.id)}
-                  >
-                    <Text style={styles.settleText}>Mark Paid</Text>
-                  </TouchableOpacity>
-                )}
+                <Text style={styles.previewCat}>{preview.category}</Text>
               </View>
-            </View>
-          ))}
-        </GlassCard>
-      )}
-
-      {/* 5. Spending Breakdown by Category */}
-      <Text style={[styles.sectionTitle, { marginTop: designTokens.spacing.lg }]}>Category Distribution</Text>
-      <GlassCard style={styles.breakdownCard}>
-        {Object.entries(categoryTotals).map(([cat, amt]) => {
-          const catPct = totalSpent > 0 ? Math.round((amt / totalSpent) * 100) : 0;
-          return (
-            <View key={cat} style={styles.categoryRow}>
-              <View style={styles.catLabelRow}>
-                <Text style={styles.catName}>{cat}</Text>
-                <Text style={styles.catAmount}>₹{amt.toLocaleString()} ({catPct}%)</Text>
-              </View>
-              <View style={styles.catBarTrack}>
-                <View style={[styles.catBarFill, { width: `${catPct}%` }]} />
-              </View>
-            </View>
-          );
-        })}
-      </GlassCard>
-
-      {/* 6. Recent Transactions */}
-      <Text style={[styles.sectionTitle, { marginTop: designTokens.spacing.lg }]}>Recent Transactions</Text>
-      {expenses.length === 0 ? (
-        <GlassCard style={styles.emptyCard}>
-          <Ionicons name="receipt-outline" size={32} color="#75A7A5" style={{ marginBottom: 6 }} />
-          <Text style={styles.emptyTitle}>No Expenses Logged Yet</Text>
-          <Text style={styles.emptySub}>
-            Track your daily expenses using the quick log bar above or snap a receipt bill to auto-log items.
-          </Text>
-        </GlassCard>
-      ) : (
-        <View style={styles.txList}>
-          {expenses.slice(0, 5).map((e) => (
-            <GlassCard key={e.id} style={styles.txCard}>
-              <View style={styles.txRow}>
-                <View style={styles.txLeft}>
-                  <Text style={styles.txDesc}>{e.description}</Text>
-                  <Text style={styles.txCat}>{e.category} • Today</Text>
-                </View>
-                <View style={styles.txRight}>
-                  <Text style={styles.txAmount}>₹{Number(e.amount).toLocaleString()}</Text>
-                  <TouchableOpacity onPress={() => deleteExpense(e.id)}>
-                    <Text style={styles.txDelete}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </GlassCard>
-          ))}
-        </View>
-      )}
-
-      {/* Split Bill Modal */}
-      <Modal visible={splitModalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <Text style={styles.modalTitle}>Split Bill Equally</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Total Amount (₹)"
-              placeholderTextColor="#64748B"
-              keyboardType="numeric"
-              value={splitAmount}
-              onChangeText={setSplitAmount}
-            />
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Friend Name (e.g. Rahul)"
-              placeholderTextColor="#64748B"
-              value={splitPerson}
-              onChangeText={setSplitPerson}
-            />
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Description (e.g. Dinner at Domino's)"
-              placeholderTextColor="#64748B"
-              value={splitDesc}
-              onChangeText={setSplitDesc}
-            />
-            <View style={styles.modalActionRow}>
-              <TouchableOpacity
-                style={styles.modalCancelBtn}
-                onPress={() => setSplitModalVisible(false)}
-              >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+              <TouchableOpacity style={styles.previewYes} onPress={confirmQuickAdd} activeOpacity={0.8}>
+                <Text style={styles.previewYesText}>Add</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSaveBtn} onPress={handleSplitBillSubmit}>
-                <Text style={styles.modalSaveText}>Split & Record</Text>
+              <TouchableOpacity onPress={() => setPreview(null)} activeOpacity={0.7}>
+                <Ionicons name="close" size={18} color={C.textMuted} />
               </TouchableOpacity>
             </View>
+          )}
+
+          {/* Category breakdown */}
+          <View style={styles.sectionHead}>
+            <Text style={styles.sectionTitle}>This Month</Text>
+            <LabelCaps>{monthCycleLabel()}</LabelCaps>
           </View>
-        </View>
-      </Modal>
-    </ScrollView>
-  </GradientBackground>
-);
+          <NiaCard style={styles.catCard}>
+            {CATS.map((cat) => {
+              const amt = categoryTotals[cat];
+              const pct = totalSpent > 0 ? Math.round((amt / totalSpent) * 100) : 0;
+              const meta = CAT_META[cat];
+              return (
+                <View key={cat} style={styles.catRow}>
+                  <View style={[styles.catIcon, { backgroundColor: meta.bg }]}>
+                    <Ionicons name={meta.icon as any} size={16} color={catColor(cat)} />
+                  </View>
+                  <View style={styles.catMain}>
+                    <View style={styles.catTop}>
+                      <Text style={styles.catName}>{cat[0] + cat.slice(1).toLowerCase()}</Text>
+                      <Text style={styles.catAmt}>{inr(amt)}</Text>
+                    </View>
+                    <View style={styles.catBarBg}>
+                      <View style={[styles.catBarFill, { width: `${pct}%`, backgroundColor: catColor(cat) }]} />
+                    </View>
+                  </View>
+                  <Text style={styles.catPct}>{pct}%</Text>
+                </View>
+              );
+            })}
+          </NiaCard>
+
+          {/* Recent transactions */}
+          <View style={styles.sectionHead}>
+            <Text style={styles.sectionTitle}>Recent</Text>
+            <LabelCaps>{expenses.length} entries</LabelCaps>
+          </View>
+          {expenses.length === 0 ? (
+            <NiaCard>
+              <Text style={styles.emptyText}>No expenses yet. Log your first one above.</Text>
+            </NiaCard>
+          ) : (
+            expenses.slice(0, 8).map((e) => {
+              const meta = CAT_META[e.category] || CAT_META.OTHER;
+              return (
+                <View key={e.id} style={styles.txRow}>
+                  <View style={[styles.catIcon, { backgroundColor: meta.bg }]}>
+                    <Ionicons name={meta.icon as any} size={16} color={catColor(e.category)} />
+                  </View>
+                  <View style={styles.taskMain}>
+                    <Text style={styles.taskTitle} numberOfLines={1}>{e.description || 'Expense'}</Text>
+                    <Text style={styles.taskDesc}>
+                      {(e.category || 'OTHER')}{e.date ? ` • ${timeAgo(e.date)}` : ''}
+                    </Text>
+                  </View>
+                  <Text style={styles.txAmt}>-{inr(Number(e.amount))}</Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      Alert.alert('Delete expense', `Remove "${e.description}"?`, [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Delete', style: 'destructive', onPress: () => deleteExpense(e.id) },
+                      ]);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="trash-outline" size={15} color={C.textSubtle} />
+                  </TouchableOpacity>
+                </View>
+              );
+            })
+          )}
+
+          {/* Splits & debts */}
+          <View style={styles.sectionHead}>
+            <Text style={styles.sectionTitle}>Splits & Debts</Text>
+            <LabelCaps>Shared bills</LabelCaps>
+          </View>
+          <View style={styles.debtRow}>
+            <NiaCard style={styles.debtCard}>
+              <LabelCaps>You get</LabelCaps>
+              <Text style={[styles.debtAmt, { color: C.eucalyptus }]}>{inr(toReceive)}</Text>
+            </NiaCard>
+            <NiaCard style={styles.debtCard}>
+              <LabelCaps>You owe</LabelCaps>
+              <Text style={[styles.debtAmt, { color: C.terracotta }]}>{inr(toPay)}</Text>
+            </NiaCard>
+          </View>
+          {pendingDebts.map((d) => (
+            <View key={d.id} style={styles.txRow}>
+              <View style={styles.debtIcon}>
+                <Ionicons
+                  name={d.type === 'OWES_ME' ? 'arrow-down-circle-outline' : 'arrow-up-circle-outline'}
+                  size={18}
+                  color={d.type === 'OWES_ME' ? C.eucalyptus : C.terracotta}
+                />
+              </View>
+              <View style={styles.taskMain}>
+                <Text style={styles.taskTitle} numberOfLines={1}>
+                  {d.type === 'OWES_ME' ? `${d.person} owes you` : `You owe ${d.person}`}
+                </Text>
+                <Text style={styles.taskDesc}>{d.notes || 'Shared expense'}</Text>
+              </View>
+              <Text style={styles.txAmt}>{inr(Number(d.amount - (d.paidAmount || 0)))}</Text>
+              <TouchableOpacity
+                style={styles.settleBtn}
+                onPress={() => {
+                  Alert.alert('Mark settled', `Mark this debt with ${d.person} as settled?`, [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Settled', onPress: () => markDebtPaid(d.id) },
+                  ]);
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.settleText}>Settle</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+
+          <View style={{ height: 8 }} />
+        </ScrollView>
+
+        {/* Add expense modal */}
+        <Modal visible={addVisible} transparent animationType="slide" onRequestClose={() => setAddVisible(false)}>
+          <TouchableOpacity style={styles.sheetOverlay} activeOpacity={1} onPress={() => setAddVisible(false)}>
+            <View style={styles.sheet} onStartShouldSetResponder={() => true}>
+              <LabelCaps style={styles.sheetLabel}>Add Expense</LabelCaps>
+              <Text style={styles.fieldLabel}>Amount (₹)</Text>
+              <TextInput style={styles.input} placeholder="450" placeholderTextColor={C.textSubtle} value={formAmount} onChangeText={setFormAmount} keyboardType="decimal-pad" />
+              <Text style={styles.fieldLabel}>Description</Text>
+              <TextInput style={styles.input} placeholder="e.g. Dinner at canteen" placeholderTextColor={C.textSubtle} value={formDesc} onChangeText={setFormDesc} />
+              <Text style={styles.fieldLabel}>Category</Text>
+              <View style={styles.prioRow}>
+                {CATS.map((c) => (
+                  <TouchableOpacity
+                    key={c}
+                    style={[styles.prioPill, formCat === c && styles.prioPillActive]}
+                    onPress={() => setFormCat(c)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.prioText, formCat === c && styles.prioTextActive]}>
+                      {c[0] + c.slice(1).toLowerCase()}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TouchableOpacity style={styles.saveBtn} onPress={submitManualAdd} activeOpacity={0.85}>
+                <Text style={styles.saveBtnText}>Add Expense</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Budget modal */}
+        <Modal visible={budgetVisible} transparent animationType="fade" onRequestClose={() => setBudgetVisible(false)}>
+          <TouchableOpacity style={styles.sheetOverlay} activeOpacity={1} onPress={() => setBudgetVisible(false)}>
+            <View style={styles.sheet} onStartShouldSetResponder={() => true}>
+              <LabelCaps style={styles.sheetLabel}>Monthly Budget</LabelCaps>
+              <Text style={styles.fieldLabel}>Amount (₹)</Text>
+              <TextInput style={styles.input} placeholder="10000" placeholderTextColor={C.textSubtle} value={budgetInput} onChangeText={setBudgetInput} keyboardType="decimal-pad" />
+              <TouchableOpacity style={styles.saveBtn} onPress={handleSetBudget} activeOpacity={0.85}>
+                <Text style={styles.saveBtnText}>Save Budget</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Split modal */}
+        <Modal visible={splitVisible} transparent animationType="slide" onRequestClose={() => setSplitVisible(false)}>
+          <TouchableOpacity style={styles.sheetOverlay} activeOpacity={1} onPress={() => setSplitVisible(false)}>
+            <View style={styles.sheet} onStartShouldSetResponder={() => true}>
+              <LabelCaps style={styles.sheetLabel}>Split a Bill</LabelCaps>
+              <Text style={styles.fieldLabel}>Total amount (₹)</Text>
+              <TextInput style={styles.input} placeholder="900" placeholderTextColor={C.textSubtle} value={splitAmount} onChangeText={setSplitAmount} keyboardType="decimal-pad" />
+              <Text style={styles.fieldLabel}>With whom?</Text>
+              <TextInput style={styles.input} placeholder="e.g. Rahul" placeholderTextColor={C.textSubtle} value={splitPerson} onChangeText={setSplitPerson} />
+              <Text style={styles.fieldLabel}>Note</Text>
+              <TextInput style={styles.input} placeholder="e.g. Pizza night" placeholderTextColor={C.textSubtle} value={splitDesc} onChangeText={setSplitDesc} />
+              <TouchableOpacity style={styles.saveBtn} onPress={submitSplit} activeOpacity={0.85}>
+                <Text style={styles.saveBtnText}>Split Evenly</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      </SafeAreaView>
+    </View>
+  );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: designTokens.spacing.lg, paddingBottom: 110 },
-  balanceHeader: {
-    alignItems: 'center',
-    marginVertical: designTokens.spacing.md,
+  root: { flex: 1, backgroundColor: C.porcelain },
+  content: { paddingBottom: 120 },
+  title: { fontSize: 27, fontWeight: '700', color: C.ink, letterSpacing: -0.6, paddingHorizontal: 20 },
+  sub: { fontSize: 12, color: C.textMuted, paddingHorizontal: 20, marginTop: 4, marginBottom: 14 },
+  budgetCard: { marginHorizontal: 20, marginBottom: 14, padding: 18 },
+  budgetTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+  budgetTotal: { fontSize: 32, fontWeight: '700', color: '#FFFFFF', letterSpacing: -0.8, marginTop: 4 },
+  budgetCycle: { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.55)', letterSpacing: 0.8, marginTop: 4 },
+  editBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7,
   },
-  balanceLabel: {
-    ...designTokens.typography.label,
-    letterSpacing: 1,
+  editText: { fontSize: 11, fontWeight: '700', color: '#FFFFFF', letterSpacing: 0.6 },
+  barBg: { height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.14)', marginBottom: 12, overflow: 'hidden' },
+  barFill: { height: 8, borderRadius: 4 },
+  budgetRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  budgetStat: { fontSize: 12.5, color: 'rgba(255,255,255,0.65)' },
+  budgetStatBold: { fontWeight: '700', color: '#FFFFFF' },
+  budgetPct: { fontSize: 12.5, fontWeight: '700', color: '#FFFFFF', marginLeft: 'auto' },
+  actionRow: { flexDirection: 'row', paddingHorizontal: 20, gap: 10, marginBottom: 12 },
+  actionBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: C.hairline, borderRadius: 14, paddingVertical: 13,
   },
-  balanceNumber: {
-    ...designTokens.typography.displayNumber,
-    fontSize: 36,
-    color: '#60A5FA',
-    marginVertical: 4,
-  },
-  balanceSub: {
-    ...designTokens.typography.micro,
-    color: designTokens.colors.textSecondary,
-  },
-  budgetCard: {
-    marginBottom: designTokens.spacing.md,
-  },
-  budgetRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: designTokens.spacing.sm,
-  },
-  budgetLabel: { ...designTokens.typography.cardTitle, fontSize: 14 },
-  budgetRatio: { ...designTokens.typography.cardTitle, fontSize: 14, color: '#FFFFFF' },
-  budgetTotal: { color: designTokens.colors.textMuted },
-  progressTrack: {
-    height: 7,
-    backgroundColor: designTokens.colors.surfaceSubtle,
-    borderRadius: 3.5,
-    overflow: 'hidden',
-    marginBottom: designTokens.spacing.xs,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: designTokens.colors.primary,
-    borderRadius: 3.5,
-  },
-  progressSubtext: { ...designTokens.typography.micro, color: designTokens.colors.textSecondary },
-  quickEntryCard: {
-    marginBottom: designTokens.spacing.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.3)',
-  },
-  quickEntryTitle: { ...designTokens.typography.label, marginBottom: designTokens.spacing.sm },
-  quickEntryRow: {
-    flexDirection: 'row',
-    gap: designTokens.spacing.sm,
-  },
+  actionText: { fontSize: 12, fontWeight: '700', color: C.ink },
+  quickRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, marginBottom: 8 },
   quickInput: {
-    flex: 1,
-    backgroundColor: designTokens.colors.surfaceElevated,
-    borderRadius: designTokens.radii.md,
-    paddingHorizontal: designTokens.spacing.md,
-    paddingVertical: designTokens.spacing.sm + 2,
-    color: designTokens.colors.textPrimary,
-    fontSize: 13,
-    borderWidth: 1,
-    borderColor: designTokens.colors.surfaceBorder,
+    flex: 1, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: C.hairline,
+    borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, fontSize: 13.5, color: C.ink,
   },
-  quickAddBtn: {
-    backgroundColor: designTokens.colors.primary,
-    paddingHorizontal: designTokens.spacing.lg,
-    justifyContent: 'center',
-    borderRadius: designTokens.radii.md,
+  quickGo: { width: 46, height: 46, borderRadius: 23, backgroundColor: C.obsidian, alignItems: 'center', justifyContent: 'center' },
+  previewRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 20, marginBottom: 8,
+    backgroundColor: C.eucalyptusFaint, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#A7F3D0',
   },
-  quickAddText: { ...designTokens.typography.cardTitle, fontSize: 13, color: '#FFFFFF' },
-  previewBox: {
-    marginTop: designTokens.spacing.md,
-    backgroundColor: '#FAF7F2',
-    borderRadius: designTokens.radii.md,
-    padding: designTokens.spacing.md,
-    borderWidth: 1,
-    borderColor: 'rgba(117, 167, 165, 0.25)',
+  previewText: { fontSize: 14, fontWeight: '700', color: C.ink },
+  previewCat: { fontSize: 11, color: C.eucalyptus, fontWeight: '700', marginTop: 2 },
+  previewYes: { backgroundColor: C.eucalyptus, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8 },
+  previewYesText: { fontSize: 12.5, fontWeight: '700', color: '#FFFFFF' },
+  sectionHead: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, marginBottom: 10, marginTop: 10,
   },
-  previewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  previewTitle: { ...designTokens.typography.cardTitle, fontSize: 13 },
-  previewAmount: { ...designTokens.typography.cardTitle, fontSize: 16, color: designTokens.colors.success },
-  previewDesc: { ...designTokens.typography.body, marginTop: 2, marginBottom: designTokens.spacing.sm },
-  previewActions: {
-    flexDirection: 'row',
-    gap: designTokens.spacing.sm,
-  },
-  editBtn: {
-    flex: 1,
-    backgroundColor: designTokens.colors.surfaceSubtle,
-    paddingVertical: 6,
-    borderRadius: designTokens.radii.sm,
-    alignItems: 'center',
-  },
-  editBtnText: { ...designTokens.typography.micro, color: designTokens.colors.textSecondary, fontWeight: '700' },
-  confirmBtn: {
-    flex: 2,
-    backgroundColor: designTokens.colors.primary,
-    paddingVertical: 6,
-    borderRadius: designTokens.radii.sm,
-    alignItems: 'center',
-  },
-  confirmBtnText: { ...designTokens.typography.micro, color: '#FFFFFF', fontWeight: '800' },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: designTokens.spacing.sm,
-  },
-  sectionTitle: { ...designTokens.typography.sectionTitle, fontSize: 15 },
-  splitBillBtn: {
-    backgroundColor: designTokens.colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: designTokens.spacing.md,
-    paddingVertical: designTokens.spacing.xs + 2,
-    borderRadius: designTokens.radii.pill,
-  },
-  splitBillText: { ...designTokens.typography.micro, color: '#FFFFFF', fontWeight: '700' },
-  debtsRow: { flexDirection: 'row', marginBottom: designTokens.spacing.sm },
-  debtListCard: { marginBottom: designTokens.spacing.md, padding: designTokens.spacing.md },
-  debtItemRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: designTokens.spacing.xs + 3,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(41, 51, 50, 0.06)',
-  },
-  debtPerson: { ...designTokens.typography.cardTitle, fontSize: 13 },
-  debtNotes: { ...designTokens.typography.micro, color: designTokens.colors.textMuted },
-  debtRight: { alignItems: 'flex-end', gap: 4 },
-  debtAmount: { ...designTokens.typography.cardTitle, fontSize: 14 },
-  textSuccess: { color: designTokens.colors.primaryDark },
-  textDanger: { color: designTokens.colors.accentPeachDot },
-  settleBtn: {
-    backgroundColor: designTokens.colors.primarySoft,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: designTokens.radii.pill,
-  },
-  settleText: { ...designTokens.typography.micro, color: designTokens.colors.primaryDeep, fontWeight: '700' },
-  breakdownCard: {
-    marginTop: designTokens.spacing.sm,
-    gap: designTokens.spacing.md,
-  },
-  categoryRow: { gap: 4 },
-  catLabelRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  catName: { ...designTokens.typography.bodyMedium, fontSize: 12 },
-  catAmount: { ...designTokens.typography.micro, color: designTokens.colors.textSecondary },
-  catBarTrack: {
-    height: 5,
-    backgroundColor: '#E6E0D4',
-    borderRadius: 2.5,
-    overflow: 'hidden',
-  },
-  catBarFill: {
-    height: '100%',
-    backgroundColor: designTokens.colors.primary,
-    borderRadius: 2.5,
-  },
-  txList: {
-    marginTop: designTokens.spacing.sm,
-    gap: designTokens.spacing.sm,
-  },
-  txCard: {
-    padding: designTokens.spacing.md,
-  },
+  sectionTitle: { fontSize: 17, fontWeight: '700', color: C.ink, letterSpacing: -0.3 },
+  catCard: { marginHorizontal: 20, marginBottom: 4 },
+  catRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9 },
+  catIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  catMain: { flex: 1 },
+  catTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  catName: { fontSize: 13.5, fontWeight: '600', color: C.ink },
+  catAmt: { fontSize: 13.5, fontWeight: '700', color: C.ink },
+  catBarBg: { height: 6, borderRadius: 3, backgroundColor: '#F1F1F4', overflow: 'hidden' },
+  catBarFill: { height: 6, borderRadius: 3 },
+  catPct: { fontSize: 11.5, fontWeight: '700', color: C.textMuted, width: 36, textAlign: 'right' },
   txRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: C.hairline,
+    padding: 13, marginHorizontal: 20, marginBottom: 8,
   },
-  txLeft: { flex: 1 },
-  txDesc: { ...designTokens.typography.cardTitle, fontSize: 13 },
-  txCat: { ...designTokens.typography.micro, color: designTokens.colors.textMuted, marginTop: 2 },
-  txRight: { flexDirection: 'row', alignItems: 'center', gap: designTokens.spacing.md },
-  txAmount: { ...designTokens.typography.cardTitle, fontSize: 14, color: designTokens.colors.textPrimary },
-  txDelete: { color: designTokens.colors.textMuted, fontSize: 14, padding: 4 },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(35, 45, 43, 0.45)',
-    justifyContent: 'flex-end',
+  taskMain: { flex: 1 },
+  taskTitle: { fontSize: 14.5, fontWeight: '600', color: C.ink },
+  taskDesc: { fontSize: 11.5, color: C.textMuted, marginTop: 2 },
+  txAmt: { fontSize: 14, fontWeight: '700', color: C.ink },
+  emptyText: { fontSize: 13, color: C.textMuted, textAlign: 'center', paddingVertical: 8 },
+  debtRow: { flexDirection: 'row', paddingHorizontal: 20, gap: 10, marginBottom: 8 },
+  debtCard: { flex: 1 },
+  debtAmt: { fontSize: 22, fontWeight: '700', letterSpacing: -0.4, marginTop: 6 },
+  debtIcon: {
+    width: 38, height: 38, borderRadius: 19, backgroundColor: C.porcelain,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.hairline,
   },
-  modalSheet: {
-    backgroundColor: '#FAF7F2',
-    borderTopLeftRadius: designTokens.radii.xl,
-    borderTopRightRadius: designTokens.radii.xl,
-    padding: designTokens.spacing.xl,
-    paddingBottom: 36,
-    gap: designTokens.spacing.md,
+  settleBtn: { backgroundColor: C.obsidian, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
+  settleText: { fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
+  sheetOverlay: { flex: 1, backgroundColor: 'rgba(17,24,39,0.35)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 36, maxHeight: '92%' },
+  sheetLabel: { marginBottom: 12 },
+  fieldLabel: { fontSize: 11, fontWeight: '700', color: C.textSecondary, letterSpacing: 0.6, marginBottom: 6, marginTop: 10, textTransform: 'uppercase' },
+  input: {
+    backgroundColor: C.porcelain, borderWidth: 1, borderColor: C.hairline, borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, color: C.ink,
   },
-  modalTitle: { ...designTokens.typography.sectionTitle, fontSize: 18, marginBottom: designTokens.spacing.xs },
-  modalInput: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: designTokens.radii.md,
-    paddingHorizontal: designTokens.spacing.md,
-    paddingVertical: designTokens.spacing.md,
-    color: designTokens.colors.textPrimary,
-    fontSize: 13,
-    borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.10)',
+  prioRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  prioPill: {
+    alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12,
+    backgroundColor: C.porcelain, borderWidth: 1, borderColor: C.hairline,
   },
-  modalActionRow: {
-    flexDirection: 'row',
-    gap: designTokens.spacing.md,
-    marginTop: designTokens.spacing.sm,
-  },
-  modalCancelBtn: {
-    flex: 1,
-    backgroundColor: designTokens.colors.surfaceSubtle,
-    paddingVertical: designTokens.spacing.md,
-    borderRadius: designTokens.radii.md,
-    alignItems: 'center',
-  },
-  modalCancelText: { ...designTokens.typography.cardTitle, fontSize: 13, color: designTokens.colors.textSecondary },
-  modalSaveBtn: {
-    flex: 1,
-    backgroundColor: designTokens.colors.primary,
-    paddingVertical: designTokens.spacing.md,
-    borderRadius: designTokens.radii.md,
-    alignItems: 'center',
-  },
-  modalSaveText: { ...designTokens.typography.cardTitle, fontSize: 13, color: '#FFFFFF' },
-
-  // Gemini Bill Scanner Styles
-  scanBillBanner: {
-    backgroundColor: '#324846',
-    borderRadius: designTokens.radii.card,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: designTokens.spacing.lg,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-  },
-  scanBillLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-    paddingRight: 8,
-  },
-  scanBillIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scanBillTextCol: {
-    flex: 1,
-  },
-  scanBillTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 2,
-  },
-  scanBillSub: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#D4E2DF',
-  },
-  scanBillBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: designTokens.radii.pill,
-  },
-  scanBillBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-  scannedResultCard: {
-    padding: 16,
-    marginBottom: designTokens.spacing.lg,
-    borderRadius: designTokens.radii.card,
-  },
-  scannedHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  scannedMerchant: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: designTokens.colors.textPrimary,
-  },
-  scannedSummary: {
-    fontSize: 12,
-    color: designTokens.colors.textSecondary,
-    marginTop: 2,
-  },
-  scannedCloseBtn: {
-    padding: 4,
-  },
-  scannedItemsTable: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: designTokens.radii.md,
-    padding: 10,
-    marginBottom: 10,
-    gap: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.08)',
-  },
-  scannedItemRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  scannedItemName: {
-    fontSize: 13,
-    color: designTokens.colors.textPrimary,
-    fontWeight: '500',
-    flex: 1,
-  },
-  scannedItemPrice: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: designTokens.colors.primaryDark,
-  },
-  scannedTotalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 6,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(41, 51, 50, 0.1)',
-    marginBottom: 8,
-  },
-  scannedTotalLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: designTokens.colors.textPrimary,
-  },
-  scannedTotalValue: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: designTokens.colors.primaryDark,
-  },
-  scannedSuccessBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#DCFCE7',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: designTokens.radii.pill,
-  },
-  scannedSuccessText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#15803D',
-  },
-  emptyCard: {
-    alignItems: 'center',
-    paddingVertical: 24,
-    paddingHorizontal: 16,
-    borderRadius: designTokens.radii.card,
-    marginTop: 6,
-  },
-  emptyTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: designTokens.colors.textPrimary,
-    marginBottom: 4,
-  },
-  emptySub: {
-    fontSize: 12,
-    color: designTokens.colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
+  prioPillActive: { backgroundColor: C.obsidian, borderColor: C.obsidian },
+  prioText: { fontSize: 11.5, fontWeight: '700', color: C.textSecondary },
+  prioTextActive: { color: '#FFFFFF' },
+  saveBtn: { backgroundColor: C.obsidian, borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 20 },
+  saveBtnText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
 });

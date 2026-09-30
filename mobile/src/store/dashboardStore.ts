@@ -63,6 +63,11 @@ interface DashboardState {
   updateTaskPriority: (taskId: string, priority: Task['priority']) => void;
   completeTask: (taskId: string) => void;
   deleteTask: (taskId: string) => void;
+  updateTask: (taskId: string, updates: Partial<Task>) => void;
+
+  addClass: (c: Partial<ClassSession>) => Promise<void>;
+  updateClass: (classId: string, updates: Partial<ClassSession>) => void;
+  deleteClass: (classId: string) => void;
 
   addExpense: (expense: Expense) => Promise<void>;
   deleteExpense: (expenseId: string) => void;
@@ -79,6 +84,9 @@ interface DashboardState {
 
   avatarUrl: string | null;
   setAvatarUrl: (avatarUrl: string | null) => void;
+
+  quietHours: boolean;
+  setQuietHours: (enabled: boolean) => void;
 
   aiMode: 'AUTO' | 'OFFLINE' | 'CLOUD';
   activeOfflineModel: string;
@@ -130,6 +138,9 @@ export const useDashboardStore = create<DashboardState>()(
       updateAcademics: (cgpa, credits) => set({ cgpa, credits }),
       avatarUrl: null,
       setAvatarUrl: (avatarUrl) => set({ avatarUrl }),
+
+      quietHours: true,
+      setQuietHours: (quietHours) => set({ quietHours }),
 
       aiMode: 'AUTO',
       activeOfflineModel: '',
@@ -308,6 +319,39 @@ export const useDashboardStore = create<DashboardState>()(
           tasks: s.tasks.filter((t) => t.id !== taskId),
         }));
         apiClient.deleteTask(taskId).catch(() => null);
+      },
+
+      updateTask: (taskId, updates) => {
+        set((s) => ({
+          tasks: s.tasks.map((t) => (t.id === taskId ? { ...t, ...updates } : t)),
+        }));
+        apiClient.updateTask(taskId, updates).catch(() => null);
+      },
+
+      addClass: async (c) => {
+        const newClass = { id: String(Date.now()), ...c } as ClassSession;
+        set((s) => ({
+          classes: [...s.classes.filter((x) => x.id !== newClass.id), newClass],
+        }));
+        try {
+          await apiClient.saveTimetableClasses(get().classes);
+        } catch {
+          /* offline: stays local, syncs on next syncWithBackend */
+        }
+      },
+
+      updateClass: (classId, updates) => {
+        set((s) => ({
+          classes: s.classes.map((c) => (c.id === classId ? { ...c, ...updates } : c)),
+        }));
+        apiClient.saveTimetableClasses(get().classes).catch(() => null);
+      },
+
+      deleteClass: (classId) => {
+        set((s) => ({
+          classes: s.classes.filter((c) => c.id !== classId),
+        }));
+        apiClient.deleteClass(classId).catch(() => null);
       },
 
       addExpense: async (expense) => {
@@ -599,6 +643,7 @@ export const useDashboardStore = create<DashboardState>()(
         cgpa: state.cgpa,
         credits: state.credits,
         avatarUrl: state.avatarUrl,
+        quietHours: state.quietHours,
         aiMode: state.aiMode,
         downloadedModels: state.downloadedModels,
         activeOfflineModel: state.activeOfflineModel,

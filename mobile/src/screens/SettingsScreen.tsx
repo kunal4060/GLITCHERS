@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Modal, TextInput, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { designTokens } from '../theme/designTokens';
-import { GradientBackground } from '../components/common/GradientBackground';
-import { NinjaAvatar } from '../components/NinjaAvatar';
 import { useAuthStore } from '../store/authStore';
 import { useDashboardStore } from '../store/dashboardStore';
-import { apiClient } from '../api/client';
+import { NiaHeader, LabelCaps, StatusPill } from '../components/nia';
+import { initials } from '../utils/niaFormat';
+
+const C = designTokens.colors;
 
 interface SettingsScreenProps {
   onRestartOnboarding?: () => void;
@@ -16,19 +18,31 @@ interface SettingsScreenProps {
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboarding, navigation }) => {
   const { user, logout } = useAuthStore();
-  const { cgpa, credits, setCgpa, setCredits, avatarUrl, setAvatarUrl, syncWithBackend } = useDashboardStore();
+  const {
+    cgpa,
+    credits,
+    setCgpa,
+    setCredits,
+    avatarUrl,
+    setAvatarUrl,
+    syncWithBackend,
+    quietHours,
+    setQuietHours,
+  } = useDashboardStore();
 
-  const [semester, setSemester] = useState('FALL SEMESTER 2026-27');
-  const [quietHoursEnabled, setQuietHoursEnabled] = useState(true);
+  const [semester, setSemester] = useState('SEMESTER 5');
   const [floatingAssistantEnabled, setFloatingAssistantEnabled] = useState(true);
+  const [voiceReplies, setVoiceReplies] = useState(false);
+  const [proactiveTips, setProactiveTips] = useState(true);
+  const [chatStyle, setChatStyle] = useState<'concise' | 'detailed'>('concise');
   const [syncing, setSyncing] = useState(false);
 
-  // Edit Modal State
   const [modalVisible, setModalVisible] = useState(false);
   const [editType, setEditType] = useState<'CGPA' | 'CREDITS'>('CGPA');
   const [editValue, setEditValue] = useState('');
 
   const studentName = user?.fullName || 'Student User';
+  const studentId = (user as any)?.studentId || (user as any)?.rollNumber || 'NEXA-STUDENT';
 
   const handlePickImageFromGallery = async () => {
     try {
@@ -37,26 +51,24 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
         Alert.alert('Permission Required', 'Please grant access to your photo library to pick a profile picture.');
         return;
       }
-
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.85,
       });
-
-      if (!result.canceled && result.assets && result.assets[0]) {
+      if (!result.canceled && result.assets?.[0]) {
         setAvatarUrl(result.assets[0].uri);
-        Alert.alert('Profile Updated', 'Your profile picture has been updated from your gallery!');
+        Alert.alert('Profile Updated', 'Your profile picture has been updated.');
       }
-    } catch (err) {
+    } catch {
       Alert.alert('Error', 'Could not open photo gallery.');
     }
   };
 
   const handleResetAvatar = () => {
     setAvatarUrl(null);
-    Alert.alert('Avatar Reset', 'Restored to default avatar character.');
+    Alert.alert('Avatar Reset', 'Restored to your initials avatar.');
   };
 
   const handleOpenEditCgpa = () => {
@@ -93,9 +105,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
 
   const handleChangeSemester = () => {
     Alert.alert('Change Semester', 'Select active academic semester:', [
-      { text: 'FALL 2026-27', onPress: () => setSemester('FALL SEMESTER 2026-27') },
-      { text: 'WINTER 2026-27', onPress: () => setSemester('WINTER SEMESTER 2026-27') },
-      { text: 'SUMMER 2027', onPress: () => setSemester('SUMMER SEMESTER 2027') },
+      { text: 'Semester 3', onPress: () => setSemester('SEMESTER 3') },
+      { text: 'Semester 4', onPress: () => setSemester('SEMESTER 4') },
+      { text: 'Semester 5', onPress: () => setSemester('SEMESTER 5') },
+      { text: 'Semester 6', onPress: () => setSemester('SEMESTER 6') },
       { text: 'Cancel', style: 'cancel' },
     ]);
   };
@@ -104,7 +117,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
     setSyncing(true);
     try {
       await syncWithBackend();
-      Alert.alert('Synced', 'All timetable sessions, tasks, and finances are synchronized with cloud backend!');
+      Alert.alert('Synced', 'All timetable sessions, tasks, and finances are synchronized with the cloud backend!');
     } catch {
       Alert.alert('Local Sync', 'Synced with local cache.');
     } finally {
@@ -112,183 +125,215 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
     }
   };
 
+  const handleLogout = () => {
+    Alert.alert('Log Out', 'Are you sure you want to log out of your student account?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Log Out', style: 'destructive', onPress: () => logout() },
+    ]);
+  };
+
+  const Row = ({ icon, label, onPress, danger, right }: { icon: string; label: string; onPress?: () => void; danger?: boolean; right?: React.ReactNode }) => (
+    <TouchableOpacity style={styles.menuRow} onPress={onPress} activeOpacity={0.7} disabled={!onPress && !right}>
+      <View style={styles.menuLeft}>
+        <View style={[styles.menuIcon, danger && { backgroundColor: C.terracottaSoft }]}>
+          <Ionicons name={icon as any} size={17} color={danger ? C.terracotta : C.obsidian} />
+        </View>
+        <Text style={[styles.menuLabel, danger && { color: C.terracotta }]}>{label}</Text>
+      </View>
+      {right || (onPress && <Ionicons name="chevron-forward" size={16} color={C.textSubtle} />)}
+    </TouchableOpacity>
+  );
+
   return (
-    <GradientBackground>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        {/* Title */}
-        <Text style={styles.screenTitle}>Account</Text>
+    <View style={styles.root}>
+      <SafeAreaView style={styles.root} edges={['top']}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+          <NiaHeader title="Account" navigation={navigation} />
 
-        {/* Ninja Hero Profile Section */}
-        <View style={styles.heroSection}>
-          <NinjaAvatar
-            size="large"
-            cgpa={cgpa}
-            credits={credits}
-            showBadges={true}
-            customImageUri={avatarUrl}
-            onPressAvatar={handlePickImageFromGallery}
-            onPressCgpa={handleOpenEditCgpa}
-            onPressCredits={handleOpenEditCredits}
-          />
-
-          <Text style={styles.studentName}>{studentName}</Text>
-
-          {/* Change Photo / Gallery Action Button */}
-          <View style={styles.photoActionRow}>
-            <TouchableOpacity style={styles.changePhotoBtn} onPress={handlePickImageFromGallery} activeOpacity={0.8}>
-              <Ionicons name="images-outline" size={15} color={designTokens.colors.primaryDark} />
-              <Text style={styles.changePhotoBtnText}>
-                {avatarUrl ? 'Change from Gallery' : 'Upload Photo from Gallery'}
-              </Text>
-            </TouchableOpacity>
-
-            {avatarUrl ? (
-              <TouchableOpacity style={styles.resetPhotoBtn} onPress={handleResetAvatar} activeOpacity={0.7}>
-                <Ionicons name="refresh-outline" size={14} color="#B91C1C" />
-                <Text style={styles.resetPhotoBtnText}>Reset</Text>
+          {/* Cover / identity banner */}
+          <View style={styles.cover}>
+            <View style={styles.avatarWrap}>
+              {avatarUrl ? (
+                <Image source={{ uri: avatarUrl }} style={styles.avatarImg} />
+              ) : (
+                <View style={styles.avatarInit}>
+                  <Text style={styles.avatarInitText}>{initials(studentName)}</Text>
+                </View>
+              )}
+              <TouchableOpacity style={styles.avatarEdit} onPress={handlePickImageFromGallery} activeOpacity={0.8}>
+                <Ionicons name="pencil" size={12} color="#FFFFFF" />
               </TouchableOpacity>
+            </View>
+            <Text style={styles.name}>{studentName}</Text>
+            <Text style={styles.idLine}>{studentId} • NEXA ACADEMIC</Text>
+            <Text style={styles.courseLine}>
+              {[user?.course || 'B.Tech CSE', user?.university || 'VIT-AP'].filter(Boolean).join(' • ')}
+            </Text>
+            <View style={styles.metaRow}>
+              <StatusPill label={semester} tone="neutral" />
+              <StatusPill label={proactiveTips ? 'NIA Tips On' : 'NIA Tips Off'} tone={proactiveTips ? 'success' : 'neutral'} />
+            </View>
+          </View>
+
+          {/* Academic profile */}
+          <View style={styles.sectionHead}>
+            <Text style={styles.sectionTitle}>Academic Profile</Text>
+            <LabelCaps>Synced</LabelCaps>
+          </View>
+          <View style={styles.card}>
+            <Row icon="school-outline" label={`CGPA: ${cgpa}`} onPress={handleOpenEditCgpa}
+              right={<Text style={styles.editLink}>EDIT</Text>} />
+            <View style={styles.divider} />
+            <Row icon="ribbon-outline" label={`Total Credits: ${credits}`} onPress={handleOpenEditCredits}
+              right={<Text style={styles.editLink}>EDIT</Text>} />
+            <View style={styles.divider} />
+            <Row icon="calendar-outline" label={`Semester: ${semester}`} onPress={handleChangeSemester}
+              right={<Ionicons name="chevron-down" size={16} color={C.textSubtle} />} />
+            <View style={styles.divider} />
+            <Row
+              icon="images-outline"
+              label={avatarUrl ? 'Change Profile Picture' : 'Upload Profile Picture'}
+              onPress={handlePickImageFromGallery}
+              right={avatarUrl ? (
+                <TouchableOpacity onPress={handleResetAvatar} activeOpacity={0.7}>
+                  <Text style={[styles.editLink, { color: C.terracotta }]}>RESET</Text>
+                </TouchableOpacity>
+              ) : undefined}
+            />
+          </View>
+
+          {/* AI preferences */}
+          <View style={styles.sectionHead}>
+            <Text style={styles.sectionTitle}>AI Preferences</Text>
+            <LabelCaps>NIA</LabelCaps>
+          </View>
+          <View style={styles.card}>
+            <Row
+              icon="chatbubble-ellipses-outline"
+              label="Chat Style"
+              right={
+                <View style={styles.segment}>
+                  {(['concise', 'detailed'] as const).map((s) => (
+                    <TouchableOpacity
+                      key={s}
+                      style={[styles.segBtn, chatStyle === s && styles.segBtnActive]}
+                      onPress={() => setChatStyle(s)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.segText, chatStyle === s && styles.segTextActive]}>
+                        {s === 'concise' ? 'Concise' : 'Detailed'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              }
+            />
+            <View style={styles.divider} />
+            <Row
+              icon="volume-medium-outline"
+              label="Voice Replies"
+              right={
+                <Switch value={voiceReplies} onValueChange={setVoiceReplies}
+                  trackColor={{ false: '#E4E4EA', true: C.eucalyptus }} thumbColor="#FFFFFF" />
+              }
+            />
+            <View style={styles.divider} />
+            <Row
+              icon="sparkles-outline"
+              label="Proactive Tips"
+              right={
+                <Switch value={proactiveTips} onValueChange={setProactiveTips}
+                  trackColor={{ false: '#E4E4EA', true: C.eucalyptus }} thumbColor="#FFFFFF" />
+              }
+            />
+          </View>
+
+          {/* Notifications */}
+          <View style={styles.sectionHead}>
+            <Text style={styles.sectionTitle}>Notifications</Text>
+            <LabelCaps>In-app</LabelCaps>
+          </View>
+          <View style={styles.card}>
+            <Row
+              icon="moon-outline"
+              label="Quiet Hours"
+              right={
+                <Switch value={quietHours} onValueChange={setQuietHours}
+                  trackColor={{ false: '#E4E4EA', true: C.eucalyptus }} thumbColor="#FFFFFF" />
+              }
+            />
+            <Text style={styles.rowHint}>
+              {quietHours
+                ? 'On — non-critical notices are muted between 11 PM and 7 AM.'
+                : 'Off — notices arrive as usual, day and night.'}
+            </Text>
+            <View style={styles.divider} />
+            <Row icon="notifications-outline" label="All Notifications" onPress={() => navigation?.navigate('Alerts')} />
+            <View style={styles.divider} />
+            <Row
+              icon="sync-outline"
+              label="Sync with Backend"
+              onPress={handleSyncNow}
+              right={syncing ? undefined : <Text style={styles.editLink}>SYNC</Text>}
+            />
+          </View>
+
+          {/* Device */}
+          <View style={styles.sectionHead}>
+            <Text style={styles.sectionTitle}>Device</Text>
+            <LabelCaps>Controls</LabelCaps>
+          </View>
+          <View style={styles.card}>
+            <Row
+              icon="sparkle-outline"
+              label="Floating AI Assistant"
+              right={
+                <Switch value={floatingAssistantEnabled} onValueChange={setFloatingAssistantEnabled}
+                  trackColor={{ false: '#E4E4EA', true: C.eucalyptus }} thumbColor="#FFFFFF" />
+              }
+            />
+            <Text style={styles.rowHint}>Quick-access NIA bubble that floats over the app.</Text>
+          </View>
+
+          {/* Account actions */}
+          <View style={styles.sectionHead}>
+            <Text style={styles.sectionTitle}>Account</Text>
+            <LabelCaps>Support</LabelCaps>
+          </View>
+          <View style={styles.card}>
+            <Row
+              icon="shield-checkmark-outline"
+              label="Privacy Policy"
+              onPress={() => navigation?.navigate('Privacy')}
+            />
+            <View style={styles.divider} />
+            <Row
+              icon="mail-outline"
+              label="Contact Support"
+              onPress={() => Alert.alert('Contact Support', 'Write to us at support@nexa.app and the team will respond within 24 hours.')}
+            />
+            {onRestartOnboarding ? (
+              <>
+                <View style={styles.divider} />
+                <Row icon="refresh-outline" label="Replay Onboarding" onPress={onRestartOnboarding} />
+              </>
             ) : null}
+            <View style={styles.divider} />
+            <Row icon="log-out-outline" label="Log Out" onPress={handleLogout} danger />
           </View>
 
-          {/* Academic Edit Bar */}
-          <View style={styles.academicChipsRow}>
-            <TouchableOpacity style={styles.academicChip} onPress={handleOpenEditCgpa} activeOpacity={0.7}>
-              <Ionicons name="school-outline" size={14} color={designTokens.colors.primaryDark} />
-              <Text style={styles.academicChipLabel}>CGPA: <Text style={styles.academicChipValue}>{cgpa}</Text> ✎</Text>
-            </TouchableOpacity>
+          <View style={{ height: 16 }} />
+        </ScrollView>
+      </SafeAreaView>
 
-            <TouchableOpacity style={styles.academicChip} onPress={handleOpenEditCredits} activeOpacity={0.7}>
-              <Ionicons name="ribbon-outline" size={14} color={designTokens.colors.primaryDark} />
-              <Text style={styles.academicChipLabel}>Credits: <Text style={styles.academicChipValue}>{credits}</Text> ✎</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Semester Pill */}
-          <View style={styles.semesterPill}>
-            <Text style={styles.semesterText}>{semester}</Text>
-          </View>
-
-          {/* Change Semester Link */}
-          <TouchableOpacity onPress={handleChangeSemester}>
-            <Text style={styles.changeSemesterText}>Change semester</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Account Navigation Group */}
-        <Text style={styles.sectionHeader}>Account</Text>
-        <View style={styles.menuCard}>
-          <TouchableOpacity
-            style={styles.menuRow}
-            onPress={() => Alert.alert(
-              'Student Profile',
-              `Name: ${studentName}\nEmail: ${user?.email || 'student@university.edu'}\nCourse: ${user?.course || 'Computer Science'}\nUniversity: ${user?.university || 'University'}\nYear / Semester: Year ${user?.year || 3}, Sem ${user?.semester || 6}`
-            )}
-          >
-            <View style={styles.menuLeft}>
-              <Ionicons name="person-outline" size={18} color={designTokens.colors.primaryDark} style={styles.menuIcon} />
-              <Text style={styles.menuLabel}>Profile</Text>
-            </View>
-            <Text style={styles.chevron}>›</Text>
-          </TouchableOpacity>
-
-          <View style={styles.divider} />
-
-          <TouchableOpacity
-            style={styles.menuRow}
-            onPress={() => navigation?.navigate ? navigation.navigate('Privacy') : Alert.alert('Manage Credentials', 'Google OAuth & Supabase authentication keys active.')}
-          >
-            <View style={styles.menuLeft}>
-              <Ionicons name="shield-checkmark-outline" size={18} color={designTokens.colors.primaryDark} style={styles.menuIcon} />
-              <Text style={styles.menuLabel}>Manage Credentials</Text>
-            </View>
-            <Text style={styles.chevron}>›</Text>
-          </TouchableOpacity>
-
-          <View style={styles.divider} />
-
-          <TouchableOpacity style={styles.menuRow} onPress={handleSyncNow}>
-            <View style={styles.menuLeft}>
-              <Ionicons name="sync-outline" size={18} color={designTokens.colors.primaryDark} style={styles.menuIcon} />
-              <Text style={styles.menuLabel}>Sync with Cloud</Text>
-            </View>
-            <Text style={styles.chevron}>›</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Device & Life Controls Group */}
-        <Text style={styles.sectionHeader}>Preferences & Device</Text>
-        <View style={styles.menuCard}>
-          <View style={styles.toggleRow}>
-            <View style={{ flex: 1, paddingRight: 10 }}>
-              <Text style={styles.toggleTitle}>Quiet Hours Mode</Text>
-              <Text style={styles.toggleSub}>Mute non-critical notices from 11 PM to 7 AM</Text>
-            </View>
-            <Switch
-              value={quietHoursEnabled}
-              onValueChange={setQuietHoursEnabled}
-              trackColor={{ false: '#E6E0D4', true: designTokens.colors.primary }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.toggleRow}>
-            <View style={{ flex: 1, paddingRight: 10 }}>
-              <Text style={styles.toggleTitle}>Floating AI Assistant (NIA)</Text>
-              <Text style={styles.toggleSub}>Quick-access NIA floating gem over other apps</Text>
-            </View>
-            <Switch
-              value={floatingAssistantEnabled}
-              onValueChange={setFloatingAssistantEnabled}
-              trackColor={{ false: '#E6E0D4', true: designTokens.colors.primary }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-        </View>
-
-        {/* Replay Onboarding */}
-        {onRestartOnboarding && (
-          <TouchableOpacity style={styles.restartBtn} onPress={onRestartOnboarding} activeOpacity={0.82}>
-            <Ionicons name="refresh-outline" size={16} color={designTokens.colors.primaryDark} style={{ marginRight: 6 }} />
-            <Text style={styles.restartBtnText}>Re-open Onboarding Setup</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Log Out */}
-        <TouchableOpacity
-          style={styles.logoutBtn}
-          onPress={() => {
-            Alert.alert('Log Out', 'Are you sure you want to log out of your student account?', [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Log Out', style: 'destructive', onPress: () => logout() },
-            ]);
-          }}
-          activeOpacity={0.82}
-        >
-          <Ionicons name="log-out-outline" size={16} color="#C25E4A" style={{ marginRight: 6 }} />
-          <Text style={styles.logoutBtnText}>Log Out</Text>
-        </TouchableOpacity>
-      </ScrollView>
-
-      {/* Edit CGPA / Credits Modal */}
-      <Modal
-        visible={modalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setModalVisible(false)}
-      >
+      {/* Edit CGPA / Credits modal */}
+      <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>
-              {editType === 'CGPA' ? 'Edit CGPA' : 'Edit Credits'}
+            <Text style={styles.modalTitle}>{editType === 'CGPA' ? 'Edit CGPA' : 'Edit Credits'}</Text>
+            <Text style={styles.modalSub}>
+              {editType === 'CGPA' ? 'Enter your current cumulative GPA (0.00 – 10.00)' : 'Enter your total completed academic credits'}
             </Text>
-            <Text style={styles.modalSubtitle}>
-              {editType === 'CGPA'
-                ? 'Enter your current cumulative GPA (0.00 – 10.00)'
-                : 'Enter your total completed academic credits'}
-            </Text>
-
             <TextInput
               style={styles.modalInput}
               value={editValue}
@@ -296,304 +341,86 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
               keyboardType="decimal-pad"
               autoFocus
               placeholder={editType === 'CGPA' ? '8.71' : '42'}
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={C.textSubtle}
             />
-
             <View style={styles.modalBtnRow}>
-              <TouchableOpacity
-                style={styles.modalCancelBtn}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={styles.modalCancelBtnText}>Cancel</Text>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setModalVisible(false)} activeOpacity={0.8}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.modalSaveBtn}
-                onPress={handleSaveAcademics}
-              >
-                <Text style={styles.modalSaveBtnText}>Save</Text>
+              <TouchableOpacity style={styles.modalSave} onPress={handleSaveAcademics} activeOpacity={0.85}>
+                <Text style={styles.modalSaveText}>Save</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-    </GradientBackground>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: 'transparent',
+  root: { flex: 1, backgroundColor: C.porcelain },
+  content: { paddingBottom: 120 },
+  cover: { alignItems: 'center', paddingVertical: 18, paddingHorizontal: 20, marginBottom: 8 },
+  avatarWrap: { position: 'relative', marginBottom: 12 },
+  avatarImg: { width: 84, height: 84, borderRadius: 42 },
+  avatarInit: {
+    width: 84, height: 84, borderRadius: 42, backgroundColor: C.obsidian,
+    alignItems: 'center', justifyContent: 'center',
   },
-  content: {
-    padding: designTokens.spacing.lg,
-    paddingBottom: 110,
+  avatarInitText: { fontSize: 30, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.5 },
+  avatarEdit: {
+    position: 'absolute', right: -2, bottom: -2, width: 28, height: 28, borderRadius: 14,
+    backgroundColor: C.eucalyptus, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2.5, borderColor: C.porcelain,
   },
-  screenTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: designTokens.colors.textPrimary,
-    marginBottom: 10,
+  name: { fontSize: 21, fontWeight: '700', color: C.ink, letterSpacing: -0.4 },
+  idLine: { fontSize: 11, fontWeight: '600', color: C.textMuted, letterSpacing: 1.2, marginTop: 5 },
+  courseLine: { fontSize: 12.5, color: C.textSecondary, marginTop: 4 },
+  metaRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  sectionHead: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, marginBottom: 10, marginTop: 14,
   },
-  heroSection: {
-    alignItems: 'center',
-    paddingVertical: 16,
-    marginBottom: 12,
-  },
-  studentName: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: designTokens.colors.textPrimary,
-    marginTop: 14,
-    textAlign: 'center',
-    letterSpacing: 0.5,
-  },
-  photoActionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 10,
-    marginBottom: 2,
-  },
-  changePhotoBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#FAF7F2',
-    borderWidth: 1,
-    borderColor: 'rgba(117, 167, 165, 0.4)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: designTokens.radii.pill,
-  },
-  changePhotoBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: designTokens.colors.primaryDark,
-  },
-  resetPhotoBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: designTokens.radii.pill,
-  },
-  resetPhotoBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#B91C1C',
-  },
-  academicChipsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 12,
-  },
-  academicChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#FAF7F2',
-    borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.12)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: designTokens.radii.pill,
-  },
-  academicChipLabel: {
-    fontSize: 12,
-    color: designTokens.colors.textSecondary,
-    fontWeight: '600',
-  },
-  academicChipValue: {
-    fontSize: 13,
-    color: designTokens.colors.primaryDark,
-    fontWeight: '800',
-  },
-  semesterPill: {
-    backgroundColor: designTokens.colors.primarySoft,
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: designTokens.radii.pill,
-    marginTop: 10,
-  },
-  semesterText: {
-    color: designTokens.colors.primaryDeep,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  changeSemesterText: {
-    color: designTokens.colors.primaryDark,
-    fontSize: 13,
-    fontWeight: '600',
-    marginTop: 10,
-  },
-  sectionHeader: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: designTokens.colors.textPrimary,
-    letterSpacing: 0.5,
-    marginBottom: 8,
-    marginTop: 8,
-  },
-  menuCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: designTokens.radii.card,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.06)',
-    marginBottom: 16,
-    ...designTokens.shadows.card,
+  sectionTitle: { fontSize: 17, fontWeight: '700', color: C.ink, letterSpacing: -0.3 },
+  card: {
+    backgroundColor: '#FFFFFF', borderRadius: 20, borderWidth: 1, borderColor: C.hairline,
+    marginHorizontal: 20, paddingHorizontal: 6, paddingVertical: 4,
+    shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04,
+    shadowRadius: 10, elevation: 2,
   },
   menuRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 12, paddingVertical: 13,
   },
-  menuLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
+  menuLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   menuIcon: {
-    width: 22,
-    textAlign: 'center',
+    width: 36, height: 36, borderRadius: 18, backgroundColor: C.porcelain,
+    borderWidth: 1, borderColor: C.hairline, alignItems: 'center', justifyContent: 'center',
   },
-  menuLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: designTokens.colors.textPrimary,
-  },
-  chevron: {
-    fontSize: 18,
-    color: designTokens.colors.textMuted,
-    fontWeight: '400',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(41, 51, 50, 0.06)',
-    marginLeft: 50,
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  toggleTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: designTokens.colors.textPrimary,
-  },
-  toggleSub: {
-    fontSize: 11,
-    color: designTokens.colors.textSecondary,
-    marginTop: 2,
-  },
-  restartBtn: {
-    backgroundColor: '#FAF7F2',
-    paddingVertical: 14,
-    borderRadius: designTokens.radii.pill,
-    alignItems: 'center',
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.08)',
-  },
-  restartBtnText: {
-    color: designTokens.colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(30, 41, 39, 0.55)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  modalCard: {
-    width: '100%',
-    maxWidth: 360,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.08)',
-    ...designTokens.shadows.card,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: designTokens.colors.textPrimary,
-    marginBottom: 6,
-  },
-  modalSubtitle: {
-    fontSize: 13,
-    color: designTokens.colors.textSecondary,
-    marginBottom: 18,
-    lineHeight: 18,
-  },
+  menuLabel: { fontSize: 14.5, fontWeight: '600', color: C.ink, flex: 1 },
+  editLink: { fontSize: 11, fontWeight: '700', color: C.eucalyptus, letterSpacing: 0.8 },
+  divider: { height: 1, backgroundColor: C.hairline, marginHorizontal: 12 },
+  rowHint: { fontSize: 11.5, color: C.textMuted, lineHeight: 16, paddingHorizontal: 12, paddingBottom: 12, marginTop: -6 },
+  segment: { flexDirection: 'row', backgroundColor: C.porcelain, borderRadius: 999, padding: 3, borderWidth: 1, borderColor: C.hairline },
+  segBtn: { paddingHorizontal: 13, paddingVertical: 7, borderRadius: 999 },
+  segBtnActive: { backgroundColor: C.obsidian },
+  segText: { fontSize: 11.5, fontWeight: '700', color: C.textSecondary },
+  segTextActive: { color: '#FFFFFF' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(17,24,39,0.4)', alignItems: 'center', justifyContent: 'center', padding: 28 },
+  modalCard: { backgroundColor: '#FFFFFF', borderRadius: 22, padding: 22, width: '100%' },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: C.ink, marginBottom: 6 },
+  modalSub: { fontSize: 12.5, color: C.textSecondary, marginBottom: 14, lineHeight: 18 },
   modalInput: {
-    backgroundColor: '#F8F6F2',
-    borderWidth: 1.5,
-    borderColor: designTokens.colors.primary,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 18,
-    fontWeight: '700',
-    color: designTokens.colors.textPrimary,
-    marginBottom: 20,
+    backgroundColor: C.porcelain, borderWidth: 1, borderColor: C.hairline, borderRadius: 12,
+    paddingHorizontal: 16, paddingVertical: 13, fontSize: 17, fontWeight: '600', color: C.ink,
   },
-  modalBtnRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
+  modalBtnRow: { flexDirection: 'row', gap: 10, marginTop: 18 },
+  modalCancel: {
+    flex: 1, alignItems: 'center', paddingVertical: 13, borderRadius: 12,
+    backgroundColor: C.porcelain, borderWidth: 1, borderColor: C.hairline,
   },
-  modalCancelBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  modalCancelBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: designTokens.colors.textSecondary,
-  },
-  modalSaveBtn: {
-    backgroundColor: designTokens.colors.primaryDark,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  modalSaveBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  logoutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FAF7F2',
-    borderWidth: 1,
-    borderColor: '#ECE6DC',
-    borderRadius: 16,
-    paddingVertical: 14,
-    marginTop: 12,
-    marginBottom: 20,
-  },
-  logoutBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#C25E4A',
-  },
+  modalCancelText: { fontSize: 14, fontWeight: '700', color: C.textSecondary },
+  modalSave: { flex: 1, alignItems: 'center', paddingVertical: 13, borderRadius: 12, backgroundColor: C.obsidian },
+  modalSaveText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
 });

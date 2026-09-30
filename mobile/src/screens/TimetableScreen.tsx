@@ -1,706 +1,451 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Alert, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as ImagePicker from 'expo-image-picker';
-import { designTokens } from '../theme/designTokens';
-import { GlassCard } from '../components/common/GlassCard';
-import { StatusBadge } from '../components/common/StatusBadge';
-import { GradientBackground } from '../components/common/GradientBackground';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { designTokens } from '../theme/designTokens';
 import { useDashboardStore } from '../store/dashboardStore';
-import { useAuthStore } from '../store/authStore';
-import type { ClassSession } from '@glitchers/shared';
-import { getClassStatus } from '../utils/timetableTimeUtils';
 import { apiClient } from '../api/client';
+import { parseTimeToMinutes, formatTime12h } from '../utils/timetableTimeUtils';
+import { NiaHeader, LabelCaps, StatusPill, NiaCard } from '../components/nia';
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const C = designTokens.colors;
 
-const getTodayDayName = () => {
-  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const today = dayNames[new Date().getDay()];
-  return today;
-};
+const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
-export const TimetableScreen: React.FC = () => {
-  const { classes, setClasses } = useDashboardStore();
-  const [selectedDay, setSelectedDay] = useState<string>(getTodayDayName);
-  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
-  const [isScanModalVisible, setIsScanModalVisible] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
-  const [newSubject, setNewSubject] = useState('');
-  const [newRoom, setNewRoom] = useState('');
-  const [newTime, setNewTime] = useState('14:00 - 15:00');
-  const [newFaculty, setNewFaculty] = useState('');
+type ClassDay = 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY';
+const FULL_DAYS: ClassDay[] = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
 
-  const dayUpper = selectedDay.toUpperCase();
-  const dayClasses = classes.filter((c) => c.day === dayUpper);
+export const TimetableScreen = ({ navigation }: { navigation?: any }) => {
+  const { classes, addClass, updateClass, deleteClass } = useDashboardStore();
 
-  const processTimetableAsset = async (asset: ImagePicker.ImagePickerAsset) => {
-    setIsScanModalVisible(false);
-    setIsScanning(true);
-    try {
-      let base64 = asset.base64;
-      const mimeType = asset.mimeType || 'image/jpeg';
+  const [selectedDay, setSelectedDay] = useState(() => {
+    const idx = new Date().getDay(); // 0=Sun
+    return DAYS[(idx + 6) % 7]; // MON-first
+  });
+  const [fabOpen, setFabOpen] = useState(false);
+  const [addVisible, setAddVisible] = useState(false);
+  const [editingClass, setEditingClass] = useState<any>(null);
+  const [subjectName, setSubjectName] = useState('');
+  const [faculty, setFaculty] = useState('');
+  const [room, setRoom] = useState('');
+  const [day, setDay] = useState<ClassDay>('MONDAY');
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [importing, setImporting] = useState(false);
 
-      if (!base64 && asset.uri) {
-        try {
-          const res = await fetch(asset.uri);
-          const blob = await res.blob();
-          base64 = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-              const str = reader.result as string;
-              resolve(str.replace(/^data:[^;]+;base64,/, ''));
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-          });
-        } catch (readErr) {
-          console.warn('Could not read asset uri as blob:', readErr);
-        }
-      }
+  const now = new Date();
+  const curMinutes = now.getHours() * 60 + now.getMinutes();
+  const dayClasses = classes
+    .filter((c) => c.day.toUpperCase().slice(0, 3) === selectedDay && !c.isCancelled)
+    .sort((a, b) => parseTimeToMinutes(a.startTime) - parseTimeToMinutes(b.startTime));
 
-      if (!base64) {
-        setIsScanning(false);
-        Alert.alert('Scan Notice', 'Could not read image file. Please try again.');
-        return;
-      }
+  const isToday = selectedDay === DAYS[(new Date().getDay() + 6) % 7];
 
-      const result = await apiClient.analyzeTimetableImage(base64, mimeType);
-      setIsScanning(false);
-
-      if (result && result.classes && result.classes.length > 0) {
-        const currentUserId = useAuthStore.getState().user?.id || 'offline-user';
-        const incoming = result.classes.map((c: any, idx: number) => ({
-          ...c,
-          id: String(Date.now() + idx),
-          userId: currentUserId,
-          isCancelled: false,
-        }));
-
-        setClasses(incoming);
-        // Persist to backend database as well
-        apiClient.saveTimetableClasses(incoming).catch((e) => console.warn('Sync classes failed:', e));
-
-        const firstDay = incoming[0]?.day;
-        if (firstDay) {
-          const matchedDay = DAYS.find((d) => d.toUpperCase() === firstDay.toUpperCase());
-          if (matchedDay) setSelectedDay(matchedDay);
-        }
-
-        Alert.alert(
-          'Timetable Imported! 🎉',
-          `Successfully extracted ${incoming.length} classes using AI Vision OCR.`
-        );
-      } else {
-        Alert.alert('Scan Notice', 'Could not detect courses in this photo. Please ensure good lighting and legible text.');
-      }
-    } catch (err: any) {
-      setIsScanning(false);
-      console.warn('Timetable scan error:', err);
-      Alert.alert('Scan Notice', err?.message || 'Failed to process timetable image.');
-    }
+  const resetForm = () => {
+    setSubjectName('');
+    setFaculty('');
+    setRoom('');
+    setDay('MONDAY');
+    setStartTime('');
+    setEndTime('');
+    setEditingClass(null);
   };
 
-  const handlePickGallery = async () => {
-    try {
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) {
-        Alert.alert('Permission Required', 'Please grant photo library access to upload a timetable.');
-        return;
-      }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        base64: true,
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        await processTimetableAsset(result.assets[0]);
-      }
-    } catch (e: any) {
-      Alert.alert('Gallery Error', e?.message || 'Could not open photo library.');
-    }
+  const openEdit = (c: any) => {
+    setEditingClass(c);
+    setSubjectName(c.subjectName || '');
+    setFaculty(c.faculty || '');
+    setRoom(c.room || '');
+    setDay((c.day as ClassDay) || 'MONDAY');
+    setStartTime(c.startTime?.slice(0, 5) || '');
+    setEndTime(c.endTime?.slice(0, 5) || '');
+    setAddVisible(true);
   };
 
-  const handleTakePhoto = async () => {
-    try {
-      const perm = await ImagePicker.requestCameraPermissionsAsync();
-      if (!perm.granted) {
-        Alert.alert('Permission Required', 'Please grant camera access to take a timetable photo.');
-        return;
-      }
-      const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: false,
-        base64: true,
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        await processTimetableAsset(result.assets[0]);
-      }
-    } catch (e: any) {
-      Alert.alert('Camera Error', e?.message || 'Could not open camera.');
-    }
-  };
-
-  const handleAddClass = () => {
-    if (!newSubject.trim()) {
-      Alert.alert('Error', 'Please enter a course name');
+  const saveClass = () => {
+    if (!subjectName.trim()) {
+      Alert.alert('Missing subject', 'Please enter a subject name.');
       return;
     }
-    const [start = '14:00', end = '15:00'] = newTime.split('-').map((s) => s.trim());
-    const currentUserId = useAuthStore.getState().user?.id || 'offline-user';
-    const newSession: ClassSession = {
-      id: String(Date.now()),
-      userId: currentUserId,
-      subjectName: newSubject.trim(),
-      day: dayUpper as any,
-      startTime: start,
-      endTime: end,
-      room: newRoom.trim() || 'AB1-101',
-      faculty: newFaculty.trim() || 'Faculty',
-      classType: 'LECTURE',
-      isCancelled: false,
-    };
-    setClasses([...classes, newSession]);
-    setNewSubject('');
-    setNewRoom('');
-    setNewFaculty('');
-    setIsAddModalVisible(false);
-    Alert.alert('Class Added', `${newSession.subjectName} added to ${selectedDay}'s schedule.`);
+    if (!startTime || !endTime) {
+      Alert.alert('Missing time', 'Please enter start and end times (HH:MM).');
+      return;
+    }
+    if (editingClass) {
+      updateClass(editingClass.id, { subjectName, faculty, room, day, startTime, endTime });
+      Alert.alert('Updated', 'Class updated.');
+    } else {
+      addClass({ subjectName, faculty, room, day, startTime, endTime });
+      Alert.alert('Added', `${subjectName} added to your timetable.`);
+    }
+    resetForm();
+    setAddVisible(false);
   };
 
-  const handleDeleteClass = (id: string, name: string) => {
-    Alert.alert('Delete Class', `Remove ${name} from schedule?`, [
+  const confirmDelete = (c: any) => {
+    Alert.alert('Delete class', `Remove ${c.subjectName}?`, [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          setClasses(classes.filter((c) => c.id !== id));
-          apiClient.deleteClass(id).catch(() => null);
-        },
-      },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteClass(c.id) },
     ]);
   };
 
+  const handleAIImport = async () => {
+    if (!aiPrompt.trim()) {
+      Alert.alert('Empty prompt', 'Paste your timetable text first.');
+      return;
+    }
+    setImporting(true);
+    try {
+      const res = await apiClient.sendAIChat(
+        `Parse this timetable text into classes. Return JSON array of objects with fields: subjectName, faculty, room, day (full name like Monday), startTime (HH:MM 24h), endTime (HH:MM 24h). Only return the JSON array, nothing else.\n\n${aiPrompt}`
+      );
+      const text = res?.message || '';
+      const match = text.match(/\[[\s\S]*\]/);
+      if (match) {
+        const parsed = JSON.parse(match[0]);
+        let added = 0;
+        for (const p of parsed) {
+          if (p.subjectName && p.startTime && p.endTime) {
+            const rawDay = String(p.day || 'MONDAY').toUpperCase();
+            const dayEnum: ClassDay = (FULL_DAYS as string[]).includes(rawDay)
+              ? (rawDay as ClassDay)
+              : 'MONDAY';
+            addClass({
+              subjectName: String(p.subjectName),
+              faculty: String(p.faculty || ''),
+              room: String(p.room || ''),
+              day: dayEnum,
+              startTime: String(p.startTime),
+              endTime: String(p.endTime),
+            });
+            added++;
+          }
+        }
+        Alert.alert('Import complete', `Added ${added} ${added === 1 ? 'class' : 'classes'} from your timetable.`);
+        setAiPrompt('');
+      } else {
+        Alert.alert('Could not parse', 'NIA could not understand that format. Try adding classes manually.');
+      }
+    } catch (e) {
+      Alert.alert('Import failed', 'Check your connection and try again.');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const statusFor = (c: any): 'done' | 'now' | 'upcoming' => {
+    if (!isToday) return 'upcoming';
+    const s = parseTimeToMinutes(c.startTime);
+    const e = parseTimeToMinutes(c.endTime);
+    if (curMinutes >= s && curMinutes < e) return 'now';
+    if (curMinutes >= e) return 'done';
+    return 'upcoming';
+  };
+
   return (
-    <GradientBackground>
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-        <View style={styles.container}>
-        {/* Top Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.headerTitle}>Timetable</Text>
-            <Text style={styles.headerSubtitle}>
-              {dayClasses.length === 0 ? `Day is Off on ${selectedDay}` : `${dayClasses.length} ${dayClasses.length === 1 ? 'class' : 'classes'} on ${selectedDay}`}
-            </Text>
-          </View>
+    <View style={styles.root}>
+      <SafeAreaView style={styles.root} edges={['top']}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+          <NiaHeader title="Schedule" navigation={navigation} />
 
-          <View style={styles.headerRightButtons}>
-            <TouchableOpacity
-              style={styles.scanBtn}
-              onPress={() => setIsScanModalVisible(true)}
-              disabled={isScanning}
-            >
-              {isScanning ? (
-                <ActivityIndicator size="small" color={designTokens.colors.primaryDeep} />
-              ) : (
-                <Ionicons name="scan-outline" size={15} color={designTokens.colors.primaryDeep} />
-              )}
-              <Text style={styles.scanBtnText}>{isScanning ? 'Scanning...' : 'Scan'}</Text>
-            </TouchableOpacity>
+          <Text style={styles.title}>Class Schedule</Text>
+          <Text style={styles.sub}>{now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</Text>
 
-            <TouchableOpacity
-              style={styles.addBtn}
-              onPress={() => setIsAddModalVisible(true)}
-            >
-              <Ionicons name="add" size={16} color="#FFFFFF" />
-              <Text style={styles.addBtnText}>Add</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Real-time scanning feedback banner */}
-        {isScanning && (
-          <View style={styles.scanningBanner}>
-            <ActivityIndicator size="small" color="#FFFFFF" />
-            <Text style={styles.scanningBannerText}>Analyzing timetable photo with AI Vision OCR...</Text>
-          </View>
-        )}
-
-        {/* Monday - Saturday Tabs */}
-        <View style={styles.dayTabsWrapper}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.dayTabsContent}
-          >
-            {DAYS.map((day) => {
-              const isActive = day === selectedDay;
+          {/* Week strip */}
+          <View style={styles.weekStrip}>
+            {DAYS.map((d) => {
+              const active = d === selectedDay;
+              const isCur = d === DAYS[(new Date().getDay() + 6) % 7];
+              const count = classes.filter((c) => c.day.toUpperCase().slice(0, 3) === d && !c.isCancelled).length;
               return (
                 <TouchableOpacity
-                  key={day}
-                  style={[styles.dayTab, isActive && styles.dayTabActive]}
-                  onPress={() => setSelectedDay(day)}
+                  key={d}
+                  style={[styles.dayCell, active && styles.dayCellActive]}
+                  onPress={() => setSelectedDay(d)}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Show ${d} classes`}
                 >
-                  <Text style={[styles.dayTabText, isActive && styles.dayTabTextActive]}>
-                    {day}
-                  </Text>
+                  <Text style={[styles.dayLabel, active && styles.dayLabelActive]}>{d}</Text>
+                  {isCur && <View style={[styles.todayDot, active && { backgroundColor: '#FFFFFF' }]} />}
+                  <Text style={[styles.dayCount, active && styles.dayCountActive]}>{count}</Text>
                 </TouchableOpacity>
               );
             })}
-          </ScrollView>
-        </View>
+          </View>
 
-        {/* Class Schedule List */}
-        <ScrollView contentContainerStyle={styles.scheduleList}>
+          {/* Import toggle */}
+          <View style={styles.importRow}>
+            <LabelCaps>{importing ? 'NIA is reading your timetable…' : 'Add classes'}</LabelCaps>
+            <TouchableOpacity onPress={() => navigation?.navigate('Attendance')} activeOpacity={0.7}>
+              <Text style={styles.linkText}>ATTENDANCE</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.aiRow}>
+            <TextInput
+              style={styles.aiInput}
+              placeholder="Paste timetable text → NIA adds the classes"
+              placeholderTextColor={C.textSubtle}
+              value={aiPrompt}
+              onChangeText={setAiPrompt}
+              multiline
+            />
+            <TouchableOpacity
+              style={styles.aiBtn}
+              onPress={handleAIImport}
+              disabled={importing}
+              activeOpacity={0.8}
+            >
+              {importing ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons name="sparkles" size={18} color="#FFFFFF" />
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {/* Timeline */}
+          <View style={styles.timelineHead}>
+            <Text style={styles.timelineTitle}>
+              {selectedDay === DAYS[(new Date().getDay() + 6) % 7] ? "Today's" : `${selectedDay}'s`} Classes
+            </Text>
+            <StatusPill label={`${dayClasses.length} scheduled`} tone="neutral" />
+          </View>
+
           {dayClasses.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Ionicons name="sunny-outline" size={36} color={designTokens.colors.primaryDark} style={{ marginBottom: 8 }} />
-              <Text style={styles.emptyTitle}>Day is Off • {selectedDay}</Text>
-              <Text style={styles.emptySub}>No classes scheduled for {selectedDay}. Enjoy your free time, recharge, or catch up on project work.</Text>
-            </View>
+            <NiaCard>
+              <Text style={styles.emptyText}>No classes scheduled. Add one below.</Text>
+            </NiaCard>
           ) : (
-            dayClasses.map((item, index) => {
-              // Real-time live status calculation
-              const now = new Date();
-              const live = getClassStatus(item, now);
-              const statusBadge =
-                live.status === 'DIFFERENT_DAY' ? (
-                  <StatusBadge label="Scheduled" variant="safe" />
-                ) : (
-                  <StatusBadge label={live.label} variant={live.badgeVariant} />
-                );
-
+            dayClasses.map((c) => {
+              const st = statusFor(c);
+              const active = st === 'now';
+              const tint = active ? C.obsidian : '#FFFFFF';
               return (
-                <GlassCard key={item.id} style={styles.classCard}>
-                  <View style={styles.cardHeader}>
-                    <View style={styles.timeBlock}>
-                      <Ionicons name="time-outline" size={13} color="#60A5FA" />
-                      <Text style={styles.timeStart}>{item.startTime}</Text>
-                      <Text style={styles.timeDivider}>–</Text>
-                      <Text style={styles.timeEnd}>{item.endTime}</Text>
-                    </View>
-
-                    <View style={styles.cardHeaderRight}>
-                      <View style={styles.typeBadge}>
-                        <Text style={styles.typeBadgeText}>{item.classType || 'LECTURE'}</Text>
-                      </View>
-                      {statusBadge}
-                    </View>
+                <View key={c.id} style={styles.cardRow}>
+                  <View style={styles.timeCol}>
+                    <Text style={[styles.timeText, active && { color: C.eucalyptus }]}>
+                      {c.startTime?.slice(0, 5)}
+                    </Text>
+                    <Text style={styles.timeEnd}>{c.endTime?.slice(0, 5)}</Text>
                   </View>
-
-                <Text style={styles.subjectName}>{item.subjectName}</Text>
-
-                <View style={styles.metaRow}>
-                  <View style={styles.metaItem}>
-                    <Ionicons name="location-outline" size={13} color="#38BDF8" />
-                    <Text style={styles.metaText}>{item.room || 'Room TBD'}</Text>
+                  <View style={styles.railCol}>
+                    <View style={[styles.railDot, active && { backgroundColor: C.eucalyptus }]} />
+                    <View style={styles.railLine} />
                   </View>
-                  <View style={styles.metaDivider} />
-                  <View style={styles.metaItem}>
-                    <Ionicons name="person-outline" size={13} color="#94A3B8" />
-                    <Text style={styles.metaText}>{item.faculty || 'Faculty'}</Text>
-                  </View>
-
                   <TouchableOpacity
-                    style={styles.deleteIconBtn}
-                    onPress={() => handleDeleteClass(item.id, item.subjectName)}
+                    style={{ flex: 1 }}
+                    onPress={() => openEdit(c)}
+                    onLongPress={() => confirmDelete(c)}
+                    activeOpacity={0.85}
                   >
-                    <Ionicons name="trash-outline" size={14} color="#64748B" />
+                    <NiaCard dark={active} style={[styles.classCard, st === 'done' && { opacity: 0.6 }]}>
+                      <View style={styles.classTop}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.classCode, active && { color: '#FFFFFF' }]}>
+                            {c.subjectName.split(' ')[0].toUpperCase().slice(0, 8)} · {formatTime12h(c.startTime)}
+                          </Text>
+                          <Text style={[styles.className, active && { color: '#FFFFFF' }]} numberOfLines={1}>
+                            {c.subjectName}
+                          </Text>
+                        </View>
+                        {active && <StatusPill label="Now" tone="success" />}
+                        {st === 'done' && <StatusPill label="Done" tone="neutral" />}
+                      </View>
+                      <View style={styles.classMeta}>
+                        {!!c.room && (
+                          <View style={styles.metaChip}>
+                            <Ionicons name="location-outline" size={13} color={active ? 'rgba(255,255,255,0.7)' : C.textMuted} />
+                            <Text style={[styles.metaText, active && { color: 'rgba(255,255,255,0.8)' }]}>Room {c.room}</Text>
+                          </View>
+                        )}
+                        {!!c.faculty && (
+                          <View style={styles.metaChip}>
+                            <Ionicons name="person-outline" size={13} color={active ? 'rgba(255,255,255,0.7)' : C.textMuted} />
+                            <Text style={[styles.metaText, active && { color: 'rgba(255,255,255,0.8)' }]} numberOfLines={1}>{c.faculty}</Text>
+                          </View>
+                        )}
+                      </View>
+                      <View style={styles.classActions}>
+                        <TouchableOpacity
+                          style={[styles.miniBtn, active && { backgroundColor: 'rgba(255,255,255,0.14)' }]}
+                          onPress={() => navigation?.navigate('Docs')}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="document-text-outline" size={13} color={active ? '#FFFFFF' : C.eucalyptus} />
+                          <Text style={[styles.miniBtnText, active && { color: '#FFFFFF' }]}>Slides</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.miniBtn, active && { backgroundColor: 'rgba(255,255,255,0.14)' }]}
+                          onPress={() => openEdit(c)}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="pencil-outline" size={13} color={active ? '#FFFFFF' : C.textSecondary} />
+                          <Text style={[styles.miniBtnText, { color: active ? '#FFFFFF' : C.textSecondary }]}>Edit</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.miniBtn, active && { backgroundColor: 'rgba(255,255,255,0.14)' }]}
+                          onPress={() => confirmDelete(c)}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="trash-outline" size={13} color={C.terracotta} />
+                          <Text style={[styles.miniBtnText, { color: C.terracotta }]}>Delete</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </NiaCard>
                   </TouchableOpacity>
                 </View>
-              </GlassCard>
-            );
-          })
-        )}
-      </ScrollView>
+              );
+            })
+          )}
+          <View style={{ height: 8 }} />
+        </ScrollView>
 
-      {/* Add Class Modal */}
-      <Modal visible={isAddModalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <Text style={styles.modalTitle}>Add Class for {selectedDay}</Text>
+        {/* FAB */}
+        <TouchableOpacity style={styles.fab} onPress={() => { resetForm(); setAddVisible(true); }} activeOpacity={0.85}>
+          <Ionicons name="add" size={28} color="#FFFFFF" />
+        </TouchableOpacity>
 
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Course Name (e.g. Compiler Design)"
-              placeholderTextColor="#64748B"
-              value={newSubject}
-              onChangeText={setNewSubject}
-            />
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Time Range (e.g. 14:00 - 15:00)"
-              placeholderTextColor="#64748B"
-              value={newTime}
-              onChangeText={setNewTime}
-            />
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Room Number (e.g. AB1-204)"
-              placeholderTextColor="#64748B"
-              value={newRoom}
-              onChangeText={setNewRoom}
-            />
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Faculty Name (e.g. Dr. K. Sharma)"
-              placeholderTextColor="#64748B"
-              value={newFaculty}
-              onChangeText={setNewFaculty}
-            />
-
-            <View style={styles.modalActionRow}>
-              <TouchableOpacity
-                style={styles.modalCancelBtn}
-                onPress={() => setIsAddModalVisible(false)}
-              >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSaveBtn} onPress={handleAddClass}>
-                <Text style={styles.modalSaveText}>Add Class</Text>
+        {/* Add / edit modal */}
+        <Modal visible={addVisible} transparent animationType="slide" onRequestClose={() => setAddVisible(false)}>
+          <TouchableOpacity style={styles.sheetOverlay} activeOpacity={1} onPress={() => setAddVisible(false)}>
+            <View style={styles.sheet} onStartShouldSetResponder={() => true}>
+              <LabelCaps style={styles.sheetLabel}>{editingClass ? 'Edit Class' : 'Add Class'}</LabelCaps>
+              <Text style={styles.fieldLabel}>Subject</Text>
+              <TextInput style={styles.input} placeholder="e.g. Data Structures" placeholderTextColor={C.textSubtle} value={subjectName} onChangeText={setSubjectName} />
+              <Text style={styles.fieldLabel}>Faculty</Text>
+              <TextInput style={styles.input} placeholder="e.g. Dr. Rao" placeholderTextColor={C.textSubtle} value={faculty} onChangeText={setFaculty} />
+              <Text style={styles.fieldLabel}>Room</Text>
+              <TextInput style={styles.input} placeholder="e.g. 305B" placeholderTextColor={C.textSubtle} value={room} onChangeText={setRoom} />
+              <Text style={styles.fieldLabel}>Day</Text>
+              <View style={styles.dayPickRow}>
+                {FULL_DAYS.map((d) => (
+                  <TouchableOpacity
+                    key={d}
+                    style={[styles.dayPick, day === d && styles.dayPickActive]}
+                    onPress={() => setDay(d)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.dayPickText, day === d && styles.dayPickTextActive]}>{d.slice(0, 3)}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <View style={styles.timeRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.fieldLabel}>Start (HH:MM)</Text>
+                  <TextInput style={styles.input} placeholder="09:00" placeholderTextColor={C.textSubtle} value={startTime} onChangeText={setStartTime} keyboardType="numbers-and-punctuation" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.fieldLabel}>End (HH:MM)</Text>
+                  <TextInput style={styles.input} placeholder="10:30" placeholderTextColor={C.textSubtle} value={endTime} onChangeText={setEndTime} keyboardType="numbers-and-punctuation" />
+                </View>
+              </View>
+              <TouchableOpacity style={styles.saveBtn} onPress={saveClass} activeOpacity={0.85}>
+                <Text style={styles.saveBtnText}>{editingClass ? 'Save Changes' : 'Add Class'}</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Modal: Scan Timetable Options */}
-      <Modal
-        visible={isScanModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setIsScanModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <Text style={styles.modalTitle}>📷 Scan Timetable Schedule</Text>
-            <Text style={styles.scanSubtitle}>
-              Upload a clear photo or screenshot of your college timetable. Our Gemini AI Vision OCR automatically parses class timings, courses, and venues.
-            </Text>
-
-            <TouchableOpacity style={styles.scanOptionCard} onPress={handleTakePhoto}>
-              <View style={styles.scanIconBox}>
-                <Ionicons name="camera" size={24} color={designTokens.colors.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.scanOptionTitle}>Take Photo</Text>
-                <Text style={styles.scanOptionSub}>Use your camera to snap your printed schedule</Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.scanOptionCard} onPress={handlePickGallery}>
-              <View style={styles.scanIconBox}>
-                <Ionicons name="images" size={24} color={designTokens.colors.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.scanOptionTitle}>Choose from Gallery</Text>
-                <Text style={styles.scanOptionSub}>Select screenshot, image, or syllabus table</Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.modalCancelBtn, { marginTop: 4 }]}
-              onPress={() => setIsScanModalVisible(false)}
-            >
-              <Text style={styles.modalCancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      </View>
+          </TouchableOpacity>
+        </Modal>
       </SafeAreaView>
-    </GradientBackground>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'transparent' },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: designTokens.spacing.lg,
-    paddingTop: 8,
-    paddingBottom: designTokens.spacing.md,
+  root: { flex: 1, backgroundColor: C.porcelain },
+  content: { paddingBottom: 120 },
+  title: { fontSize: 27, fontWeight: '700', color: C.ink, letterSpacing: -0.6, paddingHorizontal: 20 },
+  sub: { fontSize: 12, color: C.textMuted, paddingHorizontal: 20, marginTop: 4, marginBottom: 16 },
+  weekStrip: { flexDirection: 'row', paddingHorizontal: 20, gap: 6, marginBottom: 18 },
+  dayCell: {
+    flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 14,
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: C.hairline,
   },
-  headerTitle: {
-    ...designTokens.typography.hero,
-    fontSize: 22,
+  dayCellActive: { backgroundColor: C.obsidian, borderColor: C.obsidian },
+  dayLabel: { fontSize: 10, fontWeight: '700', color: C.textSecondary, letterSpacing: 0.6 },
+  dayLabelActive: { color: '#FFFFFF' },
+  todayDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: C.eucalyptus, marginTop: 3 },
+  dayCount: { fontSize: 11, fontWeight: '600', color: C.textMuted, marginTop: 2 },
+  dayCountActive: { color: 'rgba(255,255,255,0.7)' },
+  importRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, marginBottom: 8,
   },
-  headerSubtitle: {
-    ...designTokens.typography.micro,
-    color: designTokens.colors.textSecondary,
-    marginTop: 2,
+  linkText: { fontSize: 11, fontWeight: '700', color: C.eucalyptus, letterSpacing: 0.8 },
+  aiRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, marginBottom: 18 },
+  aiInput: {
+    flex: 1, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: C.hairline,
+    borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, fontSize: 13.5, color: C.ink, minHeight: 46,
   },
-  headerRightButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  aiBtn: {
+    width: 46, height: 46, borderRadius: 23, backgroundColor: C.obsidian,
+    alignItems: 'center', justifyContent: 'center',
   },
-  scanBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(117, 167, 165, 0.15)',
-    borderWidth: 1,
-    borderColor: designTokens.colors.primary,
-    paddingHorizontal: designTokens.spacing.md,
-    paddingVertical: designTokens.spacing.xs + 2,
-    borderRadius: designTokens.radii.pill,
+  timelineHead: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, marginBottom: 12,
   },
-  scanBtnText: {
-    ...designTokens.typography.cardTitle,
-    fontSize: 12,
-    color: designTokens.colors.primaryDeep,
-    fontWeight: '700',
+  timelineTitle: { fontSize: 17, fontWeight: '700', color: C.ink, letterSpacing: -0.3 },
+  emptyText: { fontSize: 13, color: C.textMuted, textAlign: 'center', paddingVertical: 8 },
+  cardRow: { flexDirection: 'row', paddingHorizontal: 20, marginBottom: 4 },
+  timeCol: { width: 52, paddingTop: 14, alignItems: 'flex-end' },
+  timeText: { fontSize: 12, fontWeight: '700', color: C.ink },
+  timeEnd: { fontSize: 10.5, color: C.textMuted, marginTop: 2 },
+  railCol: { alignItems: 'center', marginHorizontal: 10, paddingTop: 16 },
+  railDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: C.hairline },
+  railLine: { width: 1.5, flex: 1, backgroundColor: C.hairline, marginTop: 4, marginBottom: -4 },
+  classCard: { padding: 14, marginBottom: 10 },
+  classTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 8 },
+  classCode: { fontSize: 10, fontWeight: '700', color: C.textMuted, letterSpacing: 0.8, marginBottom: 3 },
+  className: { fontSize: 16, fontWeight: '700', color: C.ink, letterSpacing: -0.3 },
+  classMeta: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap' },
+  metaChip: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  metaText: { fontSize: 12, color: C.textSecondary, fontWeight: '500' },
+  classActions: { flexDirection: 'row', gap: 8 },
+  miniBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: C.eucalyptusFaint, borderRadius: 999, paddingHorizontal: 11, paddingVertical: 7,
   },
-  addBtn: {
-    backgroundColor: designTokens.colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: designTokens.spacing.md,
-    paddingVertical: designTokens.spacing.xs + 2,
-    borderRadius: designTokens.radii.pill,
+  miniBtnText: { fontSize: 11.5, fontWeight: '700', color: C.eucalyptus },
+  fab: {
+    position: 'absolute', right: 20, bottom: 104,
+    width: 58, height: 58, borderRadius: 29, backgroundColor: C.obsidian,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#0F172A', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25,
+    shadowRadius: 16, elevation: 8,
   },
-  addBtnText: {
-    ...designTokens.typography.cardTitle,
-    fontSize: 12,
-    color: '#FFFFFF',
+  sheetOverlay: { flex: 1, backgroundColor: 'rgba(17,24,39,0.35)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 36, maxHeight: '92%' },
+  sheetLabel: { marginBottom: 12 },
+  fieldLabel: { fontSize: 11, fontWeight: '700', color: C.textSecondary, letterSpacing: 0.6, marginBottom: 6, marginTop: 10, textTransform: 'uppercase' },
+  input: {
+    backgroundColor: C.porcelain, borderWidth: 1, borderColor: C.hairline, borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, color: C.ink,
   },
-  scanningBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: designTokens.colors.primary,
-    marginHorizontal: designTokens.spacing.lg,
-    marginBottom: designTokens.spacing.sm,
-    paddingHorizontal: designTokens.spacing.md,
-    paddingVertical: 8,
-    borderRadius: designTokens.radii.sm,
+  dayPickRow: { flexDirection: 'row', gap: 6 },
+  dayPick: {
+    flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 10,
+    backgroundColor: C.porcelain, borderWidth: 1, borderColor: C.hairline,
   },
-  scanningBannerText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
+  dayPickActive: { backgroundColor: C.obsidian, borderColor: C.obsidian },
+  dayPickText: { fontSize: 11, fontWeight: '700', color: C.textSecondary },
+  dayPickTextActive: { color: '#FFFFFF' },
+  timeRow: { flexDirection: 'row', gap: 10 },
+  saveBtn: {
+    backgroundColor: C.obsidian, borderRadius: 14, paddingVertical: 15,
+    alignItems: 'center', marginTop: 20,
   },
-  scanSubtitle: {
-    ...designTokens.typography.body,
-    fontSize: 12,
-    color: designTokens.colors.textSecondary,
-    marginBottom: designTokens.spacing.xs,
-  },
-  scanOptionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: designTokens.spacing.md,
-    backgroundColor: '#FFFFFF',
-    padding: designTokens.spacing.md,
-    borderRadius: designTokens.radii.card,
-    borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.08)',
-  },
-  scanIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: designTokens.colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scanOptionTitle: {
-    ...designTokens.typography.cardTitle,
-    fontSize: 14,
-    color: designTokens.colors.textPrimary,
-  },
-  scanOptionSub: {
-    ...designTokens.typography.micro,
-    color: designTokens.colors.textSecondary,
-    marginTop: 2,
-  },
-  dayTabsWrapper: {
-    marginBottom: designTokens.spacing.md,
-  },
-  dayTabsContent: {
-    paddingHorizontal: designTokens.spacing.lg,
-    gap: designTokens.spacing.sm,
-    paddingBottom: designTokens.spacing.xs,
-  },
-  dayTab: {
-    paddingHorizontal: designTokens.spacing.md,
-    paddingVertical: designTokens.spacing.xs + 3,
-    borderRadius: designTokens.radii.pill,
-    backgroundColor: '#FAF7F2',
-    borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.08)',
-  },
-  dayTabActive: {
-    backgroundColor: designTokens.colors.primaryPill,
-    borderColor: designTokens.colors.primary,
-  },
-  dayTabText: {
-    ...designTokens.typography.bodyMedium,
-    fontSize: 12,
-    color: designTokens.colors.textSecondary,
-  },
-  dayTabTextActive: {
-    color: designTokens.colors.textPrimary,
-    fontWeight: '700',
-  },
-  scheduleList: {
-    paddingHorizontal: designTokens.spacing.lg,
-    paddingBottom: 100,
-    gap: designTokens.spacing.md,
-  },
-  classCard: {
-    marginBottom: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: designTokens.spacing.sm,
-  },
-  timeBlock: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  timeStart: {
-    ...designTokens.typography.cardTitle,
-    fontSize: 13,
-    color: designTokens.colors.textPrimary,
-  },
-  timeDivider: {
-    color: designTokens.colors.textMuted,
-    fontSize: 12,
-  },
-  timeEnd: {
-    ...designTokens.typography.bodyMedium,
-    fontSize: 12,
-    color: designTokens.colors.textSecondary,
-  },
-  cardHeaderRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: designTokens.spacing.xs,
-  },
-  typeBadge: {
-    backgroundColor: designTokens.colors.primarySoft,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: designTokens.radii.xs,
-  },
-  typeBadgeText: {
-    ...designTokens.typography.micro,
-    color: designTokens.colors.primaryDeep,
-    fontSize: 9,
-    fontWeight: '800',
-  },
-  subjectName: {
-    ...designTokens.typography.hero,
-    fontSize: 17,
-    color: designTokens.colors.textPrimary,
-    marginBottom: designTokens.spacing.md,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: designTokens.spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(41, 51, 50, 0.06)',
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  metaIcon: { fontSize: 12 },
-  metaText: {
-    ...designTokens.typography.bodyMedium,
-    fontSize: 12,
-    color: designTokens.colors.textSecondary,
-  },
-  metaDivider: {
-    width: 1,
-    height: 12,
-    backgroundColor: 'rgba(41, 51, 50, 0.1)',
-    marginHorizontal: designTokens.spacing.md,
-  },
-  deleteIconBtn: {
-    marginLeft: 'auto',
-    padding: 4,
-  },
-  deleteIconText: {
-    color: designTokens.colors.textMuted,
-    fontSize: 13,
-  },
-  emptyCard: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: designTokens.spacing.hero,
-    backgroundColor: '#FFFFFF',
-    borderRadius: designTokens.radii.card,
-    paddingHorizontal: designTokens.spacing.xl,
-    borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.06)',
-    ...designTokens.shadows.card,
-  },
-  emptyIcon: { fontSize: 32, marginBottom: designTokens.spacing.sm },
-  emptyTitle: { ...designTokens.typography.sectionTitle, fontSize: 15, textAlign: 'center' },
-  emptySub: { ...designTokens.typography.body, textAlign: 'center', marginTop: 4 },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(35, 45, 43, 0.45)',
-    justifyContent: 'flex-end',
-  },
-  modalSheet: {
-    backgroundColor: '#FAF7F2',
-    borderTopLeftRadius: designTokens.radii.xl,
-    borderTopRightRadius: designTokens.radii.xl,
-    padding: designTokens.spacing.xl,
-    paddingBottom: 36,
-    gap: designTokens.spacing.md,
-  },
-  modalTitle: { ...designTokens.typography.sectionTitle, fontSize: 18, marginBottom: designTokens.spacing.xs },
-  modalInput: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: designTokens.radii.md,
-    paddingHorizontal: designTokens.spacing.md,
-    paddingVertical: designTokens.spacing.md,
-    color: designTokens.colors.textPrimary,
-    fontSize: 13,
-    borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.10)',
-  },
-  modalActionRow: {
-    flexDirection: 'row',
-    gap: designTokens.spacing.md,
-    marginTop: designTokens.spacing.sm,
-  },
-  modalCancelBtn: {
-    flex: 1,
-    backgroundColor: '#EAE5DB',
-    paddingVertical: designTokens.spacing.md,
-    borderRadius: designTokens.radii.md,
-    alignItems: 'center',
-  },
-  modalCancelText: { ...designTokens.typography.cardTitle, fontSize: 13, color: designTokens.colors.textSecondary },
-  modalSaveBtn: {
-    flex: 1,
-    backgroundColor: designTokens.colors.primary,
-    paddingVertical: designTokens.spacing.md,
-    borderRadius: designTokens.radii.md,
-    alignItems: 'center',
-  },
-  modalSaveText: { ...designTokens.typography.cardTitle, fontSize: 13, color: '#FFFFFF' },
+  saveBtnText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
 });

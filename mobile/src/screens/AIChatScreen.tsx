@@ -5,9 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { designTokens } from '../theme/designTokens';
-import { GlassCard } from '../components/common/GlassCard';
-import { GradientBackground } from '../components/common/GradientBackground';
-import { AIGemSymbol } from '../components/common/AIGemSymbol';
+import { NiaHeader, LabelCaps, StatusPill, NiaCard } from '../components/nia';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useDashboardStore, type LoadedModelFileInfo } from '../store/dashboardStore';
 import { useFloatingStore } from '../store/floatingStore';
@@ -604,1120 +602,620 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
     }
   };
 
-  return (
-    <GradientBackground>
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-        <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <AIGemSymbol size={34} />
-            <View>
-              <Text style={styles.headerTitle}>NIA</Text>
-              <View style={styles.statusRow}>
-                <View style={[styles.onlineDot, aiMode === 'OFFLINE' && { backgroundColor: '#F59E0B' }]} />
-                <Text style={styles.statusText}>
-                  {aiMode === 'OFFLINE' ? '100% Offline (HF Engine)' : 'Nexa Intelligent Assistance'}
-                </Text>
-              </View>
-            </View>
-          </View>
 
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+  const stripEmoji = (s: string) => s.replace(/^[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\s]+/u, '');
+
+  const confirmClear = () => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      if ((window as any).confirm('Clear chat history?')) clearChatMessages();
+    } else {
+      Alert.alert('Clear Chat', 'Do you want to clear your conversation history?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Clear', style: 'destructive', onPress: () => clearChatMessages() },
+      ]);
+    }
+  };
+
+  const modeLabel = aiMode === 'OFFLINE' ? 'Offline (HF)' : aiMode === 'AUTO' ? 'Auto (HF/Cloud)' : 'Gemini Cloud';
+
+  return (
+    <View style={styles.root}>
+      <SafeAreaView style={styles.root} edges={['top']}>
+        <NiaHeader title="NIA AI" navigation={navigation} />
+
+        <View style={styles.titleRow}>
+          <View>
+            <Text style={styles.title}>NIA AI Assistant</Text>
+            <Text style={styles.sub}>
+              {aiMode === 'OFFLINE' ? '100% offline on-device engine' : 'Nexa Intelligent Assistance'}
+            </Text>
+          </View>
+          <View style={styles.titleActions}>
             {chatMessages.length > 0 && (
-              <TouchableOpacity
-                onPress={() => {
-                  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-                    if ((window as any).confirm('Clear chat history?')) clearChatMessages();
-                  } else {
-                    Alert.alert('Clear Chat', 'Do you want to clear your conversation history?', [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Clear', style: 'destructive', onPress: () => clearChatMessages() },
-                    ]);
-                  }
-                }}
-                style={[styles.modelPillBtn, { paddingHorizontal: 8 }]}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons name="trash-outline" size={14} color={designTokens.colors.textSecondary} />
+              <TouchableOpacity onPress={confirmClear} style={styles.iconBtn} activeOpacity={0.7} hitSlop={10}>
+                <Ionicons name="trash-outline" size={16} color={C.textSecondary} />
               </TouchableOpacity>
             )}
-
-            {/* Offline Hugging Face Model Switcher Pill */}
             <TouchableOpacity
-              style={[styles.modelPillBtn, aiMode === 'OFFLINE' && styles.modelPillBtnOffline]}
+              style={[styles.modelPill, aiMode === 'OFFLINE' && styles.modelPillOffline]}
               onPress={() => setModelModalVisible(true)}
-              activeOpacity={0.7}
-              hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+              activeOpacity={0.8}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Ionicons
                 name={aiMode === 'OFFLINE' ? 'flash' : aiMode === 'AUTO' ? 'sync' : 'cloud'}
-                size={14}
-                color={aiMode === 'OFFLINE' ? '#B45309' : designTokens.colors.primaryDark}
+                size={13}
+                color={aiMode === 'OFFLINE' ? '#B45309' : C.eucalyptus}
               />
-              <Text style={[styles.modelPillText, aiMode === 'OFFLINE' && { color: '#B45309' }]}>
-                {aiMode === 'OFFLINE' ? 'Offline (HF)' : aiMode === 'AUTO' ? 'Auto (HF/Cloud)' : 'Gemini Cloud'}
-              </Text>
-              <Ionicons name="chevron-down" size={12} color={designTokens.colors.textSecondary} />
+              <Text style={[styles.modelPillText, aiMode === 'OFFLINE' && { color: '#B45309' }]}>{modeLabel}</Text>
+              <Ionicons name="chevron-down" size={12} color={C.textSecondary} />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Offline Pending Sync Banner */}
+        {/* Offline pending sync banner */}
         {offlineSyncQueue.filter((q) => !q.synced).length > 0 && (
-          <View style={styles.offlineQueueBanner}>
-            <View style={styles.queueBannerLeft}>
+          <View style={styles.queueBanner}>
+            <View style={styles.queueLeft}>
               <Ionicons name="cloud-offline-outline" size={15} color="#B45309" />
-              <Text style={styles.queueBannerText}>
-                {offlineSyncQueue.filter((q) => !q.synced).length} action(s) stored in phone. Will push to dataset when online.
+              <Text style={styles.queueText}>
+                {offlineSyncQueue.filter((q) => !q.synced).length} action(s) stored on this phone. Will push when online.
               </Text>
             </View>
             <TouchableOpacity
-              style={styles.syncQueueBtn}
+              style={styles.queueSyncBtn}
               onPress={async () => {
                 const res = await flushOfflineQueue();
                 Alert.alert('Dataset Synced', `Pushed ${res.syncedCount} offline record(s) to cloud database!`);
               }}
+              activeOpacity={0.8}
             >
-              <Text style={styles.syncQueueBtnText}>Sync Now</Text>
+              <Text style={styles.queueSyncText}>Sync Now</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* Chat Messages Feed or Empty State */}
+        {/* Chat feed / empty state */}
         {messages.length === 0 ? (
-          <ScrollView contentContainerStyle={styles.emptyContainer}>
-            <View style={{ marginBottom: 16 }}>
-              <AIGemSymbol size={64} />
+          <ScrollView contentContainerStyle={styles.emptyWrap} showsVerticalScrollIndicator={false}>
+            <View style={styles.emptyMark}>
+              <Text style={styles.emptyMarkN}>N</Text>
+              <View style={styles.emptyMarkSpark}>
+                <Ionicons name="sparkles" size={12} color={C.eucalyptus} />
+              </View>
             </View>
-            <Text style={styles.emptyTitle}>NIA — Nexa Intelligent Assistance</Text>
-            <Text style={styles.emptyDescription}>
-              Hello! I am NIA, your built-in AI companion for NEXA. Speak or type naturally. I can log your expenses, schedule assignments, split bills, and answer academic questions.
+            <Text style={styles.emptyTitle}>Ask NIA anything</Text>
+            <Text style={styles.emptyDesc}>
+              Your built-in AI companion for NEXA. Speak or type naturally — log expenses, schedule assignments, split bills, or get study help.
             </Text>
 
-            {/* Offline Model Switcher Banner Shortcut */}
             <TouchableOpacity
-              style={styles.offlineEngineBannerBtn}
+              style={styles.engineBanner}
               activeOpacity={0.8}
               onPress={() => setModelModalVisible(true)}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-                <Ionicons name="hardware-chip" size={18} color={aiMode === 'OFFLINE' ? '#B45309' : designTokens.colors.primaryDark} />
-                <View>
-                  <Text style={styles.offlineEngineBannerTitle}>
-                    {aiMode === 'OFFLINE' ? '📴 Running 100% Offline' : '⚡ On-Device AI Models Available'}
-                  </Text>
-                  <Text style={styles.offlineEngineBannerSubtitle}>
-                    {downloadedModels.length === 0
-                      ? 'No models downloaded yet • Tap to download'
-                      : activeOfflineModel
-                      ? `Active: ${activeOfflineModel.split('/')[1] || activeOfflineModel} • Ready offline`
-                      : `${downloadedModels.length} model(s) downloaded • Tap to activate`}
-                  </Text>
-                </View>
+              <View style={styles.engineIcon}>
+                <Ionicons name="hardware-chip-outline" size={18} color={aiMode === 'OFFLINE' ? '#B45309' : C.eucalyptus} />
               </View>
-              <Ionicons name="chevron-forward" size={16} color={designTokens.colors.textSecondary} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.engineTitle}>
+                  {aiMode === 'OFFLINE' ? 'Running 100% Offline' : 'On-Device AI Models Available'}
+                </Text>
+                <Text style={styles.engineSub}>
+                  {downloadedModels.length === 0
+                    ? 'No models downloaded yet • Tap to download'
+                    : activeOfflineModel
+                    ? `Active: ${activeOfflineModel.split('/')[1] || activeOfflineModel} • Ready offline`
+                    : `${downloadedModels.length} model(s) downloaded • Tap to activate`}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={C.textSubtle} />
             </TouchableOpacity>
 
-            <Text style={styles.tryExamplesLabel}>TRY SAYING:</Text>
-          <View style={styles.examplesList}>
-            {getContextChips().map((chip, idx) => (
-              <TouchableOpacity
-                key={idx}
-                style={styles.exampleCard}
-                onPress={() => handleSend(chip.prompt)}
-              >
-                <Text style={styles.exampleText}>{chip.label}</Text>
-                <Text style={styles.exampleArrow}>→</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
-      ) : (
-        <ScrollView
-          ref={scrollRef}
-          style={styles.chatScroll}
-          contentContainerStyle={styles.chatContent}
-        >
-          {messages.map((m) => {
-            const isUser = m.sender === 'user';
-            return (
-              <View
-                key={m.id}
-                style={[styles.messageWrapper, isUser ? styles.msgRight : styles.msgLeft]}
-              >
-                <View style={[styles.bubble, isUser ? styles.userBubble : styles.assistantBubble]}>
-                  {m.imageUri && (
-                    <Image
-                      source={{ uri: m.imageUri }}
-                      style={styles.chatUploadedImage}
-                      resizeMode="cover"
-                    />
-                  )}
-                  <Text style={[styles.bubbleText, isUser ? styles.userBubbleText : styles.assistantBubbleText]}>{m.text}</Text>
-
-                  {/* Visual Action Card */}
-                  {m.actionCard && (
-                    <GlassCard elevated style={styles.actionCard}>
-                      <View style={styles.cardHeaderRow}>
-                        <Text style={styles.cardActionTitle}>{m.actionCard.title}</Text>
-                        {m.actionCard.badge && (
-                          <View style={styles.cardBadge}>
-                            <Text style={styles.cardBadgeText}>{m.actionCard.badge}</Text>
-                          </View>
-                        )}
-                      </View>
-
-                      <Text style={styles.cardSub}>{m.actionCard.subtitle}</Text>
-
-                      <View style={styles.cardValuesRow}>
-                        <Text style={styles.cardPrimaryVal}>{m.actionCard.primaryValue}</Text>
-                        {m.actionCard.secondaryValue && (
-                          <Text style={styles.cardSecondaryVal}>{m.actionCard.secondaryValue}</Text>
-                        )}
-                      </View>
-
-                      {m.actionCard.navigationScreen && (
-                        <TouchableOpacity
-                          style={styles.cardNavBtn}
-                          onPress={() => navigation?.navigate(m.actionCard!.navigationScreen)}
-                        >
-                          <Text style={styles.cardNavBtnText}>
-                            View in {m.actionCard.navigationScreen} →
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    </GlassCard>
-                  )}
-
-                  <Text style={styles.msgTime}>{m.timestamp}</Text>
-                </View>
-              </View>
-            );
-          })}
-
-          {loading && (
-            <View style={[styles.messageWrapper, styles.msgLeft]}>
-              <View style={[styles.bubble, styles.assistantBubble, styles.loadingBubble]}>
-                <ActivityIndicator size="small" color={designTokens.colors.aiSecondary} />
-                <Text style={styles.loadingText}>Analyzing visual & academic context...</Text>
-              </View>
+            <LabelCaps style={styles.tryLabel}>Try saying</LabelCaps>
+            <View style={styles.examplesList}>
+              {getContextChips().map((chip, idx) => (
+                <TouchableOpacity key={idx} style={styles.exampleCard} onPress={() => handleSend(chip.prompt)} activeOpacity={0.85}>
+                  <Text style={styles.exampleText} numberOfLines={1}>{stripEmoji(chip.label)}</Text>
+                  <Ionicons name="arrow-forward" size={14} color={C.eucalyptus} />
+                </TouchableOpacity>
+              ))}
             </View>
-          )}
-        </ScrollView>
-      )}
+          </ScrollView>
+        ) : (
+          <ScrollView ref={scrollRef} style={styles.chatScroll} contentContainerStyle={styles.chatContent} showsVerticalScrollIndicator={false}>
+            {messages.map((m) => {
+              const isUser = m.sender === 'user';
+              return (
+                <View key={m.id} style={[styles.msgWrap, isUser ? styles.msgRight : styles.msgLeft]}>
+                  <View style={[styles.bubble, isUser ? styles.userBubble : styles.assistantBubble]}>
+                    {m.imageUri && (
+                      <Image source={{ uri: m.imageUri }} style={styles.chatImage} resizeMode="cover" />
+                    )}
+                    <Text style={[styles.bubbleText, isUser ? styles.userText : styles.assistantText]}>{m.text}</Text>
 
-      {/* Dynamic Context Prompt Chips */}
-      <View style={styles.chipsBar}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContent}>
-          {getContextChips().map((chip, i) => (
-            <TouchableOpacity
-              key={i}
-              style={styles.chipPill}
-              onPress={() => handleSend(chip.prompt)}
-            >
-              <Text style={styles.chipText}>{chip.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* Input Bar */}
-      <View style={styles.inputBar}>
-        <TouchableOpacity
-          style={styles.attachBtn}
-          onPress={handleUploadPhoto}
-          disabled={loading}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="camera-outline" size={20} color={designTokens.colors.primaryDark} />
-        </TouchableOpacity>
-
-        <TextInput
-          style={styles.input}
-          placeholder="Ask math, problem photo, or study tips..."
-          placeholderTextColor="#64748B"
-          value={input}
-          onChangeText={setInput}
-          onSubmitEditing={() => handleSend()}
-        />
-        <TouchableOpacity
-          style={[styles.sendBtn, !input.trim() && styles.sendBtnDisabled]}
-          onPress={() => handleSend()}
-          disabled={!input.trim() || loading}
-        >
-          <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Hugging Face Offline Model Manager Modal */}
-      <Modal
-        visible={modelModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setModelModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            {/* Modal Header */}
-            <View style={styles.modalHeaderRow}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Ionicons name="hardware-chip-outline" size={22} color={designTokens.colors.primaryDark} />
-                <View>
-                  <Text style={styles.modalTitle}>NIA Offline Engine</Text>
-                  <Text style={styles.modalSubtitle}>Hugging Face On-Device Models</Text>
-                </View>
-              </View>
-              <TouchableOpacity onPress={() => setModelModalVisible(false)} style={styles.modalCloseBtn}>
-                <Ionicons name="close" size={20} color={designTokens.colors.textPrimary} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
-              {/* Connectivity Mode Switcher */}
-              <Text style={styles.modalSectionLabel}>AI EXECUTION MODE</Text>
-              <View style={styles.modeToggleRow}>
-                {(['AUTO', 'OFFLINE', 'CLOUD'] as const).map((mode) => (
-                  <TouchableOpacity
-                    key={mode}
-                    style={[styles.modeToggleBtn, aiMode === mode && styles.modeToggleBtnActive]}
-                    onPress={() => setAiMode(mode)}
-                  >
-                    <Text style={[styles.modeToggleText, aiMode === mode && styles.modeToggleTextActive]}>
-                      {mode === 'AUTO' ? '⚡ Auto Fallback' : mode === 'OFFLINE' ? '📴 100% Offline' : '☁️ Cloud Gemini'}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Local Storage Model Setup */}
-              <Text style={styles.modalSectionLabel}>LOCAL DEVICE STORAGE SETUP</Text>
-              {loadedModelFile ? (
-                <View style={styles.loadedModelBanner}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                    <Ionicons name="folder-open" size={24} color="#16A34A" />
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={styles.loadedModelName} numberOfLines={1}>{loadedModelFile.name}</Text>
-                        <View style={styles.loadedBadge}>
-                          <Text style={styles.loadedBadgeText}>ACTIVE</Text>
-                        </View>
-                      </View>
-                      <Text style={styles.loadedModelSub}>
-                        {loadedModelFile.size > 0 ? `${(loadedModelFile.size / (1024 * 1024)).toFixed(1)} MB • ` : ''}Loaded from Internal Storage
-                      </Text>
-                    </View>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.unloadBtn}
-                    onPress={() => {
-                      setLoadedModelFile(null);
-                      Alert.alert('Model Unloaded', 'Switched off local storage model.');
-                    }}
-                  >
-                    <Text style={styles.unloadBtnText}>Unload</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : null}
-
-              <TouchableOpacity
-                style={styles.pickStorageBtn}
-                onPress={() => handlePickLocalModelFile()}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="file-tray-full-outline" size={22} color="#FFFFFF" />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.pickStorageBtnTitle}>📁 Select Model from Internal Storage</Text>
-                  <Text style={styles.pickStorageBtnSub}>Browse and pick your downloaded .gguf or model weights file</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
-              </TouchableOpacity>
-
-              {/* Hugging Face Offline Models List */}
-              <Text style={styles.modalSectionLabel}>HUGGING FACE MODEL REPOSITORIES</Text>
-              <Text style={styles.modalHelperText}>
-                Tap "Download Page" to open the Hugging Face repo in your browser to download the file. Once downloaded to your device, tap "Select from Storage" to load and activate it.
-              </Text>
-              {HUGGINGFACE_OFFLINE_MODELS.map((m) => {
-                const isLoaded = loadedModelFile?.modelId === m.id || activeOfflineModel === m.id;
-
-                return (
-                  <GlassCard
-                    key={m.id}
-                    variant="cream"
-                    style={[
-                      styles.modelCard,
-                      isLoaded && styles.modelCardActive,
-                      { marginBottom: 12 },
-                    ]}
-                  >
-                    <View style={styles.modelCardTop}>
-                      <View style={{ flex: 1, paddingRight: 8 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Text style={[styles.modelCardName, isLoaded && { color: designTokens.colors.primaryDark }]}>
-                            {m.name}
-                          </Text>
-                          {isLoaded && (
-                            <View style={styles.activeTag}>
-                              <Text style={styles.activeTagText}>ACTIVE (OFFLINE)</Text>
-                            </View>
+                    {m.actionCard && (
+                      <View style={styles.actionCard}>
+                        <View style={styles.actionTop}>
+                          <Text style={styles.actionTitle} numberOfLines={2}>{m.actionCard.title}</Text>
+                          {m.actionCard.badge && (
+                            <StatusPill label={m.actionCard.badge} tone="success" />
                           )}
                         </View>
-                        <Text style={styles.modelCardRepo}>{m.parameters} • {m.quantization}</Text>
-                        <Text style={styles.modelCardDesc}>{m.description}</Text>
-                        <Text style={styles.modelFileHint}>
-                          📄 File: <Text style={{ fontWeight: '700', color: designTokens.colors.textPrimary }}>{m.recommendedFilename}</Text>
+                        {!!m.actionCard.subtitle && (
+                          <Text style={styles.actionSub} numberOfLines={2}>{m.actionCard.subtitle}</Text>
+                        )}
+                        <View style={styles.actionVals}>
+                          {!!m.actionCard.primaryValue && (
+                            <Text style={styles.actionPrimary}>{m.actionCard.primaryValue}</Text>
+                          )}
+                          {!!m.actionCard.secondaryValue && (
+                            <Text style={styles.actionSecondary}>{m.actionCard.secondaryValue}</Text>
+                          )}
+                        </View>
+                        {!!m.actionCard.navigationScreen && (
+                          <TouchableOpacity
+                            style={styles.actionNav}
+                            onPress={() => navigation?.navigate(m.actionCard!.navigationScreen)}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={styles.actionNavText}>View in {m.actionCard.navigationScreen}</Text>
+                            <Ionicons name="arrow-forward" size={14} color={C.eucalyptus} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    )}
+
+                    <Text style={[styles.msgTime, isUser && styles.msgTimeUser]}>{m.timestamp}</Text>
+                  </View>
+                </View>
+              );
+            })}
+
+            {loading && (
+              <View style={[styles.msgWrap, styles.msgLeft]}>
+                <View style={[styles.bubble, styles.assistantBubble, styles.loadingBubble]}>
+                  <ActivityIndicator size="small" color={C.eucalyptus} />
+                  <Text style={styles.loadingText}>NIA is thinking…</Text>
+                </View>
+              </View>
+            )}
+          </ScrollView>
+        )}
+
+        {/* Context chips */}
+        <View style={styles.chipsBar}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContent}>
+            {getContextChips().map((chip, i) => (
+              <TouchableOpacity key={i} style={styles.chipPill} onPress={() => handleSend(chip.prompt)} activeOpacity={0.8}>
+                <Text style={styles.chipText} numberOfLines={1}>{stripEmoji(chip.label)}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Input bar */}
+        <View style={styles.inputBar}>
+          <TouchableOpacity
+            style={styles.attachBtn}
+            onPress={handleUploadPhoto}
+            disabled={loading}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Upload a photo for AI analysis"
+          >
+            <Ionicons name="image-outline" size={20} color={C.textSecondary} />
+          </TouchableOpacity>
+          <TextInput
+            style={styles.input}
+            placeholder="Ask NIA anything…"
+            placeholderTextColor={C.textSubtle}
+            value={input}
+            onChangeText={setInput}
+            onSubmitEditing={() => handleSend()}
+            returnKeyType="send"
+          />
+          <TouchableOpacity
+            style={[styles.sendBtn, !input.trim() && styles.sendBtnDisabled]}
+            onPress={() => handleSend()}
+            disabled={!input.trim() || loading}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Send message"
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Offline model manager modal */}
+        <Modal
+          visible={modelModalVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setModelModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalBox}>
+              <View style={styles.modalHead}>
+                <View style={styles.modalTitleRow}>
+                  <View style={styles.modalIcon}>
+                    <Ionicons name="hardware-chip-outline" size={20} color={C.obsidian} />
+                  </View>
+                  <View>
+                    <Text style={styles.modalTitle}>NIA Offline Engine</Text>
+                    <Text style={styles.modalSub}>Hugging Face On-Device Models</Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={() => setModelModalVisible(false)} style={styles.modalClose} hitSlop={10}>
+                  <Ionicons name="close" size={20} color={C.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+                <LabelCaps style={styles.modalSec}>AI execution mode</LabelCaps>
+                <View style={styles.modeRow}>
+                  {(['AUTO', 'OFFLINE', 'CLOUD'] as const).map((mode) => (
+                    <TouchableOpacity
+                      key={mode}
+                      style={[styles.modeBtn, aiMode === mode && styles.modeBtnActive]}
+                      onPress={() => setAiMode(mode)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.modeBtnText, aiMode === mode && styles.modeBtnTextActive]}>
+                        {mode === 'AUTO' ? 'Auto' : mode === 'OFFLINE' ? 'Offline' : 'Cloud'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <LabelCaps style={styles.modalSec}>Local device storage</LabelCaps>
+                {loadedModelFile ? (
+                  <View style={styles.loadedBanner}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                      <Ionicons name="folder-open-outline" size={24} color={C.eucalyptus} />
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={styles.loadedName} numberOfLines={1}>{loadedModelFile.name}</Text>
+                          <StatusPill label="Active" tone="success" />
+                        </View>
+                        <Text style={styles.loadedSub}>
+                          {loadedModelFile.size > 0 ? `${(loadedModelFile.size / (1024 * 1024)).toFixed(1)} MB • ` : ''}Loaded from internal storage
                         </Text>
                       </View>
-                      <Text style={styles.modelCardSize}>{m.sizeMB} MB</Text>
                     </View>
+                    <TouchableOpacity
+                      style={styles.unloadBtn}
+                      onPress={() => {
+                        setLoadedModelFile(null);
+                        Alert.alert('Model Unloaded', 'Switched off local storage model.');
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.unloadText}>Unload</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
 
-                    <View style={styles.modelCardBottom}>
-                      <Text style={styles.modelSpecialty}>🎯 {m.specialty}</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <TouchableOpacity
-                          style={styles.hfLinkBtn}
-                          onPress={() => Linking.openURL(m.downloadUrl)}
-                          activeOpacity={0.8}
-                        >
-                          <Ionicons name="open-outline" size={13} color={designTokens.colors.primaryDark} />
-                          <Text style={styles.hfLinkBtnText}>Download Page</Text>
-                        </TouchableOpacity>
+                <TouchableOpacity style={styles.pickBtn} onPress={() => handlePickLocalModelFile()} activeOpacity={0.85}>
+                  <Ionicons name="file-tray-full-outline" size={22} color="#FFFFFF" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.pickTitle}>Select Model from Internal Storage</Text>
+                    <Text style={styles.pickSub}>Browse and pick your downloaded model weights file</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
+                </TouchableOpacity>
 
-                        <TouchableOpacity
-                          style={[
-                            styles.modelActionBtn,
-                            isLoaded && styles.modelActionBtnActive,
-                            !isLoaded && styles.modelActionBtnDownload,
-                          ]}
-                          onPress={() => {
-                            if (isLoaded) {
-                              setAiMode('OFFLINE');
-                              Alert.alert('Active', `${m.name} is your active on-device model.`);
-                            } else {
-                              handlePickLocalModelFile(m.id);
-                            }
-                          }}
-                          activeOpacity={0.8}
-                        >
-                          <Text
-                            style={[
-                              styles.modelActionBtnText,
-                              isLoaded && styles.modelActionBtnTextActive,
-                            ]}
-                          >
-                            {isLoaded ? '✓ Active' : 'Select from Storage'}
-                          </Text>
-                        </TouchableOpacity>
+                <LabelCaps style={styles.modalSec}>Hugging Face model repositories</LabelCaps>
+                <Text style={styles.modalHint}>
+                  Tap “Download Page” to open the Hugging Face repo in your browser. Once downloaded to your device, tap “Select from Storage” to load it.
+                </Text>
+                {HUGGINGFACE_OFFLINE_MODELS.map((m) => {
+                  const isLoaded = loadedModelFile?.modelId === m.id || activeOfflineModel === m.id;
+                  return (
+                    <NiaCard key={m.id} style={[styles.modelCard, isLoaded && styles.modelCardActive]}>
+                      <View style={styles.modelTop}>
+                        <View style={{ flex: 1, paddingRight: 8 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={styles.modelName} numberOfLines={1}>{m.name}</Text>
+                            {isLoaded && <StatusPill label="Active offline" tone="success" />}
+                          </View>
+                          <Text style={styles.modelMeta}>{m.parameters} • {m.quantization}</Text>
+                          <Text style={styles.modelDesc} numberOfLines={2}>{m.description}</Text>
+                        </View>
+                        <Text style={styles.modelSize}>{m.sizeMB} MB</Text>
                       </View>
-                    </View>
-                  </GlassCard>
-                );
-              })}
+                      <View style={styles.modelBottom}>
+                        <Text style={styles.modelSpecialty} numberOfLines={1}>{m.specialty}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <TouchableOpacity
+                            style={styles.hfBtn}
+                            onPress={() => Linking.openURL(m.downloadUrl)}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons name="open-outline" size={13} color={C.eucalyptus} />
+                            <Text style={styles.hfBtnText}>Download Page</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.selectBtn, isLoaded && styles.selectBtnActive]}
+                            onPress={() => {
+                              if (isLoaded) {
+                                setAiMode('OFFLINE');
+                                Alert.alert('Active', `${m.name} is your active on-device model.`);
+                              } else {
+                                handlePickLocalModelFile(m.id);
+                              }
+                            }}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={[styles.selectText, isLoaded && styles.selectTextActive]}>
+                              {isLoaded ? 'Active' : 'Select from Storage'}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </NiaCard>
+                  );
+                })}
 
-              {/* Custom Hugging Face Repo Input */}
-              <Text style={styles.modalSectionLabel}>LOAD CUSTOM HUGGING FACE REPO</Text>
-              <View style={styles.customRepoCard}>
-                <TextInput
-                  style={styles.customRepoInput}
-                  placeholder="e.g. HuggingFaceTB/SmolLM2-135M"
-                  placeholderTextColor="#94A3B8"
-                  value={customRepoInput}
-                  onChangeText={setCustomRepoInput}
-                />
-                <TouchableOpacity
-                  style={[styles.customRepoBtn, !customRepoInput.trim() && { opacity: 0.5 }]}
-                  disabled={!customRepoInput.trim()}
-                  onPress={async () => {
-                    const repo = customRepoInput.trim();
-                    await downloadOfflineModel(repo);
-                    setCustomRepoInput('');
-                    Alert.alert('Model Loaded', `Downloaded & activated "${repo}" from Hugging Face for offline reasoning!`);
-                  }}
-                >
-                  <Ionicons name="download-outline" size={16} color="#FFFFFF" />
-                  <Text style={styles.customRepoBtnText}>Download</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Dataset Sync Status Card */}
-              <Text style={styles.modalSectionLabel}>OFFLINE DATASET SYNC</Text>
-              <View style={styles.syncStatusCard}>
-                <View style={{ flex: 1, paddingRight: 8 }}>
-                  <Text style={styles.syncStatusTitle}>Temporary Phone Storage</Text>
-                  <Text style={styles.syncStatusSub}>
-                    {offlineSyncQueue.filter((q) => !q.synced).length > 0
-                      ? `${offlineSyncQueue.filter((q) => !q.synced).length} record(s) queued. Will push to dataset when online.`
-                      : 'All offline records are pushed and synced to cloud dataset.'}
-                  </Text>
+                <LabelCaps style={styles.modalSec}>Load custom Hugging Face repo</LabelCaps>
+                <View style={styles.customRow}>
+                  <TextInput
+                    style={styles.customInput}
+                    placeholder="e.g. HuggingFaceTB/SmolLM2-135M"
+                    placeholderTextColor={C.textSubtle}
+                    value={customRepoInput}
+                    onChangeText={setCustomRepoInput}
+                  />
+                  <TouchableOpacity
+                    style={[styles.customBtn, !customRepoInput.trim() && { opacity: 0.5 }]}
+                    disabled={!customRepoInput.trim()}
+                    onPress={async () => {
+                      const repo = customRepoInput.trim();
+                      await downloadOfflineModel(repo);
+                      setCustomRepoInput('');
+                      Alert.alert('Model Loaded', `Downloaded & activated "${repo}" from Hugging Face for offline reasoning!`);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="download-outline" size={16} color="#FFFFFF" />
+                    <Text style={styles.customBtnText}>Download</Text>
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity
-                  style={styles.flushSyncBtn}
-                  onPress={async () => {
-                    const res = await flushOfflineQueue();
-                    Alert.alert('Dataset Synced', `Pushed ${res.syncedCount} offline record(s) to cloud database!`);
-                  }}
-                >
-                  <Ionicons name="cloud-upload-outline" size={15} color="#FFFFFF" />
-                  <Text style={styles.flushSyncBtnText}>Sync Now</Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
+
+                <LabelCaps style={styles.modalSec}>Offline dataset sync</LabelCaps>
+                <View style={styles.syncCard}>
+                  <View style={{ flex: 1, paddingRight: 8 }}>
+                    <Text style={styles.syncTitle}>Temporary Phone Storage</Text>
+                    <Text style={styles.syncSub}>
+                      {offlineSyncQueue.filter((q) => !q.synced).length > 0
+                        ? `${offlineSyncQueue.filter((q) => !q.synced).length} record(s) queued. Will push to dataset when online.`
+                        : 'All offline records are pushed and synced to cloud dataset.'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.syncBtn}
+                    onPress={async () => {
+                      const res = await flushOfflineQueue();
+                      Alert.alert('Dataset Synced', `Pushed ${res.syncedCount} offline record(s) to cloud database!`);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="cloud-upload-outline" size={15} color="#FFFFFF" />
+                    <Text style={styles.syncBtnText}>Sync Now</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </View>
           </View>
-        </View>
-      </Modal>
-      </View>
+        </Modal>
       </SafeAreaView>
-    </GradientBackground>
+    </View>
   );
 };
 
+const C = designTokens.colors;
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'transparent' },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: designTokens.spacing.lg,
-    paddingTop: 8,
-    paddingBottom: designTokens.spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: designTokens.colors.surfaceBorder,
+  root: { flex: 1, backgroundColor: C.porcelain },
+  titleRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, marginBottom: 12,
   },
-  offlineEngineBannerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: 'rgba(117, 167, 165, 0.35)',
-    borderRadius: designTokens.radii.card,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: designTokens.spacing.lg,
-    width: '100%',
-    ...designTokens.shadows.card,
+  title: { fontSize: 22, fontWeight: '700', color: C.ink, letterSpacing: -0.5 },
+  sub: { fontSize: 12, color: C.textMuted, marginTop: 2 },
+  titleActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  iconBtn: {
+    width: 38, height: 38, borderRadius: 19, backgroundColor: '#FFFFFF',
+    borderWidth: 1, borderColor: C.hairline, alignItems: 'center', justifyContent: 'center',
   },
-  offlineEngineBannerTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: designTokens.colors.textPrimary,
+  modelPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: C.hairline,
+    borderRadius: 999, paddingHorizontal: 12, paddingVertical: 9,
   },
-  offlineEngineBannerSubtitle: {
-    fontSize: 11,
-    color: designTokens.colors.textSecondary,
-    marginTop: 2,
+  modelPillOffline: { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' },
+  modelPillText: { fontSize: 12, fontWeight: '700', color: C.ink },
+  queueBanner: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginHorizontal: 20, marginBottom: 10, backgroundColor: '#FFFBEB',
+    borderWidth: 1, borderColor: '#FDE68A', borderRadius: 14, padding: 11,
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: designTokens.spacing.md,
-  },
-  aiAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: designTokens.colors.aiPrimary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  aiAvatarText: { fontSize: 18 },
-  headerTitle: { ...designTokens.typography.cardTitle, fontSize: 16 },
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1 },
-  onlineDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: designTokens.colors.success },
-  statusText: { ...designTokens.typography.micro, color: designTokens.colors.textSecondary },
-  emptyContainer: {
-    padding: designTokens.spacing.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 40,
-  },
-  emptyGlowCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: designTokens.colors.aiSubtle,
-    borderWidth: 1.5,
-    borderColor: designTokens.colors.aiBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: designTokens.spacing.lg,
-  },
-  emptyIcon: { fontSize: 32 },
-  emptyTitle: { ...designTokens.typography.sectionTitle, fontSize: 18, textAlign: 'center' },
-  emptyDescription: {
-    ...designTokens.typography.body,
-    textAlign: 'center',
-    marginTop: designTokens.spacing.xs,
-    marginBottom: designTokens.spacing.xl,
-    maxWidth: 320,
-    lineHeight: 19,
-  },
-  tryExamplesLabel: { ...designTokens.typography.label, fontSize: 10, marginBottom: designTokens.spacing.sm, alignSelf: 'flex-start' },
-  examplesList: { width: '100%', gap: designTokens.spacing.sm },
-  exampleCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: designTokens.spacing.md,
-    paddingVertical: designTokens.spacing.md,
-    borderRadius: designTokens.radii.md,
-    borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.06)',
-    ...designTokens.shadows.card,
-  },
-  exampleText: { ...designTokens.typography.bodyMedium, fontSize: 13, color: designTokens.colors.textPrimary },
-  exampleArrow: { color: designTokens.colors.primary, fontWeight: '800' },
+  queueLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  queueText: { fontSize: 11.5, color: '#92400E', flex: 1, lineHeight: 16 },
+  queueSyncBtn: { backgroundColor: C.obsidian, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  queueSyncText: { fontSize: 11.5, fontWeight: '700', color: '#FFFFFF' },
   chatScroll: { flex: 1 },
-  chatContent: { padding: designTokens.spacing.lg, paddingBottom: 20 },
-  messageWrapper: { marginBottom: designTokens.spacing.md, flexDirection: 'row' },
-  msgRight: { justifyContent: 'flex-end' },
-  msgLeft: { justifyContent: 'flex-start' },
-  bubble: {
-    maxWidth: '85%',
-    borderRadius: designTokens.radii.lg,
-    paddingHorizontal: designTokens.spacing.lg,
-    paddingVertical: designTokens.spacing.md,
-  },
-  userBubble: {
-    backgroundColor: designTokens.colors.primary,
-    borderBottomRightRadius: 4,
-  },
+  chatContent: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 12 },
+  msgWrap: { marginBottom: 10, maxWidth: '88%' },
+  msgLeft: { alignSelf: 'flex-start' },
+  msgRight: { alignSelf: 'flex-end' },
+  bubble: { borderRadius: 18, padding: 13, borderWidth: 1 },
   assistantBubble: {
-    backgroundColor: '#FFFFFF',
-    borderBottomLeftRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.08)',
-    ...designTokens.shadows.card,
+    backgroundColor: '#FFFFFF', borderColor: C.hairline,
+    borderBottomLeftRadius: 6,
+    shadowColor: '#0F172A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04,
+    shadowRadius: 6, elevation: 1,
   },
-  bubbleText: { ...designTokens.typography.bodyMedium, lineHeight: 20 },
-  userBubbleText: { color: '#FFFFFF' },
-  assistantBubbleText: { color: designTokens.colors.textPrimary },
-  msgTime: {
-    ...designTokens.typography.micro,
-    color: designTokens.colors.textMuted,
-    alignSelf: 'flex-end',
-    marginTop: 4,
-  },
+  userBubble: { backgroundColor: C.obsidian, borderColor: C.obsidian, borderBottomRightRadius: 6 },
+  bubbleText: { fontSize: 14.5, lineHeight: 21 },
+  assistantText: { color: C.ink },
+  userText: { color: '#FFFFFF' },
+  chatImage: { width: 200, height: 140, borderRadius: 12, marginBottom: 8 },
   actionCard: {
-    marginTop: designTokens.spacing.md,
-    backgroundColor: '#FAF7F2',
-    borderColor: 'rgba(117, 167, 165, 0.25)',
-    padding: designTokens.spacing.md,
+    backgroundColor: C.porcelain, borderWidth: 1, borderColor: C.hairline,
+    borderRadius: 14, padding: 12, marginTop: 10,
   },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
+  actionTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 },
+  actionTitle: { fontSize: 13.5, fontWeight: '700', color: C.ink, flex: 1 },
+  actionSub: { fontSize: 12, color: C.textSecondary, marginBottom: 6 },
+  actionVals: { flexDirection: 'row', alignItems: 'baseline', gap: 10, marginBottom: 8 },
+  actionPrimary: { fontSize: 20, fontWeight: '700', color: C.eucalyptus, letterSpacing: -0.4 },
+  actionSecondary: { fontSize: 12.5, color: C.textMuted },
+  actionNav: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  actionNavText: { fontSize: 12.5, fontWeight: '700', color: C.eucalyptus },
+  msgTime: { fontSize: 10, color: C.textSubtle, marginTop: 7 },
+  msgTimeUser: { color: 'rgba(255,255,255,0.55)' },
+  loadingBubble: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  loadingText: { fontSize: 12.5, color: C.textSecondary, fontStyle: 'italic' },
+  emptyWrap: { paddingHorizontal: 20, paddingTop: 28, alignItems: 'center' },
+  emptyMark: {
+    width: 64, height: 64, borderRadius: 19, backgroundColor: C.obsidian,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 16,
   },
-  cardActionTitle: { ...designTokens.typography.cardTitle, fontSize: 13, color: designTokens.colors.textPrimary },
-  cardBadge: {
-    backgroundColor: designTokens.colors.primarySoft,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: designTokens.radii.xs,
+  emptyMarkN: { color: '#FFFFFF', fontWeight: '800', fontSize: 32, letterSpacing: -1 },
+  emptyMarkSpark: { position: 'absolute', right: 10, top: 10 },
+  emptyTitle: { fontSize: 22, fontWeight: '700', color: C.ink, letterSpacing: -0.5, marginBottom: 8 },
+  emptyDesc: { fontSize: 13.5, color: C.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: 18 },
+  engineBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: C.hairline,
+    borderRadius: 16, padding: 14, width: '100%', marginBottom: 20,
   },
-  cardBadgeText: { ...designTokens.typography.micro, color: designTokens.colors.primaryDeep, fontWeight: '800', fontSize: 9 },
-  cardSub: { ...designTokens.typography.body, fontSize: 12, marginBottom: designTokens.spacing.sm },
-  cardValuesRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: designTokens.spacing.sm,
-    marginBottom: designTokens.spacing.sm,
+  engineIcon: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: C.eucalyptusFaint,
+    alignItems: 'center', justifyContent: 'center',
   },
-  cardPrimaryVal: { ...designTokens.typography.cardTitle, fontSize: 16, color: designTokens.colors.primaryDark },
-  cardSecondaryVal: { ...designTokens.typography.micro, color: designTokens.colors.textMuted },
-  cardNavBtn: {
-    backgroundColor: designTokens.colors.primary,
-    paddingVertical: 6,
-    borderRadius: designTokens.radii.sm,
-    alignItems: 'center',
+  engineTitle: { fontSize: 13.5, fontWeight: '700', color: C.ink },
+  engineSub: { fontSize: 11.5, color: C.textMuted, marginTop: 2 },
+  tryLabel: { alignSelf: 'flex-start', marginBottom: 10 },
+  examplesList: { width: '100%', gap: 8 },
+  exampleCard: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: C.hairline,
+    borderRadius: 14, padding: 14, marginBottom: 8,
   },
-  cardNavBtnText: { ...designTokens.typography.micro, color: '#FFFFFF', fontWeight: '800' },
-  loadingBubble: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: designTokens.spacing.md,
-  },
-  loadingText: { ...designTokens.typography.body, fontSize: 12, color: designTokens.colors.textSecondary },
-  chipsBar: {
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(41, 51, 50, 0.06)',
-    paddingVertical: designTokens.spacing.xs + 2,
-  },
-  chipsContent: {
-    paddingHorizontal: designTokens.spacing.lg,
-    gap: designTokens.spacing.sm,
-  },
+  exampleText: { fontSize: 13.5, fontWeight: '500', color: C.textSecondary, flex: 1, marginRight: 8 },
+  chipsBar: { paddingVertical: 10 },
+  chipsContent: { paddingHorizontal: 20, gap: 8 },
   chipPill: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: designTokens.spacing.md,
-    paddingVertical: 6,
-    borderRadius: designTokens.radii.pill,
-    borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.08)',
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: C.hairline,
+    borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9, marginRight: 8,
   },
-  chipText: { ...designTokens.typography.micro, color: designTokens.colors.textSecondary, fontWeight: '600' },
+  chipText: { fontSize: 12.5, fontWeight: '600', color: C.textSecondary },
   inputBar: {
-    flexDirection: 'row',
-    paddingHorizontal: designTokens.spacing.lg,
-    paddingVertical: designTokens.spacing.sm,
-    backgroundColor: '#FAF7F2',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(41, 51, 50, 0.08)',
-    alignItems: 'center',
-    gap: designTokens.spacing.sm,
-    marginBottom: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 20, paddingTop: 8, paddingBottom: 100,
   },
   attachBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.12)',
+    width: 46, height: 46, borderRadius: 23, backgroundColor: '#FFFFFF',
+    borderWidth: 1, borderColor: C.hairline, alignItems: 'center', justifyContent: 'center',
   },
   input: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: designTokens.radii.pill,
-    paddingHorizontal: designTokens.spacing.lg,
-    paddingVertical: 10,
-    color: designTokens.colors.textPrimary,
-    fontSize: 13,
-    borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.10)',
+    flex: 1, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: C.hairline,
+    borderRadius: 23, paddingHorizontal: 16, paddingVertical: 12, fontSize: 14.5, color: C.ink, minHeight: 46,
   },
   sendBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: designTokens.colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendBtnDisabled: {
-    backgroundColor: designTokens.colors.surfaceSubtle,
-    opacity: 0.5,
-  },
-  sendIcon: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '800',
-    lineHeight: 22,
-  },
-  modelPillBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: designTokens.radii.pill,
-    borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.12)',
-  },
-  modelPillBtnOffline: {
-    backgroundColor: '#FEF3C7',
-    borderColor: '#F59E0B',
-  },
-  modelPillText: {
-    ...designTokens.typography.micro,
-    color: designTokens.colors.primaryDark,
-    fontWeight: '700',
-    fontSize: 10,
-  },
-  offlineQueueBanner: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#FFFBEB',
-    borderBottomWidth: 1,
-    borderBottomColor: '#FDE68A',
-    paddingHorizontal: designTokens.spacing.lg,
-    paddingVertical: 8,
-  },
-  queueBannerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flex: 1,
-  },
-  queueBannerText: {
-    ...designTokens.typography.micro,
-    color: '#92400E',
-    fontSize: 11,
-    flex: 1,
-  },
-  syncQueueBtn: {
-    backgroundColor: '#D97706',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: designTokens.radii.xs,
-  },
-  syncQueueBtnText: {
-    ...designTokens.typography.micro,
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 10,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
-    justifyContent: 'flex-end',
-  },
-  modalContainer: {
-    backgroundColor: '#FAF7F2',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: designTokens.spacing.lg,
-    maxHeight: '85%',
-  },
-  modalHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(41, 51, 50, 0.08)',
-    paddingBottom: 12,
-  },
-  modalTitle: {
-    ...designTokens.typography.cardTitle,
-    fontSize: 16,
-    color: designTokens.colors.textPrimary,
-  },
-  modalSubtitle: {
-    ...designTokens.typography.micro,
-    color: designTokens.colors.textSecondary,
-  },
-  modalCloseBtn: {
-    padding: 6,
-  },
-  modalSectionLabel: {
-    ...designTokens.typography.micro,
-    color: designTokens.colors.textMuted,
-    letterSpacing: 1,
-    fontWeight: '800',
-    marginTop: 14,
-    marginBottom: 8,
-  },
-  modeToggleRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
-  },
-  modeToggleBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    backgroundColor: '#FFFFFF',
-    borderRadius: designTokens.radii.sm,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.1)',
-  },
-  modeToggleBtnActive: {
-    backgroundColor: designTokens.colors.primary,
-    borderColor: designTokens.colors.primary,
-  },
-  modeToggleText: {
-    ...designTokens.typography.micro,
-    color: designTokens.colors.textSecondary,
-    fontWeight: '700',
-    fontSize: 11,
-  },
-  modeToggleTextActive: {
-    color: '#FFFFFF',
-  },
-  modelCard: {
-    marginBottom: 10,
-    padding: 12,
-  },
-  modelCardActive: {
-    borderColor: designTokens.colors.primary,
-    borderWidth: 2,
-    backgroundColor: '#F0FDF4',
-  },
-  modelCardTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 6,
-  },
-  modelCardName: {
-    ...designTokens.typography.cardTitle,
-    fontSize: 13,
-    color: designTokens.colors.textPrimary,
-  },
-  activeTag: {
-    backgroundColor: '#DCFCE7',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  activeTagText: {
-    ...designTokens.typography.micro,
-    color: '#16A34A',
-    fontWeight: '800',
-    fontSize: 9,
-  },
-  modelCardRepo: {
-    ...designTokens.typography.micro,
-    color: designTokens.colors.textMuted,
-    fontSize: 10,
-    marginTop: 2,
-  },
-  modelCardDesc: {
-    ...designTokens.typography.body,
-    fontSize: 11,
-    color: designTokens.colors.textSecondary,
-    marginTop: 4,
-  },
-  modelCardSize: {
-    ...designTokens.typography.micro,
-    color: designTokens.colors.primaryDeep,
-    fontWeight: '800',
-    backgroundColor: designTokens.colors.primarySoft,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 4,
-  },
-  progressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginVertical: 6,
-  },
-  progressBarTrack: {
-    flex: 1,
-    height: 6,
-    backgroundColor: '#E2E8F0',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: designTokens.colors.primary,
-  },
-  progressText: {
-    ...designTokens.typography.micro,
-    fontWeight: '700',
-    color: designTokens.colors.primaryDark,
-    fontSize: 10,
-  },
-  modelCardBottom: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(41, 51, 50, 0.06)',
-  },
-  modelSpecialty: {
-    ...designTokens.typography.micro,
-    color: designTokens.colors.textSecondary,
-    fontSize: 11,
-  },
-  modelActionBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: designTokens.radii.xs,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: designTokens.colors.primary,
-  },
-  modelActionBtnActive: {
-    backgroundColor: '#F0FDF4',
-    borderColor: '#16A34A',
-  },
-  modelActionBtnDownload: {
-    backgroundColor: designTokens.colors.primary,
-  },
-  modelActionBtnText: {
-    ...designTokens.typography.micro,
-    color: designTokens.colors.primaryDark,
-    fontWeight: '700',
-  },
-  modelActionBtnTextActive: {
-    color: '#16A34A',
-  },
-  customRepoCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: designTokens.radii.sm,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.1)',
-    marginBottom: 8,
-  },
-  customRepoInput: {
-    backgroundColor: '#FAF7F2',
-    borderRadius: designTokens.radii.xs,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 12,
-    color: designTokens.colors.textPrimary,
-    marginBottom: 8,
-  },
-  customRepoBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: designTokens.colors.primary,
-    paddingVertical: 8,
-    borderRadius: designTokens.radii.xs,
-  },
-  customRepoBtnText: {
-    ...designTokens.typography.micro,
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-  syncStatusCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    borderRadius: designTokens.radii.sm,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.1)',
-    marginBottom: 16,
-  },
-  syncStatusTitle: {
-    ...designTokens.typography.cardTitle,
-    fontSize: 12,
-    color: designTokens.colors.textPrimary,
-  },
-  syncStatusSub: {
-    ...designTokens.typography.micro,
-    color: designTokens.colors.textSecondary,
-    fontSize: 10,
-    marginTop: 2,
-  },
-  flushSyncBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: designTokens.colors.primaryDark,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: designTokens.radii.xs,
-  },
-  flushSyncBtnText: {
-    ...designTokens.typography.micro,
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-  chatUploadedImage: {
-    width: 200,
-    height: 140,
-    borderRadius: designTokens.radii.sm,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.08)',
-  },
-  modalHelperText: {
-    ...designTokens.typography.micro,
-    color: designTokens.colors.textSecondary,
-    fontSize: 11,
-    lineHeight: 16,
-    marginBottom: 12,
-  },
-  loadedModelBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#F0FDF4',
-    borderRadius: designTokens.radii.sm,
-    padding: 12,
-    borderWidth: 1.5,
-    borderColor: '#16A34A',
-    marginBottom: 10,
-  },
-  loadedModelName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#15803D',
-  },
-  loadedBadge: {
-    backgroundColor: '#16A34A',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  loadedBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: '800',
-  },
-  loadedModelSub: {
-    fontSize: 11,
-    color: '#166534',
-    marginTop: 2,
-  },
-  unloadBtn: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: designTokens.radii.xs,
-    borderWidth: 1,
-    borderColor: '#DC2626',
-  },
-  unloadBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#DC2626',
-  },
-  pickStorageBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: designTokens.colors.primary,
-    padding: 14,
-    borderRadius: designTokens.radii.sm,
-    marginBottom: 16,
-    shadowColor: '#3D352E',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  pickStorageBtnTitle: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  pickStorageBtnSub: {
-    color: 'rgba(255, 255, 255, 0.85)',
-    fontSize: 11,
-    marginTop: 2,
-  },
-  modelFileHint: {
-    ...designTokens.typography.micro,
-    color: designTokens.colors.textMuted,
-    fontSize: 11,
-    marginTop: 4,
-  },
-  hfLinkBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#FAF7F2',
-    borderWidth: 1,
-    borderColor: designTokens.colors.primary,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: designTokens.radii.xs,
-  },
-  hfLinkBtnText: {
-    ...designTokens.typography.micro,
-    color: designTokens.colors.primaryDark,
-    fontWeight: '700',
-  },
+    width: 46, height: 46, borderRadius: 23, backgroundColor: C.obsidian,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  sendBtnDisabled: { opacity: 0.35 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(17,24,39,0.4)', justifyContent: 'flex-end' },
+  modalBox: {
+    backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 20, paddingBottom: 30, maxHeight: '90%',
+  },
+  modalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+  modalTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  modalIcon: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: C.porcelain,
+    borderWidth: 1, borderColor: C.hairline, alignItems: 'center', justifyContent: 'center',
+  },
+  modalTitle: { fontSize: 16, fontWeight: '700', color: C.ink },
+  modalSub: { fontSize: 11.5, color: C.textMuted, marginTop: 2 },
+  modalClose: {
+    width: 34, height: 34, borderRadius: 17, backgroundColor: C.porcelain,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  modalSec: { marginTop: 14, marginBottom: 8 },
+  modalHint: { fontSize: 12, color: C.textMuted, lineHeight: 17, marginBottom: 10 },
+  modeRow: { flexDirection: 'row', gap: 8 },
+  modeBtn: {
+    flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: 12,
+    backgroundColor: C.porcelain, borderWidth: 1, borderColor: C.hairline,
+  },
+  modeBtnActive: { backgroundColor: C.obsidian, borderColor: C.obsidian },
+  modeBtnText: { fontSize: 12.5, fontWeight: '700', color: C.textSecondary },
+  modeBtnTextActive: { color: '#FFFFFF' },
+  loadedBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: C.eucalyptusFaint, borderWidth: 1, borderColor: '#A7F3D0',
+    borderRadius: 14, padding: 12, marginBottom: 10,
+  },
+  loadedName: { fontSize: 13.5, fontWeight: '700', color: C.ink, flex: 1 },
+  loadedSub: { fontSize: 11.5, color: C.textSecondary, marginTop: 2 },
+  unloadBtn: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: C.hairline, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
+  unloadText: { fontSize: 12, fontWeight: '700', color: C.textSecondary },
+  pickBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: C.obsidian, borderRadius: 16, padding: 15, marginBottom: 4,
+  },
+  pickTitle: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  pickSub: { fontSize: 11.5, color: 'rgba(255,255,255,0.65)', marginTop: 2 },
+  modelCard: { marginBottom: 10 },
+  modelCardActive: { borderColor: C.eucalyptus },
+  modelTop: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 },
+  modelName: { fontSize: 14, fontWeight: '700', color: C.ink, marginBottom: 3 },
+  modelMeta: { fontSize: 11.5, color: C.textMuted, marginBottom: 3 },
+  modelDesc: { fontSize: 12, color: C.textSecondary, lineHeight: 17 },
+  modelSize: { fontSize: 11.5, fontWeight: '700', color: C.textSecondary },
+  modelBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  modelSpecialty: { fontSize: 11.5, color: C.textMuted, flex: 1 },
+  hfBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: C.eucalyptusFaint, borderRadius: 999, paddingHorizontal: 11, paddingVertical: 7,
+  },
+  hfBtnText: { fontSize: 11.5, fontWeight: '700', color: C.eucalyptus },
+  selectBtn: {
+    backgroundColor: C.porcelain, borderWidth: 1, borderColor: C.hairline,
+    borderRadius: 999, paddingHorizontal: 13, paddingVertical: 7,
+  },
+  selectBtnActive: { backgroundColor: C.eucalyptus, borderColor: C.eucalyptus },
+  selectText: { fontSize: 11.5, fontWeight: '700', color: C.textSecondary },
+  selectTextActive: { color: '#FFFFFF' },
+  customRow: { flexDirection: 'row', gap: 8 },
+  customInput: {
+    flex: 1, backgroundColor: C.porcelain, borderWidth: 1, borderColor: C.hairline,
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 13, color: C.ink,
+  },
+  customBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: C.obsidian, borderRadius: 12, paddingHorizontal: 16,
+  },
+  customBtnText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
+  syncCard: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: C.porcelain, borderWidth: 1, borderColor: C.hairline,
+    borderRadius: 14, padding: 14,
+  },
+  syncTitle: { fontSize: 13.5, fontWeight: '700', color: C.ink, marginBottom: 3 },
+  syncSub: { fontSize: 12, color: C.textSecondary, lineHeight: 17 },
+  syncBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: C.obsidian, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9,
+  },
+  syncBtnText: { fontSize: 12.5, fontWeight: '700', color: '#FFFFFF' },
 });
-
