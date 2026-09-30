@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NEXA — Your entire student life, on autopilot</title>
+<meta name="description" content="NEXA is the AI-native OS for student life. It reads your college emails, pulls out every deadline, and plans your day around your timetable — automatically." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%23111827'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='%23f9f9fb' font-family='sans-serif' font-weight='bold'>N</text></svg>" />
+</head>
+<body>
+
+<!-- ============ NAV ============ -->
+<nav class="nav" id="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#top">
+      <span class="brand-mark">N</span>
+      <span class="brand-name">NEXA</span>
+    </a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#demo">Live demo</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <a href="#waitlist" class="btn btn-dark btn-sm">Join waitlist</a>
+  </div>
+</nav>
+
+<!-- ============ HERO ============ -->
+<header class="hero" id="top">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+  <div class="container hero-grid">
+    <div class="hero-copy reveal">
+      <div class="pill"><span class="pill-dot"></span> Built for Indian college students · Android-first</div>
+      <h1>Your entire student life, <span class="hl-green">on autopilot.</span></h1>
+      <p class="lede">NEXA reads your college emails, pulls out every deadline, and plans your day around your timetable — automatically. No more missed submissions. No more chaos.</p>
+      <div class="hero-cta">
+        <a href="#waitlist" class="btn btn-green">Join the waitlist</a>
+        <a href="#demo" class="btn btn-ghost">▶ See it work</a>
+      </div>
+      <div class="hero-proof">
+        <div class="avatars"><span>A</span><span>R</span><span>S</span><span>+</span></div>
+        <p><strong>2,400+</strong> students already waiting for early access</p>
+      </div>
+    </div>
+    <div class="hero-visual reveal">
+      <div class="phone-mock">
+        <div class="float-card fc-email">
+          <div class="fc-head"><span class="fc-icon">✉️</span><div><strong>academics@college.edu</strong><small>MAT1003 CAT-2 — schedule out</small></div></div>
+          <div class="scan-line"></div>
+        </div>
+        <div class="float-arrow">↓</div>
+        <div class="float-card fc-task">
+          <div class="fc-head"><span class="fc-icon">✅</span><div><strong>Task created</strong><small>MAT1003 CAT-2 · Sep 29, 9:00 AM</small></div></div>
+          <div class="fc-tags"><span class="tag tag-green">Reminder set</span><span class="tag tag-red">2 days left</span></div>
+        </div>
+        <div class="float-card fc-money">
+          <div class="fc-head"><span class="fc-icon">💸</span><div><strong>₹340 spent</strong><small>Canteen · this week</small></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="hero-marquee"><div class="marquee-track">
+    <span>Email intelligence</span><i>✦</i><span>Timetable-aware reminders</span><i>✦</i><span>Smart tasks</span><i>✦</i><span>Expense tracking</span><i>✦</i><span>NIA AI assistant</span><i>✦</i><span>Calendar sync</span><i>✦</i>
+    <span>Email intelligence</span><i>✦</i><span>Timetable-aware reminders</span><i>✦</i><span>Smart tasks</span><i>✦</i><span>Expense tracking</span><i>✦</i><span>NIA AI assistant</span><i>✦</i><span>Calendar sync</span><i>✦</i>
+  </div></div>
+</header>
+
+<!-- ============ PROBLEM ============ -->
+<section class="section" id="problem">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="kicker">The problem</p>
+      <h2>College life is <span class="hl-red">chaos.</span> Your apps don't help.</h2>
+      <p class="sub">Deadlines hide in 200 unread emails. Your timetable lives in a screenshot. Your money vanishes into UPI. And five different apps refuse to talk to each other.</p>
+    </div>
+    <div class="cards-3">
+      <div class="pain-card reveal">
+        <div class="pain-icon">📧</div>
+        <h3>Deadlines buried alive</h3>
+        <p>Assignment notices drown in a flooded college inbox. You find out about the submission <em>after</em> the deadline.</p>
+      </div>
+      <div class="pain-card reveal">
+        <div class="pain-icon">🗓️</div>
+        <h3>Timetable in screenshots</h3>
+        <p>Classes, labs, CATs — scattered across PDFs, WhatsApp forwards and memory. Reminders have no idea you have a lab at 2 PM.</p>
+      </div>
+      <div class="pain-card reveal">
+        <div class="pain-icon">💸</div>
+        <h3>Money with no memory</h3>
+        <p>Canteen, xerox, auto — ₹50 here, ₹100 there. By month-end, nobody knows where it went. Budgeting apps weren't built for hostel life.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FEATURES ============ -->
+<section class="section section-tint" id="features">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="kicker">What NEXA does</p>
+      <h2>One app. <span class="hl-green">Six superpowers.</span></h2>
+      <p class="sub">Not six apps stitched together — one brain that connects your inbox, your timetable, your money and your day.</p>
+    </div>
+    <div class="feat-grid">
+      <div class="feat-card reveal feat-star">
+        <div class="feat-icon">📨</div>
+        <h3>Email intelligence</h3>
+        <p>NEXA reads your college inbox and auto-extracts deadlines, exam dates and notices — turning emails into tasks before you even open them.</p>
+        <span class="feat-badge">The hero feature</span>
+      </div>
+      <div class="feat-card reveal">
+        <div class="feat-icon">⏰</div>
+        <h3>Timetable-aware reminders</h3>
+        <p>Reminders that know your schedule. "Leave for lab in 20 minutes" — not a generic alarm at a random hour.</p>
+      </div>
+      <div class="feat-card reveal">
+        <div class="feat-icon">✅</div>
+        <h3>Tasks that build themselves</h3>
+        <p>Deadlines from email become tasks automatically, prioritised by urgency and your free slots.</p>
+      </div>
+      <div class="feat-card reveal">
+        <div class="feat-icon">💰</div>
+        <h3>Finance tracking</h3>
+        <p>Mess bills, canteen runs, xerox — see exactly where your money goes, with budgets that fit student life.</p>
+      </div>
+      <div class="feat-card reveal">
+        <div class="feat-icon">🤖</div>
+        <h3>NIA — your AI assistant</h3>
+        <p>"What's due this week?" "When am I free tomorrow?" Ask in plain words, get answers from your actual schedule.</p>
+      </div>
+      <div class="feat-card reveal">
+        <div class="feat-icon">📅</div>
+        <h3>Calendar, unified</h3>
+        <p>Classes, deadlines, events and reminders in one calm view. Synced with Google Calendar.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ INTERACTIVE DEMO ============ -->
+<section class="section" id="demo">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="kicker">Try it right here</p>
+      <h2>Watch NEXA read <span class="hl-red">an actual email.</span></h2>
+      <p class="sub">This is a mock college email. Hit the button and watch NEXA pull the deadline out of it — the same magic the app does with your inbox.</p>
+    </div>
+    <div class="demo-wrap reveal">
+      <div class="demo-email" id="demoEmail">
+        <div class="demo-email-head">
+          <div class="demo-avatar">🎓</div>
+          <div>
+            <strong>academics@vitap.ac.in</strong>
+            <small>to me · 9:41 AM</small>
+          </div>
+        </div>
+        <div class="demo-subject">Subject: MAT1003 — CAT-2 Examination Schedule &amp; Syllabus</div>
+        <div class="demo-body">
+          <p>Dear Students,</p>
+          <p>This is to inform you that the <span class="extract" data-step="1">Continuous Assessment Test – 2 (CAT-2)</span> for <span class="extract" data-step="2">MAT1003 Discrete Mathematical Structures</span> will be conducted on <span class="extract hot" data-step="3">29th September, 9:00 AM – 10:30 AM</span>.</p>
+          <p>Syllabus: Modules 2, 3 and 4. <span class="extract" data-step="4">Hall tickets will be issued on 27th September</span> — collect them from your class coordinator.</p>
+          <p>Regards,<br/>Academic Office</p>
+        </div>
+        <div class="demo-scan" id="demoScan"></div>
+      </div>
+      <div class="demo-side">
+        <button class="btn btn-green btn-lg" id="demoBtn">✨ Scan with NEXA</button>
+        <button class="btn btn-ghost btn-sm hidden" id="demoReplay">↻ Replay</button>
+        <div class="demo-steps" id="demoSteps">
+          <div class="demo-step" data-for="1"><span class="ds-dot"></span> Found an <strong>exam notice</strong></div>
+          <div class="demo-step" data-for="2"><span class="ds-dot"></span> Subject: <strong>MAT1003</strong></div>
+          <div class="demo-step" data-for="3"><span class="ds-dot"></span> Deadline: <strong>Sep 29, 9:00 AM</strong></div>
+          <div class="demo-step" data-for="4"><span class="ds-dot"></span> Sub-task: <strong>collect hall ticket Sep 27</strong></div>
+        </div>
+        <div class="demo-result hidden" id="demoResult">
+          <div class="demo-result-head">✅ Added to your day</div>
+          <div class="demo-task">
+            <strong>MAT1003 CAT-2</strong>
+            <small>Sep 29 · 9:00 AM · 90 marks</small>
+            <div class="fc-tags"><span class="tag tag-green">Reminder set</span><span class="tag tag-red">Study plan made</span></div>
+          </div>
+          <p class="demo-note">In the real app this happens automatically — the moment the email lands.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ HOW IT WORKS ============ -->
+<section class="section section-dark">
+  <div class="container">
+    <div class="section-head reveal light">
+      <p class="kicker">How it works</p>
+      <h2>Up and running in <span class="hl-green">three steps.</span></h2>
+    </div>
+    <div class="steps">
+      <div class="step reveal"><div class="step-num">1</div><h3>Connect your college email</h3><p>Sign in with your college Gmail. You choose exactly what NEXA may read — nothing more.</p></div>
+      <div class="step-arrow">→</div>
+      <div class="step reveal"><div class="step-num">2</div><h3>NEXA extracts every deadline</h3><p>Exams, assignments, fee dates, fest registrations — pulled out of emails and notices automatically.</p></div>
+      <div class="step-arrow">→</div>
+      <div class="step reveal"><div class="step-num">3</div><h3>Get reminded like a friend would</h3><p>Smart nudges timed around your timetable. "CAT-2 in 3 days — your evenings are free, want a plan?"</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PRICING ============ -->
+<section class="section" id="pricing">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="kicker">Pricing</p>
+      <h2>Less than <span class="hl-red">a chai.</span></h2>
+      <p class="sub">One simple price. No tiers designed to confuse you, no "Pro Max Ultra".</p>
+    </div>
+    <div class="billing-toggle reveal">
+      <button class="toggle-btn active" data-plan="monthly">Monthly</button>
+      <button class="toggle-btn" data-plan="yearly">Yearly <span class="save-tag">pay once, done</span></button>
+    </div>
+    <div class="price-card reveal">
+      <div class="price-top">
+        <h3>NEXA</h3>
+        <p class="price-amount"><span id="priceValue">₹10</span><span class="per" id="pricePer">/month</span></p>
+        <p class="price-note" id="priceNote">Billed monthly · cancel anytime</p>
+      </div>
+      <ul class="price-list">
+        <li>📨 Unlimited email intelligence</li>
+        <li>⏰ Timetable-aware reminders</li>
+        <li>✅ Smart tasks &amp; calendar</li>
+        <li>💰 Finance tracking</li>
+        <li>🤖 NIA AI assistant</li>
+      </ul>
+      <a href="#waitlist" class="btn btn-green btn-lg">Join the waitlist</a>
+      <p class="price-fine">Early waitlist members lock this price for life. 💛</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section class="section section-tint" id="faq">
+  <div class="container narrow">
+    <div class="section-head reveal">
+      <p class="kicker">FAQ</p>
+      <h2>Good <span class="hl-green">questions.</span></h2>
+    </div>
+    <div class="faq-list">
+      <div class="faq reveal">
+        <button class="faq-q">Does it work with my college? <span>+</span></button>
+        <div class="faq-a"><p>Yes — if your college email is on Gmail (most Indian colleges are), NEXA plugs right in. Outlook support is on the roadmap.</p></div>
+      </div>
+      <div class="faq reveal">
+        <button class="faq-q">Is it Android only? <span>+</span></button>
+        <div class="faq-a"><p>Android-first, because that's where 9 out of 10 Indian students are. iOS is on the roadmap — join the waitlist and tell us you want it.</p></div>
+      </div>
+      <div class="faq reveal">
+        <button class="faq-q">You're reading my email?! What about privacy? <span>+</span></button>
+        <div class="faq-a"><p>Fair question. NEXA asks for separate, plain-language permission for each thing it touches — email, calendar, expenses — and you can revoke any of them anytime, which deletes the associated data. We're building DPDP-Act-ready from day one: your data is never sold, never used for ads, and never used to train models.</p></div>
+      </div>
+      <div class="faq reveal">
+        <button class="faq-q">When does it launch? <span>+</span></button>
+        <div class="faq-a"><p>We're onboarding waitlist members in small batches, campus by campus. Join below — early members get the launch price locked for life.</p></div>
+      </div>
+      <div class="faq reveal">
+        <button class="faq-q">How is this different from Todoist / Notion / Google Calendar? <span>+</span></button>
+        <div class="faq-a"><p>Those are excellent empty notebooks — you do all the writing. NEXA is the opposite: it reads your college email and <em>fills in the notebook for you</em>. Nobody else does email intelligence for students.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ WAITLIST ============ -->
+<section class="section" id="waitlist">
+  <div class="container narrow">
+    <div class="waitlist-card reveal">
+      <div class="waitlist-blob"></div>
+      <h2>Get early access. <span class="hl-green">Skip the line.</span></h2>
+      <p class="sub">We're letting students in batch by batch. Drop your details — we'll ping you the moment your campus opens.</p>
+      <form id="waitlistForm" novalidate>
+        <label>Your name
+          <input type="text" name="name" id="fName" placeholder="Aarav Sharma" autocomplete="name" required />
+        </label>
+        <label>Email
+          <input type="email" name="email" id="fEmail" placeholder="you@college.edu" autocomplete="email" required />
+        </label>
+        <label>College
+          <input type="text" name="college" id="fCollege" placeholder="VIT-AP, Amaravati" autocomplete="organization" required />
+        </label>
+        <p class="form-error hidden" id="formError"></p>
+        <button type="submit" class="btn btn-green btn-lg" id="formBtn">Count me in 🚀</button>
+        <p class="form-fine">No spam, ever. One email when your invite is ready.</p>
+      </form>
+      <div class="form-success hidden" id="formSuccess">
+        <div class="success-check">🎉</div>
+        <h3 id="successTitle">You're on the list!</h3>
+        <p id="successMsg">We'll reach out as soon as your campus batch opens. Tell a friend — the wait is shorter together.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="footer">
+  <div class="container footer-grid">
+    <div>
+      <a class="brand" href="#top"><span class="brand-mark">N</span><span class="brand-name">NEXA</span></a>
+      <p class="footer-tag">The AI-native OS for student life.<br/>Made with 💛 in India.</p>
+    </div>
+    <div class="footer-links">
+      <a href="#features">Features</a>
+      <a href="#demo">Live demo</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+      <a href="#waitlist">Waitlist</a>
+    </div>
+  </div>
+  <div class="container footer-bottom">
+    <small>© 2026 NEXA. Your data stays yours.</small>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

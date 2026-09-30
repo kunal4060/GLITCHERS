@@ -20,6 +20,7 @@ import { assignmentRoutes } from './routes/assignments.js';
 import { documentRoutes } from './routes/documents.js';
 import { settingsRoutes } from './routes/settings.js';
 import { healthRoutes } from './routes/health.js';
+import { waitlistRoutes } from './routes/waitlist.js';
 import { onboardingRoutes } from './routes/onboarding.js';
 
 export function buildApp(): FastifyInstance {
@@ -42,6 +43,9 @@ export function buildApp(): FastifyInstance {
 
   // Health & Diagnostic check
   app.register(healthRoutes);
+
+  // Public waitlist (promo site) — no auth
+  app.register(waitlistRoutes, { prefix: '/api/waitlist' });
 
   // Register All Modular Routes
   app.register(authRoutes, { prefix: '/api/auth' });
