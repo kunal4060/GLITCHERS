@@ -51,10 +51,12 @@ export const SearchScreen: React.FC = () => {
 
   const filteredItems = allItems.filter((item) => {
     const matchesCategory = categoryFilter === 'ALL' || item.category === categoryFilter;
+    // M31: null-guarded, searches title AND subtitle (e.g. category names like "food").
+    const q = query.trim().toLowerCase();
     const matchesQuery =
-      !query.trim() ||
-      item.title.toLowerCase().includes(query.toLowerCase()) ||
-      item.subtitle.toLowerCase().includes(query.toLowerCase());
+      !q ||
+      (item.title || '').toLowerCase().includes(q) ||
+      (item.subtitle || '').toLowerCase().includes(q);
     return matchesCategory && matchesQuery;
   });
 
