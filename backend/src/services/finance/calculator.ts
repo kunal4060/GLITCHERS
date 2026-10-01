@@ -27,6 +27,19 @@ export function calculateCategoryBreakdown(expenses: Expense[]): Record<string, 
 
 export function calculateBudgetStatus(budget: Budget, expenses: Expense[]): BudgetStatus {
   const totalSpent = calculateTotalSpent(expenses);
+
+  // Guard against division by zero when no monthly limit is configured
+  if (!budget.monthlyLimit || budget.monthlyLimit <= 0) {
+    return {
+      monthlyLimit: budget.monthlyLimit,
+      totalSpent,
+      remaining: 0,
+      percentageUsed: 0,
+      isOverBudget: false,
+      alertLevel: 'NORMAL',
+    };
+  }
+
   const remaining = Math.max(0, budget.monthlyLimit - totalSpent);
   const percentageUsed = Math.round((totalSpent / budget.monthlyLimit) * 100);
 
