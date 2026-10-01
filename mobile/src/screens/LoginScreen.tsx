@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
   ActivityIndicator,
   Modal,
@@ -15,11 +14,21 @@ import {
   Alert,
   Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { designTokens } from '../theme/designTokens';
+import { LabelCaps, NiaCard } from '../components/nia';
 import { useAuthStore } from '../store/authStore';
 import { apiClient } from '../api/client';
 
+const C = designTokens.colors;
 const APP_LOGO = require('../../assets/logo.png');
+
+// L16: client ID comes from the environment so it can differ per build;
+// the embedded value is only a fallback for local development.
+const GOOGLE_CLIENT_ID =
+  process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ||
+  '536972184941-i8lk8v0n5csl128mo12ougplo6bbf7ao.apps.googleusercontent.com';
 
 export const LoginScreen: React.FC = () => {
   const { loginWithGoogle, isLoading } = useAuthStore();
@@ -54,7 +63,7 @@ export const LoginScreen: React.FC = () => {
 
       // 2. Resilient Fallback: If backend is slow/cold, compose the exact OAuth URL directly
       if (!googleAuthUrl) {
-        const clientId = '536972184941-i8lk8v0n5csl128mo12ougplo6bbf7ao.apps.googleusercontent.com';
+        const clientId = GOOGLE_CLIENT_ID;
         const isLocalWeb = Platform.OS === 'web' && typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
         const redirectUri = isLocalWeb
           ? 'http://localhost:5000/api/auth/google/callback'
@@ -132,8 +141,8 @@ export const LoginScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FAF7F2" />
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <StatusBar barStyle="dark-content" backgroundColor={C.background} />
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         {/* Top Header Badge */}
         <View style={styles.topSection}>
@@ -142,12 +151,12 @@ export const LoginScreen: React.FC = () => {
           </View>
           <Text style={styles.brandTitle}>NEXA</Text>
           <View style={styles.categoryPill}>
-            <Text style={styles.categoryPillText}>AI STUDENT COMPANION • POWERED BY NIA</Text>
+            <LabelCaps color={C.primaryDeep}>AI STUDENT COMPANION • POWERED BY NIA</LabelCaps>
           </View>
         </View>
 
         {/* Hero Value Card */}
-        <View style={styles.heroCard}>
+        <NiaCard style={styles.heroCard}>
           <Text style={styles.heroTitle}>Your student life, organized intelligently.</Text>
           <Text style={styles.heroSubtitle}>
             Connect your Google account to bring your university email, class timetable, academic calendar, tasks, and daily expenses into one calm, private space.
@@ -156,48 +165,48 @@ export const LoginScreen: React.FC = () => {
           <View style={styles.featureList}>
             <View style={styles.featureRow}>
               <View style={styles.featureDot}>
-                <Ionicons name="mail-outline" size={16} color="#2E7470" />
+                <Ionicons name="mail-outline" size={16} color={C.primaryDeep} />
               </View>
               <Text style={styles.featureText}>Smart summaries for university notices & deadlines</Text>
             </View>
             <View style={styles.featureRow}>
               <View style={styles.featureDot}>
-                <Ionicons name="calendar-outline" size={16} color="#2E7470" />
+                <Ionicons name="calendar-outline" size={16} color={C.primaryDeep} />
               </View>
               <Text style={styles.featureText}>Automated timetable & exam conflict detection</Text>
             </View>
             <View style={styles.featureRow}>
               <View style={styles.featureDot}>
-                <Ionicons name="wallet-outline" size={16} color="#2E7470" />
+                <Ionicons name="wallet-outline" size={16} color={C.primaryDeep} />
               </View>
               <Text style={styles.featureText}>Student budget tracking with bill OCR scanning</Text>
             </View>
           </View>
-        </View>
+        </NiaCard>
 
         {/* Action Section */}
         <View style={styles.actionSection}>
           <View style={styles.accountBox}>
-            <Text style={styles.accountBoxLabel}>STUDENT ACCOUNT DETAILS</Text>
-            <View style={[styles.accountInputRow, { marginBottom: 8, borderBottomWidth: 1, borderBottomColor: '#ECE7DE', paddingBottom: 6 }]}>
-              <Ionicons name="person-outline" size={18} color="#2E7470" style={{ marginRight: 8 }} />
+            <LabelCaps>STUDENT ACCOUNT DETAILS</LabelCaps>
+            <View style={[styles.accountInputRow, styles.accountInputRowBorder]}>
+              <Ionicons name="person-outline" size={18} color={C.primaryDeep} style={{ marginRight: 8 }} />
               <TextInput
                 style={styles.accountTextInput}
                 value={customName}
                 onChangeText={setCustomName}
                 placeholder="Your Full Name (e.g. Rahul Sharma)"
-                placeholderTextColor="#A09E9B"
+                placeholderTextColor={C.textMuted}
                 autoCapitalize="words"
               />
             </View>
             <View style={styles.accountInputRow}>
-              <Ionicons name="mail-outline" size={18} color="#2E7470" style={{ marginRight: 8 }} />
+              <Ionicons name="mail-outline" size={18} color={C.primaryDeep} style={{ marginRight: 8 }} />
               <TextInput
                 style={styles.accountTextInput}
                 value={customEmail}
                 onChangeText={setCustomEmail}
                 placeholder="Email (e.g. student@university.edu)"
-                placeholderTextColor="#A09E9B"
+                placeholderTextColor={C.textMuted}
                 keyboardType="email-address"
                 autoCapitalize="none"
               />
@@ -212,7 +221,7 @@ export const LoginScreen: React.FC = () => {
             activeOpacity={0.88}
           >
             {isLoading || isRedirecting ? (
-              <ActivityIndicator size="small" color="#2E7470" />
+              <ActivityIndicator size="small" color={C.primaryDeep} />
             ) : (
               <>
                 <View style={styles.googleIconBadge}>
@@ -230,13 +239,13 @@ export const LoginScreen: React.FC = () => {
             disabled={isLoading || isRedirecting}
             activeOpacity={0.85}
           >
-            <Ionicons name="school-outline" size={16} color="#5A5855" style={{ marginRight: 6 }} />
+            <Ionicons name="school-outline" size={16} color={C.textSecondary} style={{ marginRight: 6 }} />
             <Text style={styles.directButtonText}>Direct Demo Sign In (Offline)</Text>
           </TouchableOpacity>
 
           {/* Privacy note */}
           <View style={styles.securityNoteContainer}>
-            <Ionicons name="shield-checkmark-outline" size={15} color="#7A7875" />
+            <Ionicons name="shield-checkmark-outline" size={15} color={C.textSecondary} />
             <Text style={styles.securityNoteText}>
               Your Google password is never stored by this app.
             </Text>
@@ -268,7 +277,7 @@ export const LoginScreen: React.FC = () => {
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Privacy & Data Protection</Text>
                 <TouchableOpacity onPress={() => setShowPrivacyModal(false)}>
-                  <Ionicons name="close" size={24} color="#1A1A1A" />
+                  <Ionicons name="close" size={24} color={C.textPrimary} />
                 </TouchableOpacity>
               </View>
               <ScrollView style={styles.modalScroll}>
@@ -276,7 +285,7 @@ export const LoginScreen: React.FC = () => {
                   • <Text style={styles.bold}>Google Identity Only:</Text> Login only requests your basic identity to link your student profile.
                 </Text>
                 <Text style={styles.modalParagraph}>
-                  • <Text style={styles.bold}>Explicit Service Scopes:</Text> University email and Google Calendar permissions are requested separately during onboarding. You can choose which services to link.
+                  • <Text style={styles.bold}>Service Scopes:</Text> Sign-in requests read-only access to your university email and calendar so NIA can summarize notices and sync deadlines. You can pause either service anytime from the Privacy screen.
                 </Text>
                 <Text style={styles.modalParagraph}>
                   • <Text style={styles.bold}>Zero Ad Profiling:</Text> Your student data, grades, and emails are never sold, monetized, or shared with third-party advertisers.
@@ -302,7 +311,7 @@ export const LoginScreen: React.FC = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: C.background,
   },
   container: {
     flexGrow: 1,
@@ -321,7 +330,7 @@ const styles = StyleSheet.create({
     width: 68,
     height: 68,
     borderRadius: 18,
-    shadowColor: '#2E7470',
+    shadowColor: C.primaryDeep,
     shadowOpacity: 0.25,
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 10,
@@ -330,45 +339,33 @@ const styles = StyleSheet.create({
   brandTitle: {
     fontSize: 26,
     fontWeight: '800',
-    color: '#1A1A1A',
+    color: C.textPrimary,
     letterSpacing: 2,
   },
   categoryPill: {
     marginTop: 6,
-    backgroundColor: '#F0ECE4',
+    backgroundColor: C.primaryPill,
+    borderWidth: 1,
+    borderColor: C.primary,
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 12,
   },
-  categoryPillText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#2E7470',
-    letterSpacing: 1,
-  },
   heroCard: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: 24,
-    borderWidth: 1,
-    borderColor: '#ECE6DC',
-    shadowColor: '#000000',
-    shadowOpacity: 0.04,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 16,
-    elevation: 2,
   },
   heroTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: C.textPrimary,
     lineHeight: 28,
     marginBottom: 10,
   },
   heroSubtitle: {
     fontSize: 14,
     lineHeight: 21,
-    color: '#656360',
+    color: C.textSecondary,
     marginBottom: 20,
   },
   featureList: {
@@ -383,14 +380,14 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: '#F3F8F7',
+    backgroundColor: C.primarySoft,
     justifyContent: 'center',
     alignItems: 'center',
   },
   featureText: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#3D3B39',
+    color: C.textPrimary,
     flex: 1,
   },
   actionSection: {
@@ -399,29 +396,28 @@ const styles = StyleSheet.create({
   },
   accountBox: {
     width: '100%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: C.surfaceCard,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E2DED6',
+    borderColor: C.surfaceBorder,
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginBottom: 12,
-  },
-  accountBoxLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#7A7875',
-    letterSpacing: 0.8,
-    marginBottom: 4,
   },
   accountInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+  accountInputRowBorder: {
+    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: C.surfaceBorder,
+    paddingBottom: 6,
+  },
   accountTextInput: {
     flex: 1,
     fontSize: 14,
-    color: '#1A1A1A',
+    color: C.textPrimary,
     fontWeight: '600',
     paddingVertical: 2,
   },
@@ -429,32 +425,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: C.surfaceCard,
     borderWidth: 1.5,
-    borderColor: '#D8D4CC',
+    borderColor: C.surfaceBorder,
     borderRadius: 18,
     paddingVertical: 16,
     paddingHorizontal: 24,
     width: '100%',
-    shadowColor: '#000000',
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
-    elevation: 2,
+    ...designTokens.shadows.card,
     gap: 12,
   },
   googleIconBadge: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#F6F3ED',
+    backgroundColor: C.surfaceSecondary,
     justifyContent: 'center',
     alignItems: 'center',
   },
   googleButtonText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: C.textPrimary,
   },
   directButton: {
     flexDirection: 'row',
@@ -465,14 +457,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#D8D4CC',
-    backgroundColor: '#FAF7F2',
+    borderColor: C.surfaceBorder,
+    backgroundColor: C.surfaceSecondary,
     width: '100%',
   },
   directButtonText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#5A5855',
+    color: C.textSecondary,
   },
   securityNoteContainer: {
     flexDirection: 'row',
@@ -483,7 +475,7 @@ const styles = StyleSheet.create({
   },
   securityNoteText: {
     fontSize: 12,
-    color: '#7A7875',
+    color: C.textSecondary,
   },
   privacyLink: {
     marginTop: 10,
@@ -492,7 +484,7 @@ const styles = StyleSheet.create({
   privacyLinkText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#2E7470',
+    color: C.primaryDeep,
     textDecorationLine: 'underline',
   },
   modalBackdrop: {
@@ -503,11 +495,13 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   modalCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: C.surfaceCard,
     borderRadius: 24,
     padding: 24,
     width: '100%',
     maxHeight: '80%',
+    borderWidth: 1,
+    borderColor: C.surfaceBorder,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -518,7 +512,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: C.textPrimary,
   },
   modalScroll: {
     marginBottom: 20,
@@ -526,15 +520,15 @@ const styles = StyleSheet.create({
   modalParagraph: {
     fontSize: 14,
     lineHeight: 22,
-    color: '#4A4846',
+    color: C.textSecondary,
     marginBottom: 12,
   },
   bold: {
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: C.textPrimary,
   },
   modalCloseButton: {
-    backgroundColor: '#2E7470',
+    backgroundColor: C.primaryDeep,
     borderRadius: 14,
     paddingVertical: 12,
     alignItems: 'center',
@@ -552,7 +546,7 @@ const styles = StyleSheet.create({
   creditText: {
     fontSize: 11.5,
     fontWeight: '600',
-    color: '#706D66',
+    color: C.textMuted,
     letterSpacing: 0.5,
   },
 });
