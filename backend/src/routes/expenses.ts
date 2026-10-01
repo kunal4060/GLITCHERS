@@ -24,7 +24,7 @@ export const expenseRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   fastify.post<{
-    Body: { text?: string; amount?: number; category?: Expense['category']; description?: string; merchant?: string };
+    Body: { id?: string; text?: string; amount?: number; category?: Expense['category']; description?: string; merchant?: string };
   }>('/', async (req, reply) => {
     const userId = req.userId!;
     let amount = req.body.amount;
@@ -44,7 +44,7 @@ export const expenseRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const newExpense: Expense = {
-      id: randomUUID(),
+      id: typeof req.body.id === 'string' && req.body.id.trim().length > 0 ? req.body.id.trim() : randomUUID(),
       userId,
       amount: Number(amount),
       category,
