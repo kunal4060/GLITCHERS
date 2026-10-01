@@ -161,11 +161,16 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
         monthlyBudget?: number;
       };
       floatingAssistantEnabled?: boolean;
+      // Only when explicitly sent does /initialize mark onboarding complete.
+      complete?: boolean;
     };
   }>('/initialize', async (req) => {
     const userId = req.userId!;
     const body = req.body || {};
     const jobId = randomUUID();
+
+    // M12 fix: completion must be explicit — never force isComplete/completedSteps.
+    const explicitlyComplete = body.complete === true;
 
     const job: InitializationJob = {
       id: jobId,
@@ -205,15 +210,19 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
       ...(body.profile?.creditsCompleted !== undefined ? { creditsCompleted: Number(body.profile.creditsCompleted) } : {}),
       ...(body.profile?.creditsCurrent !== undefined ? { creditsCurrent: Number(body.profile.creditsCurrent) } : {}),
       ...(body.profile?.universityDomain ? { universityDomain: body.profile.universityDomain } : {}),
-      isOnboardingComplete: true,
+      // M12 fix: never force completion here — only when the client sent complete: true.
+      isOnboardingComplete: explicitlyComplete || (existingProfile as any).isOnboardingComplete || false,
       updatedAt: new Date().toISOString(),
     };
     await supabaseStore.updateProfile(userId, updatedProfile);
     job.stepStatuses.profile = { status: 'COMPLETED', message: 'Profile created' };
 
     // 2. Timetable & Subject initialization (Idempotent by subject + day + start_time)
+    // M12 fix: dedup against Supabase (supabaseStore.getClasses), not inMemoryStore —
+    // inMemoryStore is empty after a restart, which re-inserted duplicate classes.
+    let organizedClassCount = 0;
     if (body.classes && Array.isArray(body.classes) && body.classes.length > 0) {
-      const currentClasses = inMemoryStore.classes.get(userId) || [];
+      const currentClasses = await supabaseStore.getClasses(userId);
       const userSubjects = inMemoryStore.subjects.get(userId) || [];
 
       for (const item of body.classes) {
@@ -229,7 +238,8 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
             name: normalizedSubName,
             shortName: normalizedSubName.slice(0, 8).toUpperCase(),
             color: '#2E7470',
-            faculty: item.faculty || 'Department Faculty',
+            // M12 fix: never invent faculty names — store empty when not provided.
+            faculty: item.faculty || '',
             code: (item as any).subjectCode || undefined,
           };
           userSubjects.push(subject);
@@ -251,8 +261,9 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
             day: item.day,
             startTime: item.startTime,
             endTime: item.endTime,
-            room: item.room || 'AB1-204',
-            faculty: item.faculty || 'Faculty Member',
+            // M12 fix: never invent room/faculty — store empty when not provided.
+            room: item.room || '',
+            faculty: item.faculty || '',
             classType: item.classType || 'LECTURE',
             isCancelled: false,
           });
@@ -264,10 +275,11 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
       await supabaseStore.saveClasses(userId, currentClasses).catch((err) =>
         console.warn('saveClasses to Supabase in onboarding error:', err)
       );
+      organizedClassCount = currentClasses.length;
     }
     job.stepStatuses.timetable = {
       status: 'COMPLETED',
-      message: `${(inMemoryStore.classes.get(userId) || []).length} classes organized`,
+      message: `${organizedClassCount} classes organized`,
     };
 
     // 3. Calendar event initialization
@@ -320,25 +332,29 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
     await supabaseStore.saveInitializationJob(job);
 
     const existingState = (await supabaseStore.getOnboardingState(userId)) || inMemoryStore.onboardingStates.get(userId);
+    // M12 fix: do NOT force completedSteps / isComplete — only mark complete when
+    // the client explicitly sent `complete: true`. Otherwise preserve prior progress.
     const finalState: OnboardingState = {
       ...(existingState || { userId, startedAt: new Date().toISOString() }),
-      currentStep: 'COMPLETE',
-      isComplete: true,
+      currentStep: explicitlyComplete ? 'COMPLETE' : existingState?.currentStep || 'INITIAL_PROCESSING',
+      isComplete: explicitlyComplete,
       data: existingState?.data || {},
-      completedSteps: [
-        'GOOGLE_AUTH',
-        'GOOGLE_SERVICES',
-        'PROFILE',
-        'ACADEMICS',
-        'TIMETABLE',
-        'TIMETABLE_REVIEW',
-        'NOTIFICATION_SETUP',
-        'FINANCE_SETUP',
-        'FLOATING_ASSISTANT',
-        'INITIAL_PROCESSING',
-        'COMPLETE',
-      ],
-      completedAt: new Date().toISOString(),
+      completedSteps: explicitlyComplete
+        ? [
+            'GOOGLE_AUTH',
+            'GOOGLE_SERVICES',
+            'PROFILE',
+            'ACADEMICS',
+            'TIMETABLE',
+            'TIMETABLE_REVIEW',
+            'NOTIFICATION_SETUP',
+            'FINANCE_SETUP',
+            'FLOATING_ASSISTANT',
+            'INITIAL_PROCESSING',
+            'COMPLETE',
+          ]
+        : existingState?.completedSteps || [],
+      completedAt: explicitlyComplete ? new Date().toISOString() : existingState?.completedAt,
       updatedAt: new Date().toISOString(),
     };
     await supabaseStore.saveOnboardingState(userId, finalState);
@@ -348,7 +364,7 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
       jobId,
       status: 'COMPLETED',
       job,
-      isComplete: true,
+      isComplete: explicitlyComplete,
     };
   });
 
