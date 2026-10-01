@@ -305,8 +305,30 @@ class ApiClient {
     return this.get<{ exams: any[] }>('/exams');
   }
 
+  public async createExam(exam: {
+    subject: string;
+    date: string;
+    time: string;
+    room?: string;
+    syllabus?: string;
+    importance?: string;
+  }) {
+    return this.post<{ exam: any }>('/exams', exam);
+  }
+
   public async fetchAssignments() {
     return this.get<{ assignments: any[] }>('/assignments');
+  }
+
+  public async createAssignment(assignment: {
+    title: string;
+    subject: string;
+    deadline: string;
+    description?: string;
+    submissionPlatform?: string;
+    priority?: string;
+  }) {
+    return this.post<{ assignment: any }>('/assignments', assignment);
   }
 
   public async fetchDocuments() {
