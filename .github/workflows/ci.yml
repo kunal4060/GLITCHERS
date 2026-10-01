@@ -49,8 +49,8 @@ jobs:
           GEMINI_API_KEY: test-mock-key
           JWT_SECRET: ci-test-secret-key-32-chars-long
           SUPABASE_URL: https://dummy.supabase.co
-          SUPABASE_SERVICE_ROLE_KEY: dummy-service-role-key
-          SUPABASE_ANON_KEY: dummy-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: dev-ci-dummy-key
+          SUPABASE_ANON_KEY: dev-ci-dummy-key
           GOOGLE_CLIENT_ID: dummy-google-client-id
           GOOGLE_CLIENT_SECRET: dummy-google-client-secret
 
