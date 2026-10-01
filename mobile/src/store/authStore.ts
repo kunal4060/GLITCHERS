@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { UserProfile, OnboardingStep } from '@glitchers/shared';
 import { apiClient } from '../api/client';
+import { loadAuthToken } from '../utils/tokenStorage';
 import { useDashboardStore } from './dashboardStore';
 
 interface AuthState {
@@ -45,9 +46,7 @@ export const useAuthStore = create<AuthState>()(
 
       setHydrated: (isHydrated) => set({ isHydrated }),
       setUser: (user) => {
-        const token = get().token || (user?.id ? `jwt_${user.id}` : null);
-        if (token) apiClient.setToken(token);
-        set({ user, isAuthenticated: !!user, token });
+        set({ user, isAuthenticated: !!user });
       },
       setToken: (token) => {
         if (token) apiClient.setToken(token);
@@ -147,8 +146,8 @@ export const useAuthStore = create<AuthState>()(
           }
 
           if (!activeToken && user?.id) {
-            activeToken = `jwt_${user.id}`;
-            apiClient.setToken(activeToken);
+            // No synthetic tokens: without a backend-issued token the user stays logged out.
+            console.warn('Login completed without a backend token; staying logged out.');
           }
 
           // Check if this user had previously completed onboarding
@@ -163,15 +162,20 @@ export const useAuthStore = create<AuthState>()(
             ? (rawStep as OnboardingStep)
             : 'GOOGLE_SERVICES';
 
+          // Real connection flags from backend (never hardcoded)
+          const priv = await apiClient
+            .get<{ gmailConnected?: boolean; calendarConnected?: boolean }>('/privacy/status')
+            .catch(() => null);
+
           set({
-            isAuthenticated: true,
-            user: { ...user, isOnboardingComplete: isComplete },
+            isAuthenticated: !!(user && activeToken),
+            user: user ? { ...user, isOnboardingComplete: isComplete } : null,
             token: activeToken || null,
             isOnboardingComplete: isComplete,
             currentOnboardingStep: step,
             onboardingData: statusRes?.state?.data || {},
-            gmailConnected: true,
-            calendarConnected: true,
+            gmailConnected: priv?.gmailConnected ?? false,
+            calendarConnected: priv?.calendarConnected ?? false,
             isLoading: false,
           });
 
@@ -184,43 +188,58 @@ export const useAuthStore = create<AuthState>()(
       },
 
       checkSession: async () => {
+        const currentToken = get().token;
+        if (!currentToken) {
+          // No token: already logged out, nothing to validate.
+          return;
+        }
+        apiClient.setToken(currentToken);
+
         try {
-          const currentToken = get().token || (get().user?.id ? `jwt_${get().user!.id}` : null);
-          if (!currentToken) {
+          const res = await apiClient.get<{ user: UserProfile }>('/auth/me').catch(() => null);
+          if (!res?.user) {
+            // M20: dead/invalid token — clear stale auth state instead of lingering.
+            get().logout();
             return;
           }
-          apiClient.setToken(currentToken);
-
-          const res = await apiClient.get<{ user: UserProfile }>('/auth/me').catch(() => null);
-          if (res?.user) {
-            // Guard: never let dev-token mock user overwrite an actual student profile
-            if (
-              res.user.id === '00000000-0000-0000-0000-000000000001' &&
-              get().user?.id &&
-              get().user!.id !== '00000000-0000-0000-0000-000000000001'
-            ) {
-              console.warn('Blocked checkSession from overwriting real user with dev user');
-              return;
-            }
-
-            const statusRes = await apiClient.getOnboardingStatus().catch(() => null);
-            const isComplete = statusRes?.isComplete ?? res.user.isOnboardingComplete ?? false;
-            set({
-              isAuthenticated: true,
-              user: res.user,
-              token: currentToken,
-              isOnboardingComplete: isComplete,
-              currentOnboardingStep: (statusRes?.state?.currentStep as OnboardingStep) || (isComplete ? 'COMPLETE' : 'GOOGLE_SERVICES'),
-              onboardingData: statusRes?.state?.data || {},
-              gmailConnected: true,
-              calendarConnected: true,
-            });
-
-            // Hydrate latest data on session restore
-            useDashboardStore.getState().syncWithBackend().catch(() => null);
+          // Guard: never let dev-token mock user overwrite an actual student profile
+          if (
+            res.user.id === '00000000-0000-0000-0000-000000000001' &&
+            get().user?.id &&
+            get().user!.id !== '00000000-0000-0000-0000-000000000001'
+          ) {
+            console.warn('Blocked checkSession from overwriting real user with dev user');
+            return;
           }
+
+          const statusRes = await apiClient.getOnboardingStatus().catch(() => null);
+          const isComplete = statusRes?.isComplete ?? res.user.isOnboardingComplete ?? false;
+          // M21: same INITIAL_PROCESSING trap-guard as loginWithGoogle
+          const rawStep = statusRes?.state?.currentStep;
+          const step: OnboardingStep = isComplete
+            ? 'COMPLETE'
+            : rawStep && rawStep !== 'COMPLETE' && rawStep !== 'INITIAL_PROCESSING' && rawStep !== 'GOOGLE_AUTH'
+            ? (rawStep as OnboardingStep)
+            : 'GOOGLE_SERVICES';
+          const priv = await apiClient
+            .get<{ gmailConnected?: boolean; calendarConnected?: boolean }>('/privacy/status')
+            .catch(() => null);
+          set({
+            isAuthenticated: true,
+            user: res.user,
+            token: currentToken,
+            isOnboardingComplete: isComplete,
+            currentOnboardingStep: step,
+            onboardingData: statusRes?.state?.data || {},
+            gmailConnected: priv?.gmailConnected ?? false,
+            calendarConnected: priv?.calendarConnected ?? false,
+          });
+
+          // Hydrate latest data on session restore
+          useDashboardStore.getState().syncWithBackend().catch(() => null);
         } catch (err) {
           console.warn('Check session error:', err);
+          get().logout();
         }
       },
 
@@ -249,13 +268,15 @@ export const useAuthStore = create<AuthState>()(
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.setHydrated(true);
-          if (state.token) {
-            apiClient.setToken(state.token);
-          } else if (state.user?.id) {
-            const derived = `jwt_${state.user.id}`;
-            state.token = derived;
-            apiClient.setToken(derived);
-          }
+          // Token lives in SecureStore, not in the persisted slice (M23).
+          loadAuthToken()
+            .then((t) => {
+              if (t) {
+                useAuthStore.setState({ token: t });
+                apiClient.setToken(t);
+              }
+            })
+            .catch(() => null);
         }
       },
       partialize: (state) => ({
@@ -263,7 +284,6 @@ export const useAuthStore = create<AuthState>()(
         isOnboardingComplete: state.isOnboardingComplete,
         currentOnboardingStep: state.currentOnboardingStep,
         user: state.user,
-        token: state.token,
         gmailConnected: state.gmailConnected,
         calendarConnected: state.calendarConnected,
         onboardingData: state.onboardingData,
