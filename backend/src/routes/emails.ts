@@ -17,7 +17,9 @@ export const emailRoutes: FastifyPluginAsync = async (fastify) => {
 
   async function syncGmailIfAvailable(userId: string) {
     inMemoryStore.ensureStudentData(userId);
-    const token = googleService.getUserAccessToken(userId);
+    // getValidAccessToken refreshes via the persisted refresh_token when the
+    // in-memory access token is expired or was wiped by a backend restart.
+    const token = await googleService.getValidAccessToken(userId);
     if (!token) return;
 
     try {
@@ -125,14 +127,29 @@ export const emailRoutes: FastifyPluginAsync = async (fastify) => {
     const userId = req.userId!;
     const clientEmails: EmailSummary[] | undefined = req.body?.emails;
 
-    let allEmails: EmailSummary[];
-    if (clientEmails && Array.isArray(clientEmails) && clientEmails.length > 0) {
-      allEmails = clientEmails;
-      await supabaseStore.saveEmails(userId, clientEmails).catch(() => null);
-    } else {
-      await syncGmailIfAvailable(userId);
-      allEmails = await supabaseStore.getEmails(userId);
+    // Always attempt a fresh Gmail sync first. Summarizing purely from the
+    // client's cached list would keep returning the same stale summary even
+    // after new mail arrives.
+    await syncGmailIfAvailable(userId);
+
+    const stored = (await supabaseStore.getEmails(userId)) || [];
+    const byId = new Map<string, EmailSummary>();
+    for (const e of stored) {
+      if (e?.id) byId.set(e.id, e);
     }
+    if (clientEmails && Array.isArray(clientEmails) && clientEmails.length > 0) {
+      let added = false;
+      for (const e of clientEmails) {
+        if (e?.id && !byId.has(e.id)) {
+          byId.set(e.id, e);
+          added = true;
+        }
+      }
+      if (added) {
+        await supabaseStore.saveEmails(userId, Array.from(byId.values())).catch(() => null);
+      }
+    }
+    const allEmails = Array.from(byId.values());
 
     // Only summarize active (non-dismissed) notices
     const emails = allEmails.filter((e) => !e.isDismissed && !(e as any).processed);
