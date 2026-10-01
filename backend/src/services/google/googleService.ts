@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { env } from '../../config/env.js';
-import { getSupabaseClient } from '../repositories/supabaseClient.js';
+import { getSupabaseClient } from '../../repositories/supabaseClient.js';
 
 interface TokenEntry {
   token: string;
