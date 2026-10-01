@@ -7,6 +7,8 @@ import { useDashboardStore } from '../store/dashboardStore';
 import { useAuthStore } from '../store/authStore';
 import { apiClient } from '../api/client';
 
+const C = designTokens.colors;
+
 export const CalendarScreen: React.FC = () => {
   const { classes, tasks } = useDashboardStore();
   const { calendarConnected } = useAuthStore();
@@ -152,11 +154,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: C.surfaceCard,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(41, 51, 50, 0.06)',
+    borderBottomColor: C.surfaceBorder,
   },
   syncIndicator: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   syncDot: {
@@ -182,12 +184,12 @@ const styles = StyleSheet.create({
   filterRow: { flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 8 },
   filterTab: {
     flex: 1,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: C.background,
     paddingVertical: 8,
     borderRadius: designTokens.radii.pill,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.08)',
+    borderColor: C.surfaceBorder,
   },
   filterTabActive: {
     backgroundColor: designTokens.colors.primaryPill,
@@ -197,12 +199,12 @@ const styles = StyleSheet.create({
   filterTextActive: { color: designTokens.colors.textPrimary },
   content: { flex: 1 },
   eventCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: C.surfaceCard,
     borderRadius: designTokens.radii.card,
     padding: 16,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.06)',
+    borderColor: C.surfaceBorder,
     ...designTokens.shadows.card,
   },
   eventLeft: { flex: 1 },
