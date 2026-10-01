@@ -67,7 +67,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-  fastify.get<{ Querystring: { code?: string; error?: string; state?: string; email?: string; name?: string } }>('/mock-google-login', async (req, reply) => {
+  fastify.get<{ Querystring: { code?: string; error?: string; state?: string; email?: string; name?: string; returnUrl?: string } }>('/mock-google-login', async (req, reply) => {
     const returnUrl = req.query.returnUrl || 'http://localhost:8082';
     const cleanBase = returnUrl.split('?')[0].replace(/\/$/, '');
     const email = req.query.email || 'student@university.edu';
