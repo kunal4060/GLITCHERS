@@ -36,6 +36,16 @@ export class GoogleService {
   }
 
   /**
+   * Clears the cached in-memory access token for a user (e.g. on Google
+   * disconnect / account deletion). This is the only token cache in the
+   * class — the refresh path reads `refresh_token` from Supabase per call,
+   * so it dies with the deleted `google_accounts` row.
+   */
+  public clearUserToken(userId: string): void {
+    this.userTokens.delete(userId);
+  }
+
+  /**
    * Returns a valid Google access token for the user. Uses the in-memory token
    * when still fresh; otherwise refreshes via the refresh_token persisted in
    * Supabase (google_accounts) and re-caches the new token.
