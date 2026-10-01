@@ -43,8 +43,8 @@ class InMemoryStore {
 
     this.profiles.set(userId, {
       id: userId,
-      email: 'kunalugale4060@gmail.com',
-      fullName: 'Kunal Ugale',
+      email: 'dev@example.com',
+      fullName: 'Dev User',
       university: 'State Technological University',
       course: 'Computer Science & Engineering',
       year: 3,
@@ -172,9 +172,9 @@ class InMemoryStore {
       this.googleConnections.set(userId, {
         id: randomUUID(),
         userId,
-        email: profile?.email || 'kunalugale4060@gmail.com',
-        gmailConnected: true,
-        calendarConnected: true,
+        email: profile?.email || 'dev@example.com',
+        gmailConnected: false,
+        calendarConnected: false,
         scopes: ['userinfo.email', 'userinfo.profile', 'openid', 'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/calendar.events'],
       });
     }
