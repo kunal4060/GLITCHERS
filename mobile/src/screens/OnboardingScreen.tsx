@@ -6,20 +6,24 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
-  SafeAreaView,
   StatusBar,
   ActivityIndicator,
   Alert,
   Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuthStore } from '../store/authStore';
 import { useDashboardStore } from '../store/dashboardStore';
 import { apiClient } from '../api/client';
+import { designTokens } from '../theme/designTokens';
 import type { ClassSession, DayOfWeekType } from '@glitchers/shared';
 
-const DAYS_OF_WEEK: DayOfWeekType[] = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+const C = designTokens.colors;
+
+// L20: include SUNDAY so weekend classes can be scheduled.
+const DAYS_OF_WEEK: DayOfWeekType[] = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
 
 export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
   const {
@@ -38,6 +42,34 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
       ? currentOnboardingStep
       : 'GOOGLE_SERVICES'
   );
+
+  // M32: track which setup steps the user actually finished, so the COMPLETE
+  // summary only renders after every required step was completed. On resume,
+  // steps before the restored step count as already done.
+  const STEP_ORDER = [
+    'GOOGLE_SERVICES',
+    'PROFILE',
+    'ACADEMICS',
+    'TIMETABLE',
+    'TIMETABLE_REVIEW',
+    'NOTIFICATION_SETUP',
+    'FINANCE_SETUP',
+    'FLOATING_ASSISTANT',
+    'INITIAL_PROCESSING',
+    'COMPLETE',
+  ];
+  const REQUIRED_STEPS = STEP_ORDER.slice(0, 9);
+  const [completedSteps, setCompletedSteps] = useState<string[]>(() => {
+    const idx = STEP_ORDER.indexOf(activeStep);
+    return idx > 0 ? STEP_ORDER.slice(0, idx) : [];
+  });
+  const markStepDone = (step: string) =>
+    setCompletedSteps((prev) => (prev.includes(step) ? prev : [...prev, step]));
+  const goToStep = (next: string, done?: string) => {
+    if (done) markStepDone(done);
+    setActiveStep(next);
+  };
+  const allRequiredDone = REQUIRED_STEPS.every((st) => completedSteps.includes(st));
 
   // 1. Google Services
   const [gmailEnabled, setGmailEnabled] = useState(true);
@@ -156,7 +188,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
         if (res.classes && res.classes.length > 0) {
           setClasses(res.classes);
           Alert.alert('Timetable Analyzed', `Successfully extracted ${res.classes.length} classes from your schedule!`);
-          setActiveStep('TIMETABLE_REVIEW');
+          goToStep('TIMETABLE_REVIEW', 'TIMETABLE');
         } else {
           Alert.alert(
             'Extraction Notice',
@@ -193,36 +225,16 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
     setClasses((prev) => [...prev, newClass]);
     setManualSubject('');
     Alert.alert('Added', `${newClass.subjectName} added to timetable.`);
-    setActiveStep('TIMETABLE_REVIEW');
+    goToStep('TIMETABLE_REVIEW', 'TIMETABLE');
   };
 
   const handleRemoveClass = (index: number) => {
     setClasses((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Auto-progress if mounted or entered into INITIAL_PROCESSING
-  useEffect(() => {
-    if (activeStep === 'INITIAL_PROCESSING') {
-      const timer = setTimeout(() => {
-        setProcessingStages((stages) => stages.map((s) => ({ ...s, done: true, inProgress: false })));
-        setGoogleConnections(gmailEnabled, calendarEnabled);
-        completeOnboarding({
-          fullName,
-          university,
-          course,
-          year: parseInt(year, 10) || 1,
-          semester: parseInt(semester, 10) || 1,
-          section,
-          cgpa,
-        });
-        setActiveStep('COMPLETE');
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [activeStep]);
-
   // Run Real Backend Idempotent Initialization
   const runInitializationPipeline = async () => {
+    markStepDone('FLOATING_ASSISTANT');
     setActiveStep('INITIAL_PROCESSING');
 
     const payload = {
@@ -287,7 +299,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
       alertThresholds: [75, 90, 100],
     });
 
-    setActiveStep('COMPLETE');
+    goToStep('COMPLETE', 'INITIAL_PROCESSING');
   };
 
   // Step Progress Calculation
@@ -311,8 +323,8 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
       : 9;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FAF7F2" />
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <StatusBar barStyle="dark-content" backgroundColor={C.background} />
       <View style={styles.container}>
         {/* Top Stepper Bar */}
         <View style={styles.stepperContainer}>
@@ -350,7 +362,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                 ]);
               }}
             >
-              <Ionicons name="log-out-outline" size={14} color="#7A7875" style={{ marginRight: 4 }} />
+              <Ionicons name="log-out-outline" size={14} color={C.textSecondary} style={{ marginRight: 4 }} />
               <Text style={styles.signOutButtonText}>Sign Out</Text>
             </TouchableOpacity>
           </View>
@@ -365,7 +377,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
             <View style={styles.stepCard}>
               <View style={styles.iconHeading}>
                 <View style={styles.iconCircle}>
-                  <Ionicons name="link-outline" size={24} color="#2E7470" />
+                  <Ionicons name="link-outline" size={24} color={C.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardHeader}>Authorize Google Services</Text>
@@ -385,8 +397,8 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                 <Switch
                   value={gmailEnabled}
                   onValueChange={setGmailEnabled}
-                  trackColor={{ false: '#D8D4CC', true: '#2E7470' }}
-                  thumbColor="#FFFFFF"
+                  trackColor={{ false: C.surfaceBorder, true: C.primary }}
+                  thumbColor={C.surfaceCard}
                 />
               </View>
 
@@ -400,8 +412,8 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                 <Switch
                   value={calendarEnabled}
                   onValueChange={setCalendarEnabled}
-                  trackColor={{ false: '#D8D4CC', true: '#2E7470' }}
-                  thumbColor="#FFFFFF"
+                  trackColor={{ false: C.surfaceBorder, true: C.primary }}
+                  thumbColor={C.surfaceCard}
                 />
               </View>
 
@@ -412,7 +424,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   value={universityDomain}
                   onChangeText={setUniversityDomain}
                   placeholder="e.g. university.edu"
-                  placeholderTextColor="#A09E9B"
+                  placeholderTextColor={C.textMuted}
                   autoCapitalize="none"
                 />
                 <Text style={styles.inputHelp}>
@@ -422,7 +434,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
 
               <TouchableOpacity
                 style={styles.primaryButton}
-                onPress={() => setActiveStep('PROFILE')}
+                onPress={() => goToStep('PROFILE', 'GOOGLE_SERVICES')}
               >
                 <Text style={styles.primaryButtonText}>Continue to Profile →</Text>
               </TouchableOpacity>
@@ -434,7 +446,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
             <View style={styles.stepCard}>
               <View style={styles.iconHeading}>
                 <View style={styles.iconCircle}>
-                  <Ionicons name="person-outline" size={24} color="#2E7470" />
+                  <Ionicons name="person-outline" size={24} color={C.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardHeader}>Student Profile</Text>
@@ -451,7 +463,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   value={fullName}
                   onChangeText={setFullName}
                   placeholder="Your Name"
-                  placeholderTextColor="#A09E9B"
+                  placeholderTextColor={C.textMuted}
                 />
               </View>
 
@@ -462,7 +474,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   value={university}
                   onChangeText={setUniversity}
                   placeholder="e.g. State Technological University"
-                  placeholderTextColor="#A09E9B"
+                  placeholderTextColor={C.textMuted}
                 />
               </View>
 
@@ -473,7 +485,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   value={course}
                   onChangeText={setCourse}
                   placeholder="e.g. Computer Science & Engineering"
-                  placeholderTextColor="#A09E9B"
+                  placeholderTextColor={C.textMuted}
                 />
               </View>
 
@@ -486,7 +498,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                     onChangeText={setYear}
                     keyboardType="numeric"
                     placeholder="3"
-                    placeholderTextColor="#A09E9B"
+                    placeholderTextColor={C.textMuted}
                   />
                 </View>
                 <View style={[styles.inputGroup, { flex: 1 }]}>
@@ -497,7 +509,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                     onChangeText={setSemester}
                     keyboardType="numeric"
                     placeholder="6"
-                    placeholderTextColor="#A09E9B"
+                    placeholderTextColor={C.textMuted}
                   />
                 </View>
                 <View style={[styles.inputGroup, { flex: 1 }]}>
@@ -507,7 +519,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                     value={section}
                     onChangeText={setSection}
                     placeholder="A"
-                    placeholderTextColor="#A09E9B"
+                    placeholderTextColor={C.textMuted}
                   />
                 </View>
               </View>
@@ -526,7 +538,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                       Alert.alert('Name Required', 'Please enter your name.');
                       return;
                     }
-                    setActiveStep('ACADEMICS');
+                    goToStep('ACADEMICS', 'PROFILE');
                   }}
                 >
                   <Text style={styles.primaryButtonText}>Next: Academics →</Text>
@@ -540,7 +552,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
             <View style={styles.stepCard}>
               <View style={styles.iconHeading}>
                 <View style={styles.iconCircle}>
-                  <Ionicons name="school-outline" size={24} color="#2E7470" />
+                  <Ionicons name="school-outline" size={24} color={C.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardHeader}>Academic Records</Text>
@@ -557,7 +569,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   value={cgpa}
                   onChangeText={setCgpa}
                   placeholder="e.g. 8.71"
-                  placeholderTextColor="#A09E9B"
+                  placeholderTextColor={C.textMuted}
                   keyboardType="numeric"
                 />
               </View>
@@ -571,7 +583,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                     onChangeText={setCreditsCompleted}
                     keyboardType="numeric"
                     placeholder="42"
-                    placeholderTextColor="#A09E9B"
+                    placeholderTextColor={C.textMuted}
                   />
                 </View>
                 <View style={[styles.inputGroup, { flex: 1 }]}>
@@ -582,7 +594,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                     onChangeText={setCreditsCurrent}
                     keyboardType="numeric"
                     placeholder="18"
-                    placeholderTextColor="#A09E9B"
+                    placeholderTextColor={C.textMuted}
                   />
                 </View>
               </View>
@@ -594,7 +606,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   value={studentId}
                   onChangeText={setStudentId}
                   placeholder="e.g. CS2023-084"
-                  placeholderTextColor="#A09E9B"
+                  placeholderTextColor={C.textMuted}
                 />
               </View>
 
@@ -613,7 +625,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                       Alert.alert('Invalid CGPA', 'Please enter a valid CGPA between 0.00 and 10.00');
                       return;
                     }
-                    setActiveStep('TIMETABLE');
+                    goToStep('TIMETABLE', 'ACADEMICS');
                   }}
                 >
                   <Text style={styles.primaryButtonText}>Next: Timetable →</Text>
@@ -627,7 +639,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
             <View style={styles.stepCard}>
               <View style={styles.iconHeading}>
                 <View style={styles.iconCircle}>
-                  <Ionicons name="calendar-outline" size={24} color="#2E7470" />
+                  <Ionicons name="calendar-outline" size={24} color={C.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardHeader}>Add Your Timetable</Text>
@@ -639,15 +651,15 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
 
               {/* Option A: Upload image/document */}
               <TouchableOpacity
-                style={[styles.optionCard, isAnalyzingImage && { borderColor: '#2E7470', backgroundColor: '#F0F8F6' }]}
+                style={[styles.optionCard, isAnalyzingImage && { borderColor: C.primary, backgroundColor: C.primarySoft }]}
                 onPress={handleUploadTimetable}
                 disabled={isAnalyzingImage}
               >
                 <View style={styles.optionIconContainer}>
                   {isAnalyzingImage ? (
-                    <ActivityIndicator size="small" color="#2E7470" />
+                    <ActivityIndicator size="small" color={C.primary} />
                   ) : (
-                    <Ionicons name="cloud-upload-outline" size={28} color="#2E7470" />
+                    <Ionicons name="cloud-upload-outline" size={28} color={C.primary} />
                   )}
                 </View>
                 <View style={{ flex: 1 }}>
@@ -668,7 +680,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                 onPress={() => setTimetableMode('MANUAL')}
               >
                 <View style={styles.optionIconContainer}>
-                  <Ionicons name="create-outline" size={28} color="#D4856A" />
+                  <Ionicons name="create-outline" size={28} color={C.terracotta} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.optionTitle}>Enter Timetable Manually</Text>
@@ -688,11 +700,11 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                     { subjectName: 'Artificial Intelligence', day: 'TUESDAY', startTime: '11:00', endTime: '12:00', room: 'AB3-105', faculty: 'Dr. Iyer', classType: 'LECTURE' },
                     { subjectName: 'Computer Networks', day: 'WEDNESDAY', startTime: '09:00', endTime: '10:00', room: 'AB1-102', faculty: 'Prof. Kulkarni', classType: 'LECTURE' },
                   ]);
-                  setActiveStep('TIMETABLE_REVIEW');
+                  goToStep('TIMETABLE_REVIEW', 'TIMETABLE');
                 }}
               >
                 <View style={styles.optionIconContainer}>
-                  <Ionicons name="checkmark-done-circle-outline" size={28} color="#2E7470" />
+                  <Ionicons name="checkmark-done-circle-outline" size={28} color={C.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.optionTitle}>Use Sample Academic Schedule</Text>
@@ -723,7 +735,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   value={manualSubject}
                   onChangeText={setManualSubject}
                   placeholder="e.g. Computer Networks"
-                  placeholderTextColor="#A09E9B"
+                  placeholderTextColor={C.textMuted}
                 />
               </View>
 
@@ -752,7 +764,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                     value={manualStartTime}
                     onChangeText={setManualStartTime}
                     placeholder="10:00"
-                    placeholderTextColor="#A09E9B"
+                    placeholderTextColor={C.textMuted}
                   />
                 </View>
                 <View style={[styles.inputGroup, { flex: 1 }]}>
@@ -762,7 +774,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                     value={manualEndTime}
                     onChangeText={setManualEndTime}
                     placeholder="11:00"
-                    placeholderTextColor="#A09E9B"
+                    placeholderTextColor={C.textMuted}
                   />
                 </View>
               </View>
@@ -775,7 +787,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                     value={manualRoom}
                     onChangeText={setManualRoom}
                     placeholder="AB1-204"
-                    placeholderTextColor="#A09E9B"
+                    placeholderTextColor={C.textMuted}
                   />
                 </View>
                 <View style={[styles.inputGroup, { flex: 1.5 }]}>
@@ -785,7 +797,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                     value={manualFaculty}
                     onChangeText={setManualFaculty}
                     placeholder="Dr. Sharma"
-                    placeholderTextColor="#A09E9B"
+                    placeholderTextColor={C.textMuted}
                   />
                 </View>
               </View>
@@ -812,7 +824,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
             <View style={styles.stepCard}>
               <View style={styles.iconHeading}>
                 <View style={styles.iconCircle}>
-                  <Ionicons name="list-outline" size={24} color="#2E7470" />
+                  <Ionicons name="list-outline" size={24} color={C.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardHeader}>Review Class Schedule</Text>
@@ -825,7 +837,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
               {/* Conflict Detection Banner */}
               {classes.length >= 2 && (
                 <View style={styles.conflictNoticeBox}>
-                  <Ionicons name="checkmark-circle-outline" size={18} color="#2E7470" />
+                  <Ionicons name="checkmark-circle-outline" size={18} color={C.primary} />
                   <Text style={styles.conflictNoticeText}>
                     Schedule Conflict Engine active: No overlapping class collisions detected.
                   </Text>
@@ -847,7 +859,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                       </Text>
                     </View>
                     <TouchableOpacity onPress={() => handleRemoveClass(idx)}>
-                      <Ionicons name="trash-outline" size={20} color="#D4856A" />
+                      <Ionicons name="trash-outline" size={20} color={C.terracotta} />
                     </TouchableOpacity>
                   </View>
                 ))}
@@ -855,10 +867,10 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
 
               {/* Empty state if 0 classes */}
               {classes.length === 0 && (
-                <View style={{ padding: 24, alignItems: 'center', backgroundColor: '#FAF8F5', borderRadius: 12, marginVertical: 12, borderWidth: 1, borderColor: '#EAE6E1' }}>
-                  <Ionicons name="calendar-outline" size={38} color="#A09E9B" style={{ marginBottom: 8 }} />
-                  <Text style={{ fontSize: 15, fontWeight: '600', color: '#1B3B36', marginBottom: 4 }}>No classes added yet</Text>
-                  <Text style={{ fontSize: 13, color: '#666', textAlign: 'center', marginBottom: 16, lineHeight: 18 }}>
+                <View style={{ padding: 24, alignItems: 'center', backgroundColor: C.background, borderRadius: 12, marginVertical: 12, borderWidth: 1, borderColor: C.surfaceBorder }}>
+                  <Ionicons name="calendar-outline" size={38} color={C.textMuted} style={{ marginBottom: 8 }} />
+                  <Text style={{ fontSize: 15, fontWeight: '600', color: C.primaryDeep, marginBottom: 4 }}>No classes added yet</Text>
+                  <Text style={{ fontSize: 13, color: C.textSecondary, textAlign: 'center', marginBottom: 16, lineHeight: 18 }}>
                     Your schedule hasn't been populated yet. Re-upload a clearer timetable photo, add your subjects manually, or load sample courses.
                   </Text>
                   <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -891,7 +903,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   setActiveStep('TIMETABLE');
                 }}
               >
-                <Ionicons name="add-circle-outline" size={18} color="#2E7470" />
+                <Ionicons name="add-circle-outline" size={18} color={C.primary} />
                 <Text style={styles.addMoreBtnText}>Add Another Class</Text>
               </TouchableOpacity>
 
@@ -907,7 +919,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.primaryButton, { flex: 2 }]}
-                  onPress={() => setActiveStep('NOTIFICATION_SETUP')}
+                  onPress={() => goToStep('NOTIFICATION_SETUP', 'TIMETABLE_REVIEW')}
                 >
                   <Text style={styles.primaryButtonText}>Confirm Schedule →</Text>
                 </TouchableOpacity>
@@ -920,7 +932,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
             <View style={styles.stepCard}>
               <View style={styles.iconHeading}>
                 <View style={styles.iconCircle}>
-                  <Ionicons name="notifications-outline" size={24} color="#2E7470" />
+                  <Ionicons name="notifications-outline" size={24} color={C.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardHeader}>Notification Preferences</Text>
@@ -955,8 +967,8 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                 <Switch
                   value={quietHoursEnabled}
                   onValueChange={setQuietHoursEnabled}
-                  trackColor={{ false: '#D8D4CC', true: '#2E7470' }}
-                  thumbColor="#FFFFFF"
+                  trackColor={{ false: C.surfaceBorder, true: C.primary }}
+                  thumbColor={C.surfaceCard}
                 />
               </View>
 
@@ -968,7 +980,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                     value={quietHoursStart}
                     onChangeText={setQuietHoursStart}
                     placeholder="23:00"
-                    placeholderTextColor="#A09E9B"
+                    placeholderTextColor={C.textMuted}
                   />
                 </View>
                 <View style={[styles.inputGroup, { flex: 1 }]}>
@@ -978,7 +990,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                     value={quietHoursEnd}
                     onChangeText={setQuietHoursEnd}
                     placeholder="07:00"
-                    placeholderTextColor="#A09E9B"
+                    placeholderTextColor={C.textMuted}
                   />
                 </View>
               </View>
@@ -992,7 +1004,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.primaryButton, { flex: 2 }]}
-                  onPress={() => setActiveStep('FINANCE_SETUP')}
+                  onPress={() => goToStep('FINANCE_SETUP', 'NOTIFICATION_SETUP')}
                 >
                   <Text style={styles.primaryButtonText}>Next: Finance →</Text>
                 </TouchableOpacity>
@@ -1005,7 +1017,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
             <View style={styles.stepCard}>
               <View style={styles.iconHeading}>
                 <View style={styles.iconCircle}>
-                  <Ionicons name="wallet-outline" size={24} color="#2E7470" />
+                  <Ionicons name="wallet-outline" size={24} color={C.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardHeader}>Student Budget Setup</Text>
@@ -1023,7 +1035,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   onChangeText={setMonthlyBudget}
                   keyboardType="numeric"
                   placeholder="10000"
-                  placeholderTextColor="#A09E9B"
+                  placeholderTextColor={C.textMuted}
                 />
               </View>
 
@@ -1035,7 +1047,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   onChangeText={setStartingBalance}
                   keyboardType="numeric"
                   placeholder="7500"
-                  placeholderTextColor="#A09E9B"
+                  placeholderTextColor={C.textMuted}
                 />
               </View>
 
@@ -1048,7 +1060,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.primaryButton, { flex: 2 }]}
-                  onPress={() => setActiveStep('FLOATING_ASSISTANT')}
+                  onPress={() => goToStep('FLOATING_ASSISTANT', 'FINANCE_SETUP')}
                 >
                   <Text style={styles.primaryButtonText}>Next: Floating AI →</Text>
                 </TouchableOpacity>
@@ -1061,7 +1073,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
             <View style={styles.stepCard}>
               <View style={styles.iconHeading}>
                 <View style={styles.iconCircle}>
-                  <Ionicons name="sparkles-outline" size={24} color="#2E7470" />
+                  <Ionicons name="sparkles-outline" size={24} color={C.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardHeader}>Floating Assistant (NIA)</Text>
@@ -1073,7 +1085,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
 
               <View style={styles.assistantPreviewBox}>
                 <View style={styles.floatingGemBadge}>
-                  <Ionicons name="sparkles" size={20} color="#2E7470" />
+                  <Ionicons name="sparkles" size={20} color={C.primary} />
                 </View>
                 <Text style={styles.assistantPreviewTitle}>Always Accessible</Text>
                 <Text style={styles.assistantPreviewDesc}>
@@ -1091,8 +1103,8 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                 <Switch
                   value={floatingAssistantEnabled}
                   onValueChange={setFloatingAssistantEnabled}
-                  trackColor={{ false: '#D8D4CC', true: '#2E7470' }}
-                  thumbColor="#FFFFFF"
+                  trackColor={{ false: C.surfaceBorder, true: C.primary }}
+                  thumbColor={C.surfaceCard}
                 />
               </View>
 
@@ -1107,7 +1119,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   style={[styles.primaryButton, { flex: 2 }]}
                   onPress={runInitializationPipeline}
                 >
-                  <Text style={styles.primaryButtonText}>Prepare My AI (NIA) ⚡</Text>
+                  <Text style={styles.primaryButtonText}>Prepare My AI (NIA)</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1117,7 +1129,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
           {activeStep === 'INITIAL_PROCESSING' && (
             <View style={styles.stepCard}>
               <View style={styles.prepHeader}>
-                <ActivityIndicator size="large" color="#2E7470" style={{ marginBottom: 16 }} />
+                <ActivityIndicator size="large" color={C.primary} style={{ marginBottom: 16 }} />
                 <Text style={styles.prepTitle}>Preparing your Student AI (NIA)</Text>
                 <Text style={styles.prepDesc}>
                   Configuring your academic database, timetable engine, and NIA assistant...
@@ -1129,11 +1141,11 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   <View key={st.key} style={styles.stageRow}>
                     <View style={styles.stageIcon}>
                       {st.done ? (
-                        <Ionicons name="checkmark-circle" size={22} color="#2E7470" />
+                        <Ionicons name="checkmark-circle" size={22} color={C.primary} />
                       ) : st.inProgress ? (
-                        <ActivityIndicator size="small" color="#2E7470" />
+                        <ActivityIndicator size="small" color={C.primary} />
                       ) : (
-                        <Ionicons name="ellipse-outline" size={18} color="#D8D4CC" />
+                        <Ionicons name="ellipse-outline" size={18} color={C.surfaceBorder} />
                       )}
                     </View>
                     <Text
@@ -1149,23 +1161,14 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                 ))}
               </View>
 
-              <TouchableOpacity
-                style={[styles.primaryButton, { marginTop: 20 }]}
-                onPress={() => {
-                  completeOnboarding({ fullName, university, course, year: parseInt(year, 10) || 1, semester: parseInt(semester, 10) || 1, section, cgpa });
-                  setActiveStep('COMPLETE');
-                }}
-              >
-                <Text style={styles.primaryButtonText}>Continue to Dashboard →</Text>
-              </TouchableOpacity>
             </View>
           )}
 
           {/* STEP 10: COMPLETE & DASHBOARD ENTRY */}
-          {activeStep === 'COMPLETE' && (
+          {activeStep === 'COMPLETE' && allRequiredDone && (
             <View style={styles.stepCard}>
               <View style={styles.congratsCircle}>
-                <Ionicons name="checkmark" size={36} color="#FFFFFF" />
+                <Ionicons name="checkmark" size={36} color={C.surfaceCard} />
               </View>
               <Text style={styles.congratsTitle}>You are Ready!</Text>
               <Text style={styles.congratsDesc}>
@@ -1204,6 +1207,21 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
               </TouchableOpacity>
             </View>
           )}
+          {activeStep === 'COMPLETE' && !allRequiredDone && (
+            <View style={styles.stepCard}>
+              <Text style={styles.congratsTitle}>Almost There</Text>
+              <Text style={styles.congratsDesc}>
+                Please finish the remaining setup steps to see your personalized summary.
+              </Text>
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={() => setActiveStep('GOOGLE_SERVICES')}
+                activeOpacity={0.88}
+              >
+                <Text style={styles.primaryButtonText}>Back to Setup →</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -1213,7 +1231,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: C.background,
   },
   container: {
     flex: 1,
@@ -1223,8 +1241,8 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#ECE6DC',
-    backgroundColor: '#FAF7F2',
+    borderBottomColor: C.surfaceBorder,
+    backgroundColor: C.background,
   },
   stepperHeaderRow: {
     flexDirection: 'row',
@@ -1242,35 +1260,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 10,
-    backgroundColor: '#F0ECE4',
+    backgroundColor: C.primaryPill,
     borderWidth: 1,
-    borderColor: '#E2DED6',
+    borderColor: C.surfaceBorder,
   },
   signOutButtonText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#7A7875',
+    color: C.textSecondary,
   },
   stepperTitle: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#2E7470',
+    color: C.primary,
     letterSpacing: 0.5,
   },
   stepperSubtitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#1A1A1A',
+    color: C.textPrimary,
   },
   stepProgressBar: {
     height: 4,
-    backgroundColor: '#E6E0D4',
+    backgroundColor: C.surfaceBorder,
     borderRadius: 2,
     overflow: 'hidden',
   },
   stepProgressFill: {
     height: '100%',
-    backgroundColor: '#2E7470',
+    backgroundColor: C.primary,
     borderRadius: 2,
   },
   scrollContent: {
@@ -1278,11 +1296,11 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   stepCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: C.surfaceCard,
     borderRadius: 24,
     padding: 24,
     borderWidth: 1,
-    borderColor: '#ECE6DC',
+    borderColor: C.surfaceBorder,
     shadowColor: '#000000',
     shadowOpacity: 0.04,
     shadowOffset: { width: 0, height: 4 },
@@ -1299,39 +1317,39 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#E6F0EF',
+    backgroundColor: C.primarySoft,
     justifyContent: 'center',
     alignItems: 'center',
   },
   cardHeader: {
     fontSize: 19,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: C.textPrimary,
     marginBottom: 3,
   },
   cardDesc: {
     fontSize: 13,
     lineHeight: 18,
-    color: '#656360',
+    color: C.textSecondary,
   },
   serviceToggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0ECE4',
+    borderBottomColor: C.primaryPill,
     gap: 12,
   },
   toggleTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#1A1A1A',
+    color: C.textPrimary,
     marginBottom: 3,
   },
   toggleDesc: {
     fontSize: 12,
     lineHeight: 17,
-    color: '#656360',
+    color: C.textSecondary,
   },
   inputGroup: {
     marginTop: 14,
@@ -1339,22 +1357,22 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#3D3B39',
+    color: C.textPrimary,
     marginBottom: 6,
   },
   textInput: {
-    backgroundColor: '#FAF7F2',
+    backgroundColor: C.background,
     borderWidth: 1,
-    borderColor: '#ECE6DC',
+    borderColor: C.surfaceBorder,
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    color: '#1A1A1A',
+    color: C.textPrimary,
   },
   inputHelp: {
     fontSize: 11,
-    color: '#7A7875',
+    color: C.textSecondary,
     marginTop: 5,
     lineHeight: 15,
   },
@@ -1368,7 +1386,7 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   primaryButton: {
-    backgroundColor: '#2E7470',
+    backgroundColor: C.primary,
     borderRadius: 16,
     paddingVertical: 15,
     alignItems: 'center',
@@ -1378,13 +1396,13 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: C.surfaceCard,
   },
   secondaryButton: {
     flex: 1,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: C.background,
     borderWidth: 1,
-    borderColor: '#D8D4CC',
+    borderColor: C.surfaceBorder,
     borderRadius: 16,
     paddingVertical: 15,
     alignItems: 'center',
@@ -1393,14 +1411,14 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#3D3B39',
+    color: C.textPrimary,
   },
   optionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FAF7F2',
+    backgroundColor: C.background,
     borderWidth: 1,
-    borderColor: '#ECE6DC',
+    borderColor: C.surfaceBorder,
     borderRadius: 18,
     padding: 16,
     marginBottom: 14,
@@ -1410,46 +1428,46 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: C.surfaceCard,
     justifyContent: 'center',
     alignItems: 'center',
   },
   optionTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: C.textPrimary,
     marginBottom: 3,
   },
   optionDesc: {
     fontSize: 12,
     lineHeight: 17,
-    color: '#656360',
+    color: C.textSecondary,
   },
   dayPill: {
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 12,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: C.background,
     marginRight: 8,
     borderWidth: 1,
-    borderColor: '#ECE6DC',
+    borderColor: C.surfaceBorder,
   },
   dayPillActive: {
-    backgroundColor: '#2E7470',
-    borderColor: '#2E7470',
+    backgroundColor: C.primary,
+    borderColor: C.primary,
   },
   dayPillText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#3D3B39',
+    color: C.textPrimary,
   },
   dayPillTextActive: {
-    color: '#FFFFFF',
+    color: C.surfaceCard,
   },
   conflictNoticeBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EBF4F3',
+    backgroundColor: C.primarySoft,
     padding: 12,
     borderRadius: 14,
     marginBottom: 16,
@@ -1457,7 +1475,7 @@ const styles = StyleSheet.create({
   },
   conflictNoticeText: {
     fontSize: 12,
-    color: '#2E7470',
+    color: C.primary,
     fontWeight: '600',
     flex: 1,
   },
@@ -1468,14 +1486,14 @@ const styles = StyleSheet.create({
   classItemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FAF7F2',
+    backgroundColor: C.background,
     padding: 12,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#ECE6DC',
+    borderColor: C.surfaceBorder,
   },
   classTimeBadge: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: C.surfaceCard,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
@@ -1484,21 +1502,21 @@ const styles = StyleSheet.create({
   classDayText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#2E7470',
+    color: C.primary,
   },
   classTimeText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#1A1A1A',
+    color: C.textPrimary,
   },
   classSubjectText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: C.textPrimary,
   },
   classMetaText: {
     fontSize: 11,
-    color: '#656360',
+    color: C.textSecondary,
     marginTop: 2,
   },
   addMoreBtn: {
@@ -1511,7 +1529,7 @@ const styles = StyleSheet.create({
   addMoreBtnText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#2E7470',
+    color: C.primary,
   },
   pillRow: {
     flexDirection: 'row',
@@ -1522,37 +1540,37 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     borderRadius: 12,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: C.background,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#ECE6DC',
+    borderColor: C.surfaceBorder,
   },
   timePillActive: {
-    backgroundColor: '#2E7470',
-    borderColor: '#2E7470',
+    backgroundColor: C.primary,
+    borderColor: C.primary,
   },
   timePillText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#3D3B39',
+    color: C.textPrimary,
   },
   timePillTextActive: {
-    color: '#FFFFFF',
+    color: C.surfaceCard,
   },
   assistantPreviewBox: {
-    backgroundColor: '#FAF7F2',
+    backgroundColor: C.background,
     padding: 18,
     borderRadius: 18,
     alignItems: 'center',
     marginVertical: 16,
     borderWidth: 1,
-    borderColor: '#ECE6DC',
+    borderColor: C.surfaceBorder,
   },
   floatingGemBadge: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#E6F0EF',
+    backgroundColor: C.primarySoft,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
@@ -1560,13 +1578,13 @@ const styles = StyleSheet.create({
   assistantPreviewTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: C.textPrimary,
     marginBottom: 4,
   },
   assistantPreviewDesc: {
     fontSize: 12,
     lineHeight: 18,
-    color: '#656360',
+    color: C.textSecondary,
     textAlign: 'center',
   },
   prepHeader: {
@@ -1576,12 +1594,12 @@ const styles = StyleSheet.create({
   prepTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: C.textPrimary,
     marginBottom: 6,
   },
   prepDesc: {
     fontSize: 13,
-    color: '#656360',
+    color: C.textSecondary,
     textAlign: 'center',
     lineHeight: 19,
   },
@@ -1600,21 +1618,21 @@ const styles = StyleSheet.create({
   },
   stageText: {
     fontSize: 14,
-    color: '#A09E9B',
+    color: C.textMuted,
   },
   stageTextActive: {
-    color: '#1A1A1A',
+    color: C.textPrimary,
     fontWeight: '600',
   },
   stageTextDone: {
-    color: '#2E7470',
+    color: C.primary,
     fontWeight: '600',
   },
   congratsCircle: {
     width: 68,
     height: 68,
     borderRadius: 34,
-    backgroundColor: '#2E7470',
+    backgroundColor: C.primary,
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'center',
@@ -1623,24 +1641,24 @@ const styles = StyleSheet.create({
   congratsTitle: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#1A1A1A',
+    color: C.textPrimary,
     textAlign: 'center',
     marginBottom: 8,
   },
   congratsDesc: {
     fontSize: 14,
     lineHeight: 20,
-    color: '#656360',
+    color: C.textSecondary,
     textAlign: 'center',
     marginBottom: 20,
   },
   summaryBox: {
-    backgroundColor: '#FAF7F2',
+    backgroundColor: C.background,
     borderRadius: 18,
     padding: 16,
     gap: 10,
     borderWidth: 1,
-    borderColor: '#ECE6DC',
+    borderColor: C.surfaceBorder,
     marginBottom: 24,
   },
   summaryItem: {
@@ -1650,15 +1668,15 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 13,
-    color: '#7A7875',
+    color: C.textSecondary,
   },
   summaryVal: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: C.textPrimary,
   },
   launchButton: {
-    backgroundColor: '#2E7470',
+    backgroundColor: C.primary,
     borderRadius: 16,
     paddingVertical: 16,
     alignItems: 'center',
@@ -1667,6 +1685,6 @@ const styles = StyleSheet.create({
   launchButtonText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: C.surfaceCard,
   },
 });
