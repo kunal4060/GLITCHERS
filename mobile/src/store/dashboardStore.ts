@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ClassSession, Task, Expense, Budget, Debt, EmailSummary } from '@glitchers/shared';
 import { apiClient } from '../api/client';
+import { newUuid } from '../utils/tokenStorage';
 
 const getActiveUserId = () => {
   try {
@@ -12,6 +13,16 @@ const getActiveUserId = () => {
     return 'offline-user';
   }
 };
+
+// Real UUIDs for every client-minted entity id (L3). Backend accepts the
+// client id on create, so local and server copies dedupe correctly (E2/E2b).
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ensureUuid = (id?: string): string => (id && UUID_RE.test(id) ? id : newUuid());
+
+// Consistent 50/50 split share (E4): exact half rounded to paise, used for
+// both the recorded debt and any UI label — never Math.round(total/2).
+export const splitShare = (totalAmount: number): number =>
+  Math.round((totalAmount / 2) * 100) / 100;
 
 export interface ChatMessage {
   id: string;
@@ -69,7 +80,7 @@ interface DashboardState {
   updateClass: (classId: string, updates: Partial<ClassSession>) => void;
   deleteClass: (classId: string) => void;
 
-  addExpense: (expense: Expense) => Promise<void>;
+  addExpense: (expense: Expense, opts?: { skipRemote?: boolean }) => Promise<void>;
   deleteExpense: (expenseId: string) => void;
   splitExpense: (totalAmount: number, description: string, person: string) => void;
 
@@ -195,41 +206,44 @@ export const useDashboardStore = create<DashboardState>()(
         const pending = get().offlineSyncQueue.filter((q) => !q.synced);
         if (pending.length === 0) return { syncedCount: 0 };
 
-        let syncedCount = 0;
+        // H3: only items that actually synced are marked synced — failures
+        // stay queued for the next flush instead of being silently dropped.
+        const succeeded = new Set<string>();
         for (const item of pending) {
           try {
             if (item.type === 'CREATE_EXPENSE') {
-              await apiClient.createExpense(item.payload);
-              syncedCount++;
+              await apiClient.createExpense({ id: item.payload.id, ...item.payload });
             } else if (item.type === 'CREATE_TASK') {
-              await apiClient.createTask(item.payload);
-              syncedCount++;
+              await apiClient.createTask({ id: item.payload.id, ...item.payload });
             } else if (item.type === 'CREATE_DEBT') {
-              await apiClient.createDebt(item.payload);
-              syncedCount++;
+              await apiClient.createDebt({ id: item.payload.id, ...item.payload });
             } else if (item.type === 'SPLIT_EXPENSE') {
               const { totalAmount, description, person } = item.payload;
               await apiClient.createExpense({
+                id: newUuid(),
                 amount: totalAmount,
                 category: 'FOOD',
                 description: `${description} (Split with ${person})`,
               });
               await apiClient.createDebt({
+                id: newUuid(),
                 person,
-                amount: Math.round(totalAmount / 2),
+                amount: splitShare(totalAmount),
                 type: 'OWES_ME',
                 notes: `Split for ${description}`,
               });
-              syncedCount++;
             }
+            succeeded.add(item.id);
           } catch (err) {
             console.warn('Offline push item failed:', err);
           }
         }
         set((s) => ({
-          offlineSyncQueue: s.offlineSyncQueue.map((item) => ({ ...item, synced: true })),
+          offlineSyncQueue: s.offlineSyncQueue.map((item) =>
+            succeeded.has(item.id) ? { ...item, synced: true } : item
+          ),
         }));
-        return { syncedCount };
+        return { syncedCount: succeeded.size };
       },
 
       isHydrated: false,
@@ -237,14 +251,7 @@ export const useDashboardStore = create<DashboardState>()(
       classes: [],
       tasks: [],
       expenses: [],
-      budget: {
-        id: 'b1',
-        userId: getActiveUserId(),
-        monthlyLimit: 10000,
-        currentSpending: 0,
-        month: new Date().toISOString().slice(0, 7),
-        alertThresholds: [75, 90, 100],
-      },
+      budget: null,
       debts: [],
       emails: [],
       emailBullets: ['All university circulars and notices have been acknowledged & cleared! 🎉'],
@@ -256,7 +263,13 @@ export const useDashboardStore = create<DashboardState>()(
       setClasses: (classes) => set({ classes }),
       setTasks: (tasks) => set({ tasks }),
       setExpenses: (expenses) => set({ expenses }),
-      setBudget: (budget) => set({ budget }),
+      setBudget: (budget) => {
+        set({ budget });
+        // E3: persist to backend — budget must survive reinstall/logout.
+        if (budget) {
+          apiClient.updateBudget(budget.monthlyLimit).catch(() => null);
+        }
+      },
       setDebts: (debts) => set({ debts }),
       setEmails: (emails) => set({ emails }),
       setEmailBullets: (emailBullets) => set({ emailBullets }),
@@ -282,18 +295,20 @@ export const useDashboardStore = create<DashboardState>()(
       },
 
       addTask: async (task) => {
+        const normalized = { ...task, id: ensureUuid(task.id) };
         set((s) => ({
-          tasks: [task, ...s.tasks.filter((t) => t.id !== task.id)],
+          tasks: [normalized, ...s.tasks.filter((t) => t.id !== normalized.id)],
         }));
         try {
           await apiClient.createTask({
-            title: task.title,
-            priority: task.priority,
-            dueDate: task.dueDate,
-            description: task.description,
+            id: normalized.id,
+            title: normalized.title,
+            priority: normalized.priority,
+            dueDate: normalized.dueDate,
+            description: normalized.description,
           });
         } catch {
-          get().queueOfflineAction({ type: 'CREATE_TASK', payload: task });
+          get().queueOfflineAction({ type: 'CREATE_TASK', payload: normalized });
         }
       },
 
@@ -329,7 +344,7 @@ export const useDashboardStore = create<DashboardState>()(
       },
 
       addClass: async (c) => {
-        const newClass = { id: String(Date.now()), ...c } as ClassSession;
+        const newClass = { ...c, id: ensureUuid(c.id) } as ClassSession;
         set((s) => ({
           classes: [...s.classes.filter((x) => x.id !== newClass.id), newClass],
         }));
@@ -354,19 +369,25 @@ export const useDashboardStore = create<DashboardState>()(
         apiClient.deleteClass(classId).catch(() => null);
       },
 
-      addExpense: async (expense) => {
+      addExpense: async (expense, opts) => {
+        const normalized = { ...expense, id: ensureUuid(expense.id) };
         set((s) => ({
-          expenses: [expense, ...s.expenses.filter((e) => e.id !== expense.id)],
+          expenses: [normalized, ...s.expenses.filter((e) => e.id !== normalized.id)],
         }));
+        if (opts?.skipRemote) {
+          // E1: backend already saved this record (e.g. scanned bill) — don't POST again.
+          return;
+        }
         try {
           await apiClient.createExpense({
-            amount: Number(expense.amount),
-            category: expense.category,
-            description: expense.description,
-            merchant: expense.merchant || undefined,
+            id: normalized.id,
+            amount: Number(normalized.amount),
+            category: normalized.category,
+            description: normalized.description,
+            merchant: normalized.merchant || undefined,
           });
         } catch {
-          get().queueOfflineAction({ type: 'CREATE_EXPENSE', payload: expense });
+          get().queueOfflineAction({ type: 'CREATE_EXPENSE', payload: normalized });
         }
       },
 
@@ -378,10 +399,10 @@ export const useDashboardStore = create<DashboardState>()(
       },
 
       splitExpense: (totalAmount, description, person) => {
-        const half = Math.round(totalAmount / 2);
+        const half = splitShare(totalAmount);
         const currentUserId = getActiveUserId();
         const newExp: Expense = {
-          id: String(Date.now()),
+          id: newUuid(),
           userId: currentUserId,
           amount: totalAmount,
           category: 'FOOD',
@@ -390,7 +411,7 @@ export const useDashboardStore = create<DashboardState>()(
           type: 'EXPENSE',
         };
         const newDebt: Debt = {
-          id: String(Date.now() + 1),
+          id: newUuid(),
           userId: currentUserId,
           person,
           type: 'OWES_ME',
@@ -406,6 +427,7 @@ export const useDashboardStore = create<DashboardState>()(
         }));
 
         apiClient.createExpense({
+          id: newExp.id,
           amount: totalAmount,
           category: 'FOOD',
           description: `${description} (Split with ${person})`,
@@ -414,6 +436,7 @@ export const useDashboardStore = create<DashboardState>()(
         });
 
         apiClient.createDebt({
+          id: newDebt.id,
           person,
           amount: half,
           type: 'OWES_ME',
@@ -422,16 +445,18 @@ export const useDashboardStore = create<DashboardState>()(
       },
 
       addDebt: async (debt) => {
-        set((s) => ({ debts: [debt, ...s.debts] }));
+        const normalized = { ...debt, id: ensureUuid(debt.id) };
+        set((s) => ({ debts: [normalized, ...s.debts.filter((d) => d.id !== normalized.id)] }));
         try {
           await apiClient.createDebt({
-            person: debt.person,
-            amount: Number(debt.amount),
-            type: debt.type,
-            notes: debt.notes || undefined,
+            id: normalized.id,
+            person: normalized.person,
+            amount: Number(normalized.amount),
+            type: normalized.type,
+            notes: normalized.notes || undefined,
           });
         } catch {
-          get().queueOfflineAction({ type: 'CREATE_DEBT', payload: debt });
+          get().queueOfflineAction({ type: 'CREATE_DEBT', payload: normalized });
         }
       },
 
@@ -485,6 +510,7 @@ export const useDashboardStore = create<DashboardState>()(
               set({ tasks: [...backendTasks, ...unsynced] });
               for (const t of unsynced) {
                 apiClient.createTask({
+                  id: t.id,
                   title: t.title,
                   priority: t.priority,
                   dueDate: t.dueDate,
@@ -494,6 +520,7 @@ export const useDashboardStore = create<DashboardState>()(
             } else if (localTasks.length > 0) {
               for (const t of localTasks) {
                 apiClient.createTask({
+                  id: t.id,
                   title: t.title,
                   priority: t.priority,
                   dueDate: t.dueDate,
@@ -513,6 +540,7 @@ export const useDashboardStore = create<DashboardState>()(
               set({ expenses: [...backendExps, ...unsynced] });
               for (const e of unsynced) {
                 apiClient.createExpense({
+                  id: e.id,
                   amount: Number(e.amount),
                   category: e.category,
                   description: e.description,
@@ -522,6 +550,7 @@ export const useDashboardStore = create<DashboardState>()(
             } else if (localExps.length > 0) {
               for (const e of localExps) {
                 apiClient.createExpense({
+                  id: e.id,
                   amount: Number(e.amount),
                   category: e.category,
                   description: e.description,
@@ -547,6 +576,7 @@ export const useDashboardStore = create<DashboardState>()(
             } else if (localDebts.length > 0) {
               for (const d of localDebts) {
                 apiClient.createDebt({
+                  id: d.id,
                   person: d.person,
                   amount: Number(d.amount),
                   type: d.type,
