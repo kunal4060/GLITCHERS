@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { inMemoryStore } from '../repositories/inMemoryStore.js';
 import { supabaseStore } from '../repositories/supabaseStore.js';
 import { authMiddleware } from '../middleware/auth.js';
-import { calculateDebtTotals, calculateEqualSplit } from '../services/finance/calculator.js';
+import { calculateDebtTotals } from '../services/finance/calculator.js';
 import { geminiAssistant } from '../services/gemini/geminiClient.js';
 import type { Debt } from '@glitchers/shared';
 import { randomUUID } from 'crypto';
@@ -22,7 +22,7 @@ export const debtRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   fastify.post<{
-    Body: { text?: string; person?: string; type?: 'OWES_ME' | 'I_OWE'; amount?: number; notes?: string };
+    Body: { id?: string; text?: string; person?: string; type?: 'OWES_ME' | 'I_OWE'; amount?: number; notes?: string };
   }>('/', async (req, reply) => {
     const userId = req.userId!;
     let person = req.body.person;
@@ -43,7 +43,7 @@ export const debtRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const newDebt: Debt = {
-      id: randomUUID(),
+      id: typeof req.body.id === 'string' && req.body.id.trim().length > 0 ? req.body.id.trim() : randomUUID(),
       userId,
       person,
       type,
@@ -66,9 +66,14 @@ export const debtRoutes: FastifyPluginAsync = async (fastify) => {
 
     if (!debt) return reply.status(404).send({ error: 'Debt not found' });
 
-    const payAmount = req.body.paidAmount !== undefined ? req.body.paidAmount : debt.amount;
-    const status = payAmount >= debt.amount ? 'PAID' : 'PARTIALLY_PAID';
-    const updated = await supabaseStore.updateDebt(userId, id, { paidAmount: payAmount, status });
+    const payAmount = req.body.paidAmount !== undefined ? Number(req.body.paidAmount) : Number(debt.amount);
+    if (!Number.isFinite(payAmount) || payAmount <= 0) {
+      return reply.status(400).send({ error: 'paidAmount must be a positive number' });
+    }
+
+    const newPaidTotal = Number(debt.paidAmount || 0) + payAmount;
+    const status = newPaidTotal >= Number(debt.amount) ? 'PAID' : 'PARTIALLY_PAID';
+    const updated = await supabaseStore.updateDebt(userId, id, { paidAmount: newPaidTotal, status });
 
     return { debt: updated || debt };
   });
@@ -79,21 +84,34 @@ export const debtRoutes: FastifyPluginAsync = async (fastify) => {
       const userId = req.userId!;
       const { totalAmount, description, numberOfPeople, friends } = req.body || {};
 
-      if (!totalAmount || !numberOfPeople || numberOfPeople < 2) {
-        return reply.status(400).send({ error: 'Valid totalAmount and at least 2 people required' });
+      if (!totalAmount || totalAmount <= 0 || !numberOfPeople || numberOfPeople < 2 || !description) {
+        return reply.status(400).send({ error: 'Valid totalAmount, description and at least 2 people required' });
       }
 
-      const sharePerPerson = calculateEqualSplit(totalAmount, numberOfPeople);
-      const createdDebts: Debt[] = [];
       const peopleList = friends && friends.length > 0 ? friends : Array.from({ length: numberOfPeople - 1 }, (_, i) => `Friend ${i + 1}`);
 
-      for (const friendName of peopleList) {
+      if (peopleList.length > numberOfPeople) {
+        return reply.status(400).send({ error: 'Friends list cannot exceed numberOfPeople' });
+      }
+
+      // Split into exact paise so the shares sum EXACTLY to the total
+      // (e.g. ₹100 / 3 → 3334 + 3333 + 3333 paise, not 33.33 × 3 = 99.99).
+      const totalPaise = Math.round(Number(totalAmount) * 100);
+      const baseSharePaise = Math.floor(totalPaise / numberOfPeople);
+      const remainderPaise = totalPaise - baseSharePaise * numberOfPeople;
+      const shareForPerson = (index: number) => (baseSharePaise + (index < remainderPaise ? 1 : 0)) / 100;
+
+      const sharePerPerson = shareForPerson(0);
+      const createdDebts: Debt[] = [];
+
+      for (let i = 0; i < peopleList.length; i++) {
+        const friendName = peopleList[i];
         const debt: Debt = {
           id: randomUUID(),
           userId,
           person: friendName,
           type: 'OWES_ME',
-          amount: sharePerPerson,
+          amount: shareForPerson(i),
           status: 'PENDING',
           paidAmount: 0,
           notes: `Split for ${description} (Total: ₹${totalAmount})`,
