@@ -1,8 +1,14 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { useAuthStore } from '../store/authStore';
+import { apiClient } from '../api/client';
 import { designTokens } from '../theme/designTokens';
+import { NiaHeader, LabelCaps } from '../components/nia';
+
+const C = designTokens.colors;
 
 export const PrivacyScreen: React.FC = () => {
   const { user, gmailConnected, calendarConnected, setGoogleConnections, logout } = useAuthStore();
@@ -10,6 +16,8 @@ export const PrivacyScreen: React.FC = () => {
   const handleToggleGmail = () => {
     const next = !gmailConnected;
     setGoogleConnections(next, calendarConnected);
+    // M30: actually pause/resume server-side sync, not just the local flag.
+    apiClient.updateGoogleServices({ gmailConnected: next, calendarConnected }).catch(() => null);
     Alert.alert(
       next ? 'Gmail Connected' : 'Gmail Disconnected',
       next
@@ -21,6 +29,7 @@ export const PrivacyScreen: React.FC = () => {
   const handleToggleCalendar = () => {
     const next = !calendarConnected;
     setGoogleConnections(gmailConnected, next);
+    apiClient.updateGoogleServices({ gmailConnected, calendarConnected: next }).catch(() => null);
     Alert.alert(
       next ? 'Google Calendar Connected' : 'Google Calendar Disconnected',
       next
@@ -29,11 +38,25 @@ export const PrivacyScreen: React.FC = () => {
     );
   };
 
-  const handleExportData = () => {
-    Alert.alert(
-      'Export Ready',
-      'A complete JSON file containing your timetable, tasks, expenses, debts, and email metadata has been prepared for download.'
-    );
+  const handleExportData = async () => {
+    // M29: real export — pull the server-side dump, write a JSON file, open the share sheet.
+    try {
+      const data = await apiClient.post<any>('/privacy/export-data', {});
+      const json = JSON.stringify(data ?? {}, null, 2);
+      const uri = (FileSystem.documentDirectory || '') + 'nia-data-export.json';
+      await FileSystem.writeAsStringAsync(uri, json);
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, { mimeType: 'application/json' });
+      } else {
+        Alert.alert(
+          'Export Ready',
+          `Exported ${(json.length / 1024).toFixed(1)} KB of your data. Sharing is not available on this device.`
+        );
+      }
+    } catch (err) {
+      console.warn('Data export failed:', err);
+      Alert.alert('Export failed', 'Could not export your data. Please try again.');
+    }
   };
 
   const handleDeleteAccount = () => {
@@ -45,7 +68,13 @@ export const PrivacyScreen: React.FC = () => {
         {
           text: 'Delete Everything',
           style: 'destructive',
-          onPress: () => {
+          onPress: async () => {
+            // H2: actually delete server-side before wiping local state.
+            try {
+              await apiClient.deleteAccount();
+            } catch (err) {
+              console.warn('Server-side account deletion failed:', err);
+            }
             logout();
             Alert.alert('Account Deleted', 'All student data has been wiped.');
           },
@@ -56,7 +85,8 @@ export const PrivacyScreen: React.FC = () => {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.sectionHeader}>CONNECTED GOOGLE SERVICES</Text>
+      <NiaHeader title="Privacy" />
+      <LabelCaps>CONNECTED GOOGLE SERVICES</LabelCaps>
 
       <View style={styles.card}>
         <View style={styles.serviceRow}>
@@ -115,7 +145,7 @@ export const PrivacyScreen: React.FC = () => {
         </View>
       </View>
 
-      <Text style={styles.sectionHeader}>DATA & PRIVACY CONTROLS</Text>
+      <LabelCaps>DATA & PRIVACY CONTROLS</LabelCaps>
       <View style={styles.card}>
         <TouchableOpacity style={styles.btnSecondary} onPress={handleExportData} activeOpacity={0.8}>
           <Ionicons name="download-outline" size={16} color={designTokens.colors.primaryDark} style={{ marginRight: 8 }} />
@@ -132,23 +162,22 @@ export const PrivacyScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FAF7F2' },
+  container: { flex: 1, backgroundColor: C.background },
   content: { padding: 16, paddingBottom: 100 },
-  sectionHeader: { fontSize: 11, fontWeight: '700', color: designTokens.colors.textSecondary, letterSpacing: 1, marginBottom: 10, marginTop: 6 },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(41, 51, 50, 0.08)' },
+  card: { backgroundColor: C.surfaceCard, borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: C.surfaceBorder },
   serviceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
   serviceLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 10 },
-  serviceTitle: { fontSize: 14, color: designTokens.colors.textPrimary, fontWeight: '700' },
-  serviceSub: { fontSize: 12, color: designTokens.colors.textSecondary, marginTop: 2 },
-  verifiedBadge: { backgroundColor: '#E8F5E9', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  verifiedBadgeText: { fontSize: 11, color: '#1B5E20', fontWeight: '700' },
-  connectedBtn: { backgroundColor: '#E6F4EA', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: '#A8D5BA' },
-  connectedBtnText: { fontSize: 11, color: '#1E7E34', fontWeight: '700' },
-  connectBtn: { backgroundColor: designTokens.colors.primary, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
+  serviceTitle: { fontSize: 14, color: C.textPrimary, fontWeight: '700' },
+  serviceSub: { fontSize: 12, color: C.textSecondary, marginTop: 2 },
+  verifiedBadge: { backgroundColor: C.successSoft, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  verifiedBadgeText: { fontSize: 11, color: C.success, fontWeight: '700' },
+  connectedBtn: { backgroundColor: C.successSoft, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(15,118,110,0.25)' },
+  connectedBtnText: { fontSize: 11, color: C.success, fontWeight: '700' },
+  connectBtn: { backgroundColor: C.primary, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
   connectBtnText: { fontSize: 11, color: '#FFFFFF', fontWeight: '700' },
-  divider: { height: 1, backgroundColor: 'rgba(41, 51, 50, 0.06)', marginVertical: 6 },
-  btnSecondary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F6F3ED', padding: 14, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(41, 51, 50, 0.08)' },
-  btnSecondaryText: { color: designTokens.colors.primaryDark, fontWeight: '700', fontSize: 13 },
-  btnDanger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FEF2F2', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#FECACA' },
-  btnDangerText: { color: '#DC2626', fontWeight: '700', fontSize: 13 },
+  divider: { height: 1, backgroundColor: C.surfaceBorder, marginVertical: 6 },
+  btnSecondary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: C.surfaceSecondary, padding: 14, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: C.surfaceBorder },
+  btnSecondaryText: { color: C.primaryDark, fontWeight: '700', fontSize: 13 },
+  btnDanger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: C.dangerSoft, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(225,29,72,0.2)' },
+  btnDangerText: { color: C.danger, fontWeight: '700', fontSize: 13 },
 });
