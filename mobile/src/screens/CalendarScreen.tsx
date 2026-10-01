@@ -1,18 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { designTokens } from '../theme/designTokens';
 import { GradientBackground } from '../components/common/GradientBackground';
 import { useDashboardStore } from '../store/dashboardStore';
+import { useAuthStore } from '../store/authStore';
+import { apiClient } from '../api/client';
 
 export const CalendarScreen: React.FC = () => {
   const { classes, tasks } = useDashboardStore();
+  const { calendarConnected } = useAuthStore();
   const [filter, setFilter] = useState<'TODAY' | 'WEEK' | 'MONTH'>('TODAY');
 
-  const now = new Date();
+  // L11: roll over at midnight even if the screen stays open all day.
+  const [dayKey, setDayKey] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setDayKey(Date.now()), 60000);
+    return () => clearInterval(t);
+  }, []);
+
+  const now = new Date(dayKey);
   const dayNames = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
   const todayDay = dayNames[now.getDay()];
-  const todayDateStr = now.toISOString().slice(0, 10);
+  // M28: local calendar date, not UTC (toISOString drifts a day near midnight IST).
+  const todayDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const weekLater = new Date(now.getTime() + 7 * 86400000);
   const monthLater = new Date(now.getTime() + 30 * 86400000);
 
@@ -21,7 +32,7 @@ export const CalendarScreen: React.FC = () => {
       id: `c_${c.id}`,
       title: c.subjectName,
       time: `${c.day} • ${c.startTime} - ${c.endTime}`,
-      location: `Room ${c.room || 'AB1-204'}`,
+      location: c.room ? `Room ${c.room}` : 'Room TBA',
       type: 'CLASS' as const,
       day: c.day.toUpperCase(),
       dueDate: null as string | null,
@@ -62,7 +73,13 @@ export const CalendarScreen: React.FC = () => {
   });
 
   const handleSyncGoogleCalendar = () => {
-    Alert.alert('Google Calendar Synced', 'All recurring classes and assignment deadlines synchronized with your Google Calendar.');
+    // L10: don't claim a sync that never happened — require a real connection, then request it.
+    if (!calendarConnected) {
+      Alert.alert('Google Calendar not connected', 'Connect Google Calendar from the Privacy screen first.');
+      return;
+    }
+    apiClient.syncTimetableToCalendar().catch(() => null);
+    Alert.alert('Sync requested', 'Your classes and deadlines are being pushed to Google Calendar.');
   };
 
   return (
@@ -71,8 +88,10 @@ export const CalendarScreen: React.FC = () => {
         {/* Google Calendar Sync Bar */}
         <View style={styles.syncBar}>
           <View style={styles.syncIndicator}>
-            <View style={styles.syncDot} />
-            <Text style={styles.syncText}>Google Calendar Connected</Text>
+            <View style={[styles.syncDot, !calendarConnected && styles.syncDotOff]} />
+            <Text style={styles.syncText}>
+              {calendarConnected ? 'Google Calendar Connected' : 'Google Calendar not connected'}
+            </Text>
           </View>
           <TouchableOpacity style={styles.syncBtn} onPress={handleSyncGoogleCalendar} activeOpacity={0.82}>
             <Ionicons name="sync-outline" size={13} color={designTokens.colors.primaryDeep} />
@@ -145,6 +164,9 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     backgroundColor: designTokens.colors.primary,
+  },
+  syncDotOff: {
+    backgroundColor: designTokens.colors.textMuted,
   },
   syncText: { color: designTokens.colors.textSecondary, fontSize: 12, fontWeight: '600' },
   syncBtn: {
