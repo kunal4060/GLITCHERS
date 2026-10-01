@@ -283,6 +283,10 @@ class ApiClient {
     return this.post<any>('/emails/sync');
   }
 
+  public async syncTimetableToCalendar() {
+    return this.post<any>('/calendar/sync-google');
+  }
+
   public async sendAIChat(message: string) {
     return this.post<AIChatResponse>('/ai/chat', {
       message,
