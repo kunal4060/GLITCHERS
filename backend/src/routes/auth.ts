@@ -58,7 +58,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     try {
-      const { email, googleId, name, accessToken } = await googleService.exchangeCodeForTokens(code);
+      const { email, googleId, name, accessToken, refreshToken } = await googleService.exchangeCodeForTokens(code);
       const profile = await supabaseStore.syncOrEnsureUser(email, name);
 
       if (accessToken) {
@@ -78,6 +78,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         googleId: googleId || `google_${profile.email.replace(/[^a-zA-Z0-9]/g, '_')}`,
         email,
         accessToken,
+        refreshToken,
         scopes: ['userinfo.email', 'userinfo.profile', 'openid', 'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/calendar.events'],
       });
 
@@ -95,7 +96,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: 'Authorization code is required' });
     }
 
-    const { email, googleId, name, accessToken } = await googleService.exchangeCodeForTokens(code);
+    const { email, googleId, name, accessToken, refreshToken } = await googleService.exchangeCodeForTokens(code);
     const profile = await supabaseStore.syncOrEnsureUser(email, name);
 
     if (accessToken) {
@@ -115,6 +116,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       googleId: googleId || `google_${profile.email.replace(/[^a-zA-Z0-9]/g, '_')}`,
       email,
       accessToken,
+      refreshToken,
       scopes: ['userinfo.email', 'userinfo.profile', 'openid', 'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/calendar.events'],
     });
 
