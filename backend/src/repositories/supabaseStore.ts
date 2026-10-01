@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import { getSupabaseClient } from './supabaseClient.js';
 import { inMemoryStore } from './inMemoryStore.js';
 import type {
@@ -26,6 +26,16 @@ function ensureUUID(id?: string): string {
   return randomUUID();
 }
 
+/**
+ * Deterministic UUID derived from an arbitrary string (e.g. a Gmail message
+ * id). Same input always yields the same id, so re-syncing the same email
+ * upserts onto the existing row instead of inserting a duplicate.
+ */
+function deterministicUuid(input: string): string {
+  const hex = createHash('sha256').update(input).digest('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
 export class SupabaseStore {
   // ==========================================
   // PROFILES & AUTH
@@ -47,15 +57,15 @@ export class SupabaseStore {
             email: data.email,
             fullName: data.full_name || '',
             avatarUrl: data.avatar_url || null,
-            university: data.university || 'State Technological University',
-            course: data.course || 'Computer Science & Engineering',
-            year: data.year || 3,
-            semester: data.semester || 6,
-            section: data.section || 'A',
-            cgpa: data.cgpa ? String(data.cgpa) : '8.71',
-            creditsCompleted: data.credits_completed ?? 42,
-            creditsCurrent: data.credits_current ?? 18,
-            universityDomain: data.university_domain || 'university.edu',
+            university: data.university || null,
+            course: data.course || null,
+            year: data.year ?? null,
+            semester: data.semester ?? null,
+            section: data.section || null,
+            cgpa: data.cgpa ? String(data.cgpa) : null,
+            creditsCompleted: data.credits_completed ?? null,
+            creditsCurrent: data.credits_current ?? null,
+            universityDomain: data.university_domain || '',
             isOnboardingComplete: data.is_onboarding_complete ?? false,
             createdAt: data.created_at || new Date().toISOString(),
           };
@@ -87,15 +97,15 @@ export class SupabaseStore {
             email: data.email,
             fullName: data.full_name || '',
             avatarUrl: data.avatar_url || null,
-            university: data.university || 'State Technological University',
-            course: data.course || 'Computer Science & Engineering',
-            year: data.year || 3,
-            semester: data.semester || 6,
-            section: data.section || 'A',
-            cgpa: data.cgpa ? String(data.cgpa) : '8.71',
-            creditsCompleted: data.credits_completed ?? 42,
-            creditsCurrent: data.credits_current ?? 18,
-            universityDomain: data.university_domain || (safeEmail.includes('@') ? safeEmail.split('@')[1] : 'university.edu'),
+            university: data.university || null,
+            course: data.course || null,
+            year: data.year ?? null,
+            semester: data.semester ?? null,
+            section: data.section || null,
+            cgpa: data.cgpa ? String(data.cgpa) : null,
+            creditsCompleted: data.credits_completed ?? null,
+            creditsCurrent: data.credits_current ?? null,
+            universityDomain: data.university_domain || (safeEmail.includes('@') ? safeEmail.split('@')[1] : ''),
             isOnboardingComplete: data.is_onboarding_complete ?? false,
             createdAt: data.created_at || new Date().toISOString(),
           };
@@ -429,31 +439,60 @@ export class SupabaseStore {
   }
 
   public async updateTask(userId: string, taskId: string, updates: Partial<Task>): Promise<Task | null> {
+    const supabase = getSupabaseClient();
+
+    // Look up the task: in-memory cache first, then Supabase (source of truth).
     const list = inMemoryStore.tasks.get(userId) || [];
     const idx = list.findIndex((t) => t.id === taskId);
-    let updated: Task;
+
+    let existing: Task | null = null;
+    if (idx !== -1) {
+      existing = list[idx];
+    } else if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        const { data, error } = await supabase
+          .from('tasks')
+          .select('*')
+          .eq('id', taskId)
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (data && !error) {
+          existing = {
+            id: data.id,
+            userId: data.user_id,
+            title: data.title,
+            description: data.description || null,
+            priority: data.priority || 'NORMAL',
+            status: data.status || 'TODO',
+            dueDate: data.due_date || null,
+            recurrence: data.recurrence || null,
+            relatedSubject: data.related_subject || null,
+            createdAt: data.created_at || new Date().toISOString(),
+            completedAt: data.completed_at || null,
+          };
+        }
+      } catch (err) {
+        console.warn('SupabaseStore.updateTask lookup warning:', err);
+      }
+    }
+
+    // Never fabricate a task on update — return null so the route can 404.
+    if (!existing) {
+      return null;
+    }
+
+    const updated: Task = { ...existing, ...updates };
+    if (updates.status === 'COMPLETED' && !updated.completedAt) {
+      updated.completedAt = new Date().toISOString();
+    }
 
     if (idx !== -1) {
-      updated = { ...list[idx], ...updates };
-      if (updates.status === 'COMPLETED' && !updated.completedAt) {
-        updated.completedAt = new Date().toISOString();
-      }
       list[idx] = updated;
       inMemoryStore.tasks.set(userId, list);
     } else {
-      updated = {
-        id: taskId,
-        userId,
-        title: updates.title || 'Task',
-        priority: updates.priority || 'NORMAL',
-        status: updates.status || 'TODO',
-        createdAt: new Date().toISOString(),
-        ...updates,
-      };
       inMemoryStore.tasks.set(userId, [updated, ...list]);
     }
 
-    const supabase = getSupabaseClient();
     if (supabase && UUID_REGEX.test(userId)) {
       try {
         await supabase
@@ -744,30 +783,55 @@ export class SupabaseStore {
   }
 
   public async updateDebt(userId: string, debtId: string, updates: Partial<Debt>): Promise<Debt | null> {
+    const supabase = getSupabaseClient();
+
     const list = inMemoryStore.debts.get(userId) || [];
     const idx = list.findIndex((d) => d.id === debtId);
-    let updated: Debt;
+
+    let existing: Debt | null = null;
+    if (idx !== -1) {
+      existing = list[idx];
+    } else if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        const { data, error } = await supabase
+          .from('debts')
+          .select('*')
+          .eq('id', debtId)
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (data && !error) {
+          existing = {
+            id: data.id,
+            userId: data.user_id,
+            person: data.person,
+            type: data.type || 'OWES_ME',
+            amount: Number(data.amount),
+            status: data.status || 'PENDING',
+            paidAmount: Number(data.paid_amount || 0),
+            dueDate: data.due_date || null,
+            notes: data.notes || null,
+            createdAt: data.created_at || new Date().toISOString(),
+          };
+        }
+      } catch (err) {
+        console.warn('SupabaseStore.updateDebt lookup warning:', err);
+      }
+    }
+
+    // Never fabricate a debt on update — return null so the route can 404.
+    if (!existing) {
+      return null;
+    }
+
+    const updated: Debt = { ...existing, ...updates };
 
     if (idx !== -1) {
-      updated = { ...list[idx], ...updates };
       list[idx] = updated;
       inMemoryStore.debts.set(userId, list);
     } else {
-      updated = {
-        id: debtId,
-        userId,
-        person: updates.person || 'Friend',
-        type: updates.type || 'OWES_ME',
-        amount: updates.amount || 0,
-        status: updates.status || 'PENDING',
-        paidAmount: updates.paidAmount || 0,
-        createdAt: new Date().toISOString(),
-        ...updates,
-      };
       inMemoryStore.debts.set(userId, [updated, ...list]);
     }
 
-    const supabase = getSupabaseClient();
     if (supabase && UUID_REGEX.test(userId)) {
       try {
         await supabase
@@ -963,7 +1027,12 @@ export class SupabaseStore {
   public async saveEmails(userId: string, emails: EmailSummary[]): Promise<void> {
     const prepared: EmailSummary[] = emails.map((e) => ({
       ...e,
-      id: ensureUUID(e.id),
+      // Gmail message ids are stable but not UUIDs: derive a deterministic id
+      // from the provider message id so re-syncs upsert onto the same row
+      // (onConflict: 'id') instead of inserting duplicates.
+      id: e.providerMessageId
+        ? deterministicUuid(`gmail:${e.providerMessageId}`)
+        : ensureUUID(e.id),
       userId,
     }));
 
