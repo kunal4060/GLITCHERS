@@ -14,9 +14,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { designTokens } from '../theme/designTokens';
-import { useDashboardStore } from '../store/dashboardStore';
+import { useDashboardStore, splitShare } from '../store/dashboardStore';
 import { useAuthStore } from '../store/authStore';
 import { apiClient } from '../api/client';
+import { newUuid } from '../utils/tokenStorage';
 import { NiaHeader, LabelCaps, StatusPill, NiaCard } from '../components/nia';
 import { monthCycleLabel, inr, timeAgo } from '../utils/niaFormat';
 
@@ -70,9 +71,10 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
   const [formCat, setFormCat] = useState<string>('FOOD');
 
   const totalSpent = expenses.reduce((s, e) => s + Number(e.amount), 0);
-  const monthlyLimit = budget?.monthlyLimit || 10000;
-  const remaining = Math.max(0, monthlyLimit - totalSpent);
-  const progressPct = monthlyLimit > 0 ? Math.min(100, Math.round((totalSpent / monthlyLimit) * 100)) : 0;
+  // M25: no phantom default — a fresh user who never set a budget sees an explicit empty state.
+  const monthlyLimit = budget?.monthlyLimit ?? null;
+  const remaining = monthlyLimit !== null ? Math.max(0, monthlyLimit - totalSpent) : null;
+  const progressPct = monthlyLimit ? Math.min(100, Math.round((totalSpent / monthlyLimit) * 100)) : 0;
 
   const categoryTotals: Record<string, number> = { FOOD: 0, TRANSPORT: 0, EDUCATION: 0, SHOPPING: 0, OTHER: 0 };
   expenses.forEach((e) => {
@@ -109,7 +111,7 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
         try {
           const scanRes = await apiClient.scanBill(res.assets[0].base64, res.assets[0].mimeType || 'image/jpeg');
           if (scanRes && scanRes.success && scanRes.expense) {
-            addExpense(scanRes.expense);
+            addExpense(scanRes.expense, { skipRemote: true });
             Alert.alert(
               'Bill scanned & logged',
               `Logged ${inr(Number(scanRes.parsed?.total || scanRes.expense.amount))} from ${
@@ -133,7 +135,7 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
   // ---- quick add ----
   const handleQuickAdd = () => {
     if (!quickInput.trim()) return;
-    const match = quickInput.match(/(\d+(?:\.\d{1,2})?)/);
+    const match = quickInput.replace(/,/g, '').match(/(\d+(?:\.\d{1,2})?)/);
     const amount = match ? parseFloat(match[1]) : 150;
     const lower = quickInput.toLowerCase();
     let category = 'OTHER';
@@ -189,8 +191,8 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
 
   const submitSplit = () => {
     const amt = parseFloat(splitAmount);
-    if (!amt || !splitPerson.trim()) {
-      Alert.alert('Missing info', 'Enter the amount and the friend’s name.');
+    if (!amt || amt <= 0 || !splitPerson.trim()) {
+      Alert.alert('Missing info', 'Enter a valid amount and the friend’s name.');
       return;
     }
     splitExpense(amt, splitDesc.trim() || 'Shared bill', splitPerson.trim());
@@ -198,7 +200,7 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
     setSplitPerson('');
     setSplitDesc('');
     setSplitVisible(false);
-    Alert.alert('Bill split', `Split ${inr(amt)} — ${splitPerson.trim()} owes ${inr(amt / 2)}.`);
+    Alert.alert('Bill split', `Split ${inr(amt)} — ${splitPerson.trim()} owes ${inr(splitShare(amt))}.`);
   };
 
   const handleSetBudget = () => {
@@ -207,7 +209,12 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
       Alert.alert('Invalid budget', 'Enter a monthly budget amount.');
       return;
     }
-    useDashboardStore.getState().setBudget({ monthlyLimit: v } as any);
+    useDashboardStore.getState().setBudget({
+      id: newUuid(),
+      userId: useAuthStore.getState().user?.id || 'offline-user',
+      monthlyLimit: v,
+      month: new Date().toISOString().slice(0, 7),
+    } as any);
     setBudgetInput('');
     setBudgetVisible(false);
     Alert.alert('Budget updated', `Monthly budget set to ${inr(v)}.`);
@@ -226,27 +233,45 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
 
           {/* Budget card */}
           <NiaCard dark style={styles.budgetCard}>
-            <View style={styles.budgetTop}>
-              <View>
-                <LabelCaps color="rgba(255,255,255,0.6)">Monthly Budget</LabelCaps>
-                <Text style={styles.budgetTotal}>{inr(monthlyLimit)}</Text>
-                <Text style={styles.budgetCycle}>{monthCycleLabel()}</Text>
-              </View>
-              <TouchableOpacity onPress={() => { setBudgetInput(String(monthlyLimit)); setBudgetVisible(true); }} activeOpacity={0.7}>
-                <View style={styles.editBadge}>
-                  <Ionicons name="pencil-outline" size={13} color="#FFFFFF" />
-                  <Text style={styles.editText}>EDIT</Text>
+            {monthlyLimit !== null ? (
+              <>
+                <View style={styles.budgetTop}>
+                  <View>
+                    <LabelCaps color="rgba(255,255,255,0.6)">Monthly Budget</LabelCaps>
+                    <Text style={styles.budgetTotal}>{inr(monthlyLimit)}</Text>
+                    <Text style={styles.budgetCycle}>{monthCycleLabel()}</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => { setBudgetInput(String(monthlyLimit)); setBudgetVisible(true); }} activeOpacity={0.7}>
+                    <View style={styles.editBadge}>
+                      <Ionicons name="pencil-outline" size={13} color="#FFFFFF" />
+                      <Text style={styles.editText}>EDIT</Text>
+                    </View>
+                  </TouchableOpacity>
                 </View>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.barBg}>
-              <View style={[styles.barFill, { width: `${progressPct}%`, backgroundColor: barColor }]} />
-            </View>
-            <View style={styles.budgetRow}>
-              <Text style={styles.budgetStat}>Spent <Text style={styles.budgetStatBold}>{inr(totalSpent)}</Text></Text>
-              <Text style={styles.budgetStat}>Left <Text style={styles.budgetStatBold}>{inr(remaining)}</Text></Text>
-              <Text style={styles.budgetPct}>{progressPct}%</Text>
-            </View>
+                <View style={styles.barBg}>
+                  <View style={[styles.barFill, { width: `${progressPct}%`, backgroundColor: barColor }]} />
+                </View>
+                <View style={styles.budgetRow}>
+                  <Text style={styles.budgetStat}>Spent <Text style={styles.budgetStatBold}>{inr(totalSpent)}</Text></Text>
+                  <Text style={styles.budgetStat}>Left <Text style={styles.budgetStatBold}>{inr(remaining ?? 0)}</Text></Text>
+                  <Text style={styles.budgetPct}>{progressPct}%</Text>
+                </View>
+              </>
+            ) : (
+              <View style={styles.budgetTop}>
+                <View>
+                  <LabelCaps color="rgba(255,255,255,0.6)">Monthly Budget</LabelCaps>
+                  <Text style={styles.budgetTotal}>Not set</Text>
+                  <Text style={styles.budgetCycle}>Set a monthly limit to track spending</Text>
+                </View>
+                <TouchableOpacity onPress={() => { setBudgetInput(''); setBudgetVisible(true); }} activeOpacity={0.7}>
+                  <View style={styles.editBadge}>
+                    <Ionicons name="add-outline" size={13} color="#FFFFFF" />
+                    <Text style={styles.editText}>SET</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            )}
           </NiaCard>
 
           {/* Action row */}
