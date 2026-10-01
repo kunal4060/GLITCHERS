@@ -1,6 +1,11 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { inMemoryStore } from '../repositories/inMemoryStore.js';
+import { supabaseStore } from '../repositories/supabaseStore.js';
 import { authMiddleware } from '../middleware/auth.js';
+
+// Null-safe case-insensitive substring match (avoids the item.title crash pattern).
+const includes = (value: unknown, query: string): boolean =>
+  String(value ?? '').toLowerCase().includes(query);
 
 export const searchRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', authMiddleware);
@@ -13,35 +18,56 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
       return { results: [] };
     }
 
-    const classes = inMemoryStore.classes.get(userId) || [];
-    const tasks = inMemoryStore.tasks.get(userId) || [];
-    const expenses = inMemoryStore.expenses.get(userId) || [];
+    // M10 fix: query the persistent stores via supabaseStore (Supabase-backed,
+    // falling back to its in-memory cache) and merge with the request-scoped
+    // in-memory store so search works after a restart.
+    const [sbClasses, sbTasks, sbExpenses, sbEmails] = await Promise.all([
+      supabaseStore.getClasses(userId),
+      supabaseStore.getTasks(userId),
+      supabaseStore.getExpenses(userId),
+      supabaseStore.getEmails(userId),
+    ]);
+
+    const classes = [...(inMemoryStore.classes.get(userId) || []), ...sbClasses];
+    const tasks = [...(inMemoryStore.tasks.get(userId) || []), ...sbTasks];
+    const expenses = [...(inMemoryStore.expenses.get(userId) || []), ...sbExpenses];
     const debts = inMemoryStore.debts.get(userId) || [];
-    const emails = inMemoryStore.emails.get(userId) || [];
+    const emails = [...(inMemoryStore.emails.get(userId) || []), ...sbEmails];
 
     const matchedClasses = classes
-      .filter((c) => c.subjectName.toLowerCase().includes(query) || (c.room && c.room.toLowerCase().includes(query)))
+      .filter((c) => includes(c.subjectName, query) || includes(c.room, query))
       .map((c) => ({ type: 'CLASS', title: c.subjectName, subtitle: `${c.day} ${c.startTime} - ${c.endTime} (${c.room || 'TBD'})`, data: c }));
 
     const matchedTasks = tasks
-      .filter((t) => t.title.toLowerCase().includes(query) || (t.description && t.description.toLowerCase().includes(query)))
+      .filter((t) => includes(t.title, query) || includes(t.description, query))
       .map((t) => ({ type: 'TASK', title: t.title, subtitle: `Priority: ${t.priority} • Status: ${t.status}`, data: t }));
 
     const matchedExpenses = expenses
-      .filter((e) => e.description.toLowerCase().includes(query) || e.category.toLowerCase().includes(query))
+      .filter((e) => includes(e.description, query) || includes(e.category, query))
       .map((e) => ({ type: 'EXPENSE', title: `₹${e.amount} - ${e.description}`, subtitle: `Category: ${e.category}`, data: e }));
 
     const matchedDebts = debts
-      .filter((d) => d.person.toLowerCase().includes(query) || (d.notes && d.notes.toLowerCase().includes(query)))
+      .filter((d) => includes(d.person, query) || includes(d.notes, query))
       .map((d) => ({ type: 'DEBT', title: `${d.person}: ₹${d.amount}`, subtitle: d.type === 'OWES_ME' ? 'Owes you' : 'You owe', data: d }));
 
     const matchedEmails = emails
-      .filter((e) => e.subject.toLowerCase().includes(query) || e.summary.toLowerCase().includes(query))
+      .filter((e) => includes(e.subject, query) || includes(e.summary, query))
       .map((e) => ({ type: 'EMAIL', title: e.subject, subtitle: e.summary, data: e }));
+
+    // Dedupe across the two stores (same row can appear in both).
+    const seen = new Set<string>();
+    const results: Array<{ type: string; title: unknown; subtitle: unknown; data: unknown }> = [];
+    for (const r of [...matchedClasses, ...matchedTasks, ...matchedExpenses, ...matchedDebts, ...matchedEmails]) {
+      const key = `${r.type}:${(r.data as { id?: string } | null)?.id ?? r.title}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        results.push(r);
+      }
+    }
 
     return {
       query,
-      results: [...matchedClasses, ...matchedTasks, ...matchedExpenses, ...matchedDebts, ...matchedEmails],
+      results,
     };
   });
 };
