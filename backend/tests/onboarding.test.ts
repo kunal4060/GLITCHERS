@@ -91,6 +91,7 @@ describe('Onboarding & First-Time Student Experience API', () => {
 
   test('POST /api/onboarding/initialize runs idempotent initialization pipeline', async () => {
     const payload = {
+      complete: true,
       profile: {
         fullName: 'Kunal Ugale',
         university: 'State Technological University',
