@@ -20,20 +20,33 @@ export const chatbotRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: 'Valid message string is required' });
     }
 
-    // Persist user prompt in cloud chat history
-    await supabaseStore.saveChatMessage(userId, 'user', message);
+    // M6 fix: never persist the user message before the Gemini call succeeds,
+    // and never 500 on an AI failure. On error, store both messages with a
+    // fallback assistant reply and return 200 — no orphan, no crash.
+    try {
+      const response = await geminiAssistant.processStudentQuery(userId, message);
 
-    const response = await geminiAssistant.processStudentQuery(userId, message);
+      // Persist both messages only after a successful call
+      await supabaseStore.saveChatMessage(userId, 'user', message);
+      await supabaseStore.saveChatMessage(
+        userId,
+        'assistant',
+        response.message || '',
+        response.data || response.confirmationPayload
+      );
 
-    // Persist assistant reply in cloud chat history
-    await supabaseStore.saveChatMessage(
-      userId,
-      'assistant',
-      response.message || '',
-      response.data || response.confirmationPayload
-    );
-
-    return response;
+      return response;
+    } catch (err: any) {
+      console.error('Chatbot /chat error:', err);
+      const fallback = 'Sorry, I could not process that right now.';
+      await supabaseStore.saveChatMessage(userId, 'user', message);
+      await supabaseStore.saveChatMessage(userId, 'assistant', fallback);
+      return {
+        message: fallback,
+        data: null,
+        notice: 'AI service temporarily unavailable',
+      };
+    }
   });
 
   fastify.post<{ Body: { imageBase64: string; mimeType?: string; message?: string } }>('/analyze-image', async (req, reply) => {
@@ -45,25 +58,32 @@ export const chatbotRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const cleanBase64 = imageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
+    const userText = message ? `📷 [Photo]: ${message}` : '📷 [Uploaded Image for Analysis]';
 
-    // Persist user query with photo indicator
-    await supabaseStore.saveChatMessage(
-      userId,
-      'user',
-      message ? `📷 [Photo]: ${message}` : '📷 [Uploaded Image for Analysis]'
-    );
+    // Same M6 pattern as /chat: no orphan message, no 500 on AI failure.
+    try {
+      const response = await geminiAssistant.analyzeStudentImage(userId, cleanBase64, mimeType, message);
 
-    const response = await geminiAssistant.analyzeStudentImage(userId, cleanBase64, mimeType, message);
+      await supabaseStore.saveChatMessage(userId, 'user', userText);
+      await supabaseStore.saveChatMessage(
+        userId,
+        'assistant',
+        response.message,
+        response.expense ? { type: 'EXPENSE', data: response.expense } : undefined
+      );
 
-    // Persist assistant reply
-    await supabaseStore.saveChatMessage(
-      userId,
-      'assistant',
-      response.message,
-      response.expense ? { type: 'EXPENSE', data: response.expense } : undefined
-    );
-
-    return response;
+      return response;
+    } catch (err: any) {
+      console.error('Chatbot /analyze-image error:', err);
+      const fallback = 'Sorry, I could not analyze that image right now.';
+      await supabaseStore.saveChatMessage(userId, 'user', userText);
+      await supabaseStore.saveChatMessage(userId, 'assistant', fallback);
+      return {
+        message: fallback,
+        data: null,
+        notice: 'AI service temporarily unavailable',
+      };
+    }
   });
 
   fastify.delete('/history', async (req) => {
