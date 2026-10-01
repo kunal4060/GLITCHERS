@@ -26,7 +26,7 @@ export const EmailSummarySchema = z.object({
   providerMessageId: z.string(),
   sender: z.string(),
   subject: z.string(),
-  receivedAt: z.string().datetime(),
+  receivedAt: z.string(),
   isUniversityRelated: z.boolean(),
   importance: z.enum(['LOW', 'NORMAL', 'HIGH', 'CRITICAL']).default('NORMAL'),
   summary: z.string(),
