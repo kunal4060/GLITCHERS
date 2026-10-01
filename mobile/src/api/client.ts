@@ -1,6 +1,14 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { AIChatResponse } from '@glitchers/shared';
+import { saveAuthToken, loadAuthToken, clearAuthToken } from '../utils/tokenStorage';
+
+export class AuthError extends Error {
+  constructor(message = 'Session expired. Please sign in again.') {
+    super(message);
+    this.name = 'AuthError';
+  }
+}
 
 const PROD_HOST = 'https://glitchers-backend.onrender.com/api';
 const LOCAL_DEV_HOST = Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://localhost:5000/api';
@@ -42,7 +50,7 @@ class ApiClient {
   public setToken(token: string) {
     this.token = token;
     if (token) {
-      AsyncStorage.setItem('nexa-auth-token', token).catch(() => null);
+      saveAuthToken(token).catch(() => null);
     }
   }
 
@@ -52,67 +60,56 @@ class ApiClient {
 
   public clearToken() {
     this.token = '';
+    clearAuthToken().catch(() => null);
     AsyncStorage.removeItem('nexa-auth-token').catch(() => null);
     AsyncStorage.removeItem('glitchers-auth-token').catch(() => null);
   }
 
   public async getEffectiveToken(): Promise<string> {
-    if (this.token && this.token.trim() && this.token !== 'dev-token') {
+    if (this.token && this.token.trim()) {
       return this.token.trim();
     }
 
-    // 1. Try reading from active authStore in memory
+    // 1. SecureStore (Keychain / Keystore) — the canonical home of the token
+    try {
+      const secure = await loadAuthToken();
+      if (secure && secure.trim()) {
+        this.token = secure.trim();
+        return this.token;
+      }
+    } catch {
+      // ignore
+    }
+
+    // 2. One-time migration from legacy plain-AsyncStorage keys
+    try {
+      const legacy =
+        (await AsyncStorage.getItem('nexa-auth-token')) ||
+        (await AsyncStorage.getItem('glitchers-auth-token'));
+      if (legacy && legacy.trim()) {
+        this.token = legacy.trim();
+        saveAuthToken(this.token).catch(() => null);
+        AsyncStorage.removeItem('nexa-auth-token').catch(() => null);
+        AsyncStorage.removeItem('glitchers-auth-token').catch(() => null);
+        return this.token;
+      }
+    } catch {
+      // ignore
+    }
+
+    // 3. In-memory authStore token (set during this session)
     try {
       const { useAuthStore } = require('../store/authStore');
       const authState = useAuthStore?.getState?.();
-      if (authState?.token && authState.token !== 'dev-token') {
-        this.token = authState.token;
-        return this.token;
-      }
-      if (authState?.user?.id && authState.user.id !== '00000000-0000-0000-0000-000000000001') {
-        this.token = `jwt_${authState.user.id}`;
+      if (authState?.token && authState.token.trim()) {
+        this.token = authState.token.trim();
         return this.token;
       }
     } catch {
       // ignore
     }
 
-    // 2. Try reading from dedicated token storage (nexa first, then legacy fallback)
-    try {
-      const stored = (await AsyncStorage.getItem('nexa-auth-token')) || (await AsyncStorage.getItem('glitchers-auth-token'));
-      if (stored && stored.trim() && stored !== 'dev-token') {
-        this.token = stored.trim();
-        return this.token;
-      }
-    } catch {
-      // ignore
-    }
-
-    // 3. Try reading from persisted authStore storage in AsyncStorage
-    try {
-      const rawAuth = (await AsyncStorage.getItem('nexa-auth-storage')) || (await AsyncStorage.getItem('glitchers-auth-storage'));
-      if (rawAuth) {
-        const parsed = JSON.parse(rawAuth);
-        const storedToken = parsed?.state?.token;
-        const storedUserId = parsed?.state?.user?.id;
-        if (storedToken && storedToken !== 'dev-token') {
-          this.token = storedToken;
-          return this.token;
-        }
-        if (storedUserId && storedUserId !== '00000000-0000-0000-0000-000000000001') {
-          this.token = `jwt_${storedUserId}`;
-          return this.token;
-        }
-      }
-    } catch {
-      // ignore
-    }
-
-    // Fallback for local development only if no real session exists
-    if (__DEV__) {
-      return 'dev-token';
-    }
-
+    // No token: caller treats this as logged out. Never mint synthetic tokens.
     return '';
   }
 
@@ -139,7 +136,18 @@ class ApiClient {
       clearTimeout(timeoutId);
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || `API error: ${res.status}`);
+        const serverMessage = errorData.error || errorData.message;
+        if (res.status === 401) {
+          this.clearToken();
+          try {
+            const { useAuthStore } = require('../store/authStore');
+            useAuthStore?.getState?.()?.logout?.();
+          } catch {
+            // ignore
+          }
+          throw new AuthError(serverMessage || 'Session expired. Please sign in again.');
+        }
+        throw new Error(serverMessage || `API error: ${res.status}`);
       }
       return (await res.json()) as T;
     } catch (err: any) {
@@ -195,7 +203,7 @@ class ApiClient {
     return this.get<{ tasks: any[] }>('/tasks');
   }
 
-  public async createTask(task: { title: string; priority?: string; dueDate?: string | null; description?: string | null }) {
+  public async createTask(task: { id?: string; title: string; priority?: string; dueDate?: string | null; description?: string | null }) {
     return this.post<{ task: any }>('/tasks', task);
   }
 
@@ -215,7 +223,7 @@ class ApiClient {
     return this.get<{ expenses: any[]; totalSpent: number }>('/expenses');
   }
 
-  public async createExpense(expense: { amount: number; category?: string; description?: string; merchant?: string }) {
+  public async createExpense(expense: { id?: string; amount: number; category?: string; description?: string; merchant?: string }) {
     return this.post<{ expense: any }>('/expenses', expense);
   }
 
@@ -228,14 +236,22 @@ class ApiClient {
   }
 
   public async fetchBudget() {
-    return this.get<{ configured: boolean; status: any; budget: any }>('/budgets/current');
+    return this.get<{ configured: boolean; status: any; budget?: any }>('/budgets/current');
+  }
+
+  public async updateBudget(monthlyLimit: number) {
+    return this.post<{ budget: any }>('/budgets/', { monthlyLimit });
+  }
+
+  public async deleteAccount() {
+    return this.delete<{ ok: boolean }>('/auth/account');
   }
 
   public async fetchDebts() {
     return this.get<{ debts: any[]; totals?: any; summary?: any }>('/debts');
   }
 
-  public async createDebt(debt: { person: string; amount: number; type?: string; notes?: string }) {
+  public async createDebt(debt: { id?: string; person: string; amount: number; type?: string; notes?: string }) {
     return this.post<{ debt: any }>('/debts', debt);
   }
 
@@ -267,10 +283,9 @@ class ApiClient {
     return this.post<any>('/emails/sync');
   }
 
-  public async sendAIChat(message: string, conversationId?: string) {
+  public async sendAIChat(message: string) {
     return this.post<AIChatResponse>('/ai/chat', {
       message,
-      conversationId,
     });
   }
 
@@ -330,10 +345,6 @@ class ApiClient {
       mimeType,
       message: prompt,
     });
-  }
-
-  public async syncBatch(operations: any[]) {
-    return this.post<any>('/sync/batch', { operations });
   }
 
   // Onboarding & Identity methods
