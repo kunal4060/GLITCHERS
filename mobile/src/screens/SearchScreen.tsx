@@ -5,6 +5,8 @@ import { designTokens } from '../theme/designTokens';
 import { GradientBackground } from '../components/common/GradientBackground';
 import { useDashboardStore } from '../store/dashboardStore';
 
+const C = designTokens.colors;
+
 export const SearchScreen: React.FC = () => {
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'CLASSES' | 'TASKS' | 'FINANCE' | 'EMAILS'>('ALL');
@@ -69,7 +71,7 @@ export const SearchScreen: React.FC = () => {
           <TextInput
             style={styles.searchInput}
             placeholder="Search classes, tasks, expenses, debts, emails..."
-            placeholderTextColor="#8C9692"
+            placeholderTextColor={C.textMuted}
             value={query}
             onChangeText={setQuery}
           />
@@ -126,13 +128,13 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: C.surfaceCard,
     marginHorizontal: 16,
     marginTop: 16,
     paddingHorizontal: 14,
     borderRadius: designTokens.radii.pill,
     borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.10)',
+    borderColor: C.surfaceBorder,
     ...designTokens.shadows.card,
   },
   searchInput: {
@@ -146,12 +148,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   chip: {
-    backgroundColor: '#FAF7F2',
+    backgroundColor: C.background,
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: designTokens.radii.pill,
     borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.08)',
+    borderColor: C.surfaceBorder,
   },
   chipActive: {
     backgroundColor: designTokens.colors.primaryPill,
@@ -170,13 +172,13 @@ const styles = StyleSheet.create({
   },
   resultCard: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: C.surfaceCard,
     borderRadius: designTokens.radii.card,
     padding: 14,
     marginBottom: 10,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.06)',
+    borderColor: C.surfaceBorder,
     ...designTokens.shadows.card,
   },
   iconContainer: {
