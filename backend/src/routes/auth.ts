@@ -4,11 +4,29 @@ import { inMemoryStore } from '../repositories/inMemoryStore.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { getSupabaseClient } from '../repositories/supabaseClient.js';
 import { supabaseStore } from '../repositories/supabaseStore.js';
+import { signToken } from '../utils/tokens.js';
+import { env } from '../config/env.js';
 import { randomUUID } from 'crypto';
 
 async function syncSupabaseUser(email: string, name?: string, googleId?: string, accessToken?: string): Promise<string | null> {
   const profile = await supabaseStore.syncOrEnsureUser(email, name);
   return profile.id;
+}
+
+async function verifyGoogleIdToken(idToken: string): Promise<{ email: string; name?: string } | null> {
+  try {
+    const res = await globalThis.fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
+    if (!res.ok) return null;
+    const payload = (await res.json()) as { email?: string; name?: string; aud?: string };
+    if (!payload.email) return null;
+    const clientId = (env.GOOGLE_CLIENT_ID || '').trim();
+    if (clientId && !clientId.startsWith('dev-') && payload.aud !== clientId) {
+      return null;
+    }
+    return { email: payload.email, name: payload.name };
+  } catch {
+    return null;
+  }
 }
 
 export const authRoutes: FastifyPluginAsync = async (fastify) => {
@@ -17,27 +35,46 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     return { url: googleService.getAuthUrl(returnUrl) };
   });
 
-  fastify.post<{ Body: { email?: string; name?: string } }>('/login', async (req, reply) => {
-    const { email, name } = req.body || {};
+  fastify.post<{ Body: { email?: string; name?: string; idToken?: string } }>('/login', async (req, reply) => {
+    const { email, name, idToken } = req.body || {};
+
+    if (idToken) {
+      // Verify the Google ID token server-side before minting a session token
+      const verified = await verifyGoogleIdToken(idToken);
+      if (!verified) {
+        return reply.status(401).send({ error: 'Invalid Google ID token' });
+      }
+      const profile = await supabaseStore.syncOrEnsureUser(verified.email, name || verified.name);
+      return {
+        accessToken: signToken(profile.id),
+        user: profile,
+      };
+    }
+
+    // SECURITY: set ALLOW_DEMO_LOGIN=false before public release — demo login must not ship
+    if (process.env.ALLOW_DEMO_LOGIN === 'false') {
+      return reply.status(401).send({ error: 'Demo login is disabled; please sign in with Google' });
+    }
+
     if (!email || !email.includes('@')) {
       return reply.status(400).send({ error: 'Valid email is required' });
     }
 
     const profile = await supabaseStore.syncOrEnsureUser(email, name);
     return {
-      accessToken: 'jwt_' + profile.id,
+      accessToken: signToken(profile.id),
       user: profile,
     };
   });
 
-  fastify.get<{ Querystring: { code?: string; returnUrl?: string; email?: string; name?: string } }>('/mock-google-login', async (req, reply) => {
+  fastify.get<{ Querystring: { code?: string; error?: string; state?: string; email?: string; name?: string } }>('/mock-google-login', async (req, reply) => {
     const returnUrl = req.query.returnUrl || 'http://localhost:8082';
     const cleanBase = returnUrl.split('?')[0].replace(/\/$/, '');
     const email = req.query.email || 'student@university.edu';
     const name = req.query.name || (email.split('@')[0].charAt(0).toUpperCase() + email.split('@')[0].slice(1));
     const profile = await supabaseStore.syncOrEnsureUser(email, name);
     return reply.redirect(
-      `${cleanBase}/?token=jwt_${profile.id}&email=${encodeURIComponent(profile.email)}&name=${encodeURIComponent(profile.fullName)}`
+      `${cleanBase}/?token=${encodeURIComponent(signToken(profile.id))}&email=${encodeURIComponent(profile.email)}&name=${encodeURIComponent(profile.fullName)}`
     );
   });
 
@@ -83,7 +120,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       return reply.redirect(
-        `${cleanBase}/?token=jwt_${profile.id}&email=${encodeURIComponent(profile.email)}&name=${encodeURIComponent(profile.fullName)}`
+        `${cleanBase}/?token=${encodeURIComponent(signToken(profile.id))}&email=${encodeURIComponent(profile.email)}&name=${encodeURIComponent(profile.fullName)}`
       );
     } catch (err: any) {
       return reply.redirect(`${cleanBase}/?auth_error=${encodeURIComponent(err.message)}`);
@@ -121,7 +158,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     return {
-      accessToken: 'jwt_' + profile.id,
+      accessToken: signToken(profile.id),
       user: profile,
     };
   });
@@ -171,6 +208,27 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     };
     inMemoryStore.googleConnections.set(userId, updatedConn);
 
+    // M11: persist universityDomain + connection flags to Supabase (best-effort;
+    // never break the route if the DB is unavailable)
+    try {
+      if (universityDomain) {
+        await supabaseStore.updateProfile(userId, { universityDomain });
+      }
+      const supabase = getSupabaseClient();
+      if (supabase && (gmailConnected !== undefined || calendarConnected !== undefined)) {
+        await supabase
+          .from('google_accounts')
+          .update({
+            ...(gmailConnected !== undefined ? { gmail_connected: gmailConnected } : {}),
+            ...(calendarConnected !== undefined ? { calendar_connected: calendarConnected } : {}),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', userId);
+      }
+    } catch {
+      // best-effort only — in-memory state above was already updated
+    }
+
     return {
       success: true,
       connection: updatedConn,
@@ -182,11 +240,67 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     const connection = inMemoryStore.googleConnections.get(userId) || {
       userId,
       email: inMemoryStore.profiles.get(userId)?.email || 'student@university.edu',
-      gmailConnected: true,
-      calendarConnected: true,
-      scopes: ['userinfo.email', 'gmail.readonly', 'calendar.events'],
+      gmailConnected: false,
+      calendarConnected: false,
+      scopes: [],
     };
     return { connection };
   });
-};
 
+  fastify.delete('/account', { preHandler: authMiddleware }, async (req) => {
+    const userId = req.userId!;
+
+    // Clear any cached Google tokens so no background sync can touch this account
+    try {
+      const svc = googleService as unknown as { clearUserToken?: (uid: string) => unknown };
+      if (typeof svc.clearUserToken === 'function') {
+        await svc.clearUserToken(userId);
+      }
+    } catch {
+      // best-effort
+    }
+
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      const tables = [
+        'profiles',
+        'expenses',
+        'tasks',
+        'debts',
+        'emails',
+        'budgets',
+        'notifications',
+        'classes',
+        'timetables',
+        'semesters',
+        'subjects',
+        'exams',
+        'ai_conversations',
+        'ai_messages',
+        'google_accounts',
+        'onboarding_state',
+        'initialization_jobs',
+        'user_preferences',
+      ];
+      for (const table of tables) {
+        try {
+          // profiles is keyed by id; everything else references user_id
+          const column = table === 'profiles' ? 'id' : 'user_id';
+          await supabase.from(table).delete().eq(column, userId);
+        } catch {
+          // best-effort: keep deleting the remaining tables
+        }
+      }
+    }
+
+    // Drop any in-memory state for this user as well
+    try {
+      inMemoryStore.profiles.delete(userId);
+      inMemoryStore.googleConnections.delete(userId);
+    } catch {
+      // best-effort
+    }
+
+    return { ok: true };
+  });
+};
