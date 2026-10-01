@@ -154,7 +154,7 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
   const confirmQuickAdd = () => {
     if (!preview) return;
     addExpense({
-      id: String(Date.now()),
+      id: newUuid(),
       userId: useAuthStore.getState().user?.id || 'offline-user',
       amount: preview.amount,
       category: preview.category as any,
@@ -174,7 +174,7 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
       return;
     }
     addExpense({
-      id: String(Date.now()),
+      id: newUuid(),
       userId: useAuthStore.getState().user?.id || 'offline-user',
       amount: amt,
       category: formCat as any,
