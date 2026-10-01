@@ -46,6 +46,11 @@ export class SyncService {
             }
             break;
           }
+          default: {
+            // Unknown entity types must NOT be silently marked processed —
+            // surface them as failed so the client can retry or investigate.
+            throw new Error(`Unknown entityType: ${String(record.entityType)}`);
+          }
         }
         processedRecordIds.push(record.id);
       } catch (err: any) {
