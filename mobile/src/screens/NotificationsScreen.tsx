@@ -150,9 +150,9 @@ export const NotificationsScreen: React.FC<{ navigation?: any }> = ({ navigation
               style={styles.notifCard}
               activeOpacity={0.85}
               onPress={() => {
-                if (n.id.startsWith('task-')) navigation?.navigate('Tasks');
+                if (n.id.startsWith('task-')) navigation?.navigate('MainTabs', { screen: 'Tasks' });
                 else if (n.id.startsWith('email-')) navigation?.navigate('Email');
-                else if (n.id.startsWith('class-')) navigation?.navigate('Schedule');
+                else if (n.id.startsWith('class-')) navigation?.navigate('MainTabs', { screen: 'Timetable' });
               }}
             >
               <View style={styles.row}>
