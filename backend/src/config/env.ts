@@ -48,3 +48,24 @@ const EnvSchema = z.object({
 });
 
 export const env = EnvSchema.parse(process.env);
+
+// Fail fast on missing required secrets instead of booting with empty
+// values and failing cryptically at runtime.
+const requiredEnvVars = [
+  'SUPABASE_URL',
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'SUPABASE_ANON_KEY',
+  'GEMINI_API_KEY',
+  'GOOGLE_CLIENT_ID',
+  'GOOGLE_CLIENT_SECRET',
+  'JWT_SECRET',
+] as const;
+
+const missingEnvVars = requiredEnvVars.filter((key) => {
+  const value = env[key];
+  return typeof value !== 'string' || value.trim().length === 0;
+});
+
+if (missingEnvVars.length > 0) {
+  throw new Error('Missing required env vars: ' + missingEnvVars.join(', '));
+}
