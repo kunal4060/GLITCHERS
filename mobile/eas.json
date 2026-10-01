@@ -16,7 +16,6 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://glitchers-backend.onrender.com/api"
       },
-      "platform": "android"
     },
     "production": {
       "android": {
