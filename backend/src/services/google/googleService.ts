@@ -1,9 +1,15 @@
 import { google } from 'googleapis';
 import { env } from '../../config/env.js';
+import { getSupabaseClient } from '../repositories/supabaseClient.js';
+
+interface TokenEntry {
+  token: string;
+  expiresAt: number; // epoch ms
+}
 
 export class GoogleService {
   private oauth2Client: any = null;
-  private userTokens = new Map<string, string>();
+  private userTokens = new Map<string, TokenEntry>();
 
   constructor() {
     if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && !env.GOOGLE_CLIENT_ID.startsWith('dev-')) {
@@ -15,12 +21,70 @@ export class GoogleService {
     }
   }
 
-  public setUserAccessToken(userId: string, token: string) {
-    this.userTokens.set(userId, token);
+  public setUserAccessToken(userId: string, token: string, expiresInSec = 3600) {
+    this.userTokens.set(userId, { token, expiresAt: Date.now() + expiresInSec * 1000 });
   }
 
   public getUserAccessToken(userId: string): string | undefined {
-    return this.userTokens.get(userId);
+    const entry = this.userTokens.get(userId);
+    if (!entry) return undefined;
+    if (Date.now() > entry.expiresAt) {
+      this.userTokens.delete(userId);
+      return undefined;
+    }
+    return entry.token;
+  }
+
+  /**
+   * Returns a valid Google access token for the user. Uses the in-memory token
+   * when still fresh; otherwise refreshes via the refresh_token persisted in
+   * Supabase (google_accounts) and re-caches the new token.
+   */
+  public async getValidAccessToken(userId: string): Promise<string | undefined> {
+    const cached = this.getUserAccessToken(userId);
+    if (cached) return cached;
+    if (!this.oauth2Client) return undefined;
+
+    try {
+      const supabase = getSupabaseClient();
+      if (!supabase) return undefined;
+      const { data } = await supabase
+        .from('google_accounts')
+        .select('access_token, refresh_token')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (!data?.refresh_token) {
+        // No refresh token persisted (e.g. logged in before this fix) —
+        // fall back to the stored access token; user may need to re-login.
+        return data?.access_token || undefined;
+      }
+
+      this.oauth2Client.setCredentials({ refresh_token: data.refresh_token });
+      const { credentials } = await this.oauth2Client.refreshAccessToken();
+      const newToken: string | undefined = credentials.access_token;
+      if (!newToken) return data?.access_token || undefined;
+
+      const expiresIn = Math.max(
+        300,
+        Math.floor(((credentials.expiry_date || 0) - Date.now()) / 1000) || 3600
+      );
+      this.setUserAccessToken(userId, newToken, expiresIn);
+
+      await supabase
+        .from('google_accounts')
+        .update({
+          access_token: newToken,
+          token_expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', userId);
+
+      return newToken;
+    } catch (err) {
+      console.warn('Google token refresh warning:', (err as any)?.message || err);
+      return undefined;
+    }
   }
 
   public getAuthUrl(stateUrl?: string): string {
@@ -72,7 +136,8 @@ export class GoogleService {
       googleId: userInfo.data.id || 'google_user_id',
       name: userInfo.data.name || (userInfo.data.email ? userInfo.data.email.split('@')[0] : 'Student User'),
       accessToken: tokens.access_token || '',
-      refreshToken: tokens.refreshToken || undefined,
+      // NOTE: googleapis uses snake_case `refresh_token` on the credentials object
+      refreshToken: (tokens as any).refresh_token || undefined,
     };
   }
 
