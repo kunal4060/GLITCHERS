@@ -13,7 +13,8 @@
       "backgroundColor": "#0D1115"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nexa.studentcompanion"
     },
     "android": {
       "adaptiveIcon": {
@@ -22,11 +23,9 @@
       },
       "package": "com.nexa.studentcompanion",
       "permissions": [
-        "android.permission.INTERNET",
-        "android.permission.SYSTEM_ALERT_WINDOW",
-        "android.permission.POST_NOTIFICATIONS",
-        "android.permission.SCHEDULE_EXACT_ALARM"
-      ]
+        "android.permission.INTERNET"
+      ],
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png",
