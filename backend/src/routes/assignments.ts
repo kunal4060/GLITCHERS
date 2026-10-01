@@ -1,15 +1,18 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { inMemoryStore } from '../repositories/inMemoryStore.js';
 import { authMiddleware } from '../middleware/auth.js';
 import type { Assignment } from '@glitchers/shared';
 import { randomUUID } from 'crypto';
+
+// NOTE: in-memory only. There is no `assignments` table in Supabase yet —
+// assignments are lost on restart until an `assignments` migration lands.
+const assignmentsDb = new Map<string, Assignment[]>();
 
 export const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', authMiddleware);
 
   fastify.get('/', async (req) => {
     const userId = req.userId!;
-    const assignments = inMemoryStore.assignments.get(userId) || [];
+    const assignments = assignmentsDb.get(userId) || [];
     return { assignments };
   });
 
@@ -42,9 +45,9 @@ export const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
       status: 'PENDING',
     };
 
-    const assignments = inMemoryStore.assignments.get(userId) || [];
+    const assignments = assignmentsDb.get(userId) || [];
     assignments.push(newAssignment);
-    inMemoryStore.assignments.set(userId, assignments);
+    assignmentsDb.set(userId, assignments);
 
     return { assignment: newAssignment };
   });
@@ -53,12 +56,27 @@ export const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
     const userId = req.userId!;
     const { id } = req.params;
     const { status } = req.body || {};
-    const assignments = inMemoryStore.assignments.get(userId) || [];
+    const assignments = assignmentsDb.get(userId) || [];
     const assignment = assignments.find((a) => a.id === id);
 
     if (!assignment) return reply.status(404).send({ error: 'Assignment not found' });
     if (status) assignment.status = status;
 
     return { assignment };
+  });
+
+  fastify.delete<{ Params: { id: string } }>('/:id', async (req, reply) => {
+    const userId = req.userId!;
+    const { id } = req.params;
+    const assignments = assignmentsDb.get(userId) || [];
+    const index = assignments.findIndex((a) => a.id === id);
+
+    if (index === -1) {
+      return reply.status(404).send({ error: 'Assignment not found' });
+    }
+
+    assignments.splice(index, 1);
+    assignmentsDb.set(userId, assignments);
+    return { success: true, id };
   });
 };
