@@ -16,11 +16,12 @@ export const taskRoutes: FastifyPluginAsync = async (fastify) => {
     return { tasks };
   });
 
-  fastify.post<{ Body: { text?: string; title?: string; priority?: Task['priority']; dueDate?: string } }>(
+  fastify.post<{ Body: { text?: string; title?: string; description?: string; priority?: Task['priority']; dueDate?: string } }>(
     '/',
     async (req, reply) => {
       const userId = req.userId!;
       let title = req.body.title;
+      let description = req.body.description;
       let priority = req.body.priority || 'NORMAL';
       let dueDate = req.body.dueDate;
 
@@ -35,10 +36,16 @@ export const taskRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: 'Task title is required' });
       }
 
+      const validPriorities: Array<Task['priority']> = ['LOW', 'NORMAL', 'HIGH', 'EXTREMELY_IMPORTANT'];
+      if (!validPriorities.includes(priority)) {
+        return reply.status(400).send({ error: `Invalid priority. Must be one of: ${validPriorities.join(', ')}` });
+      }
+
       const newTask: Task = {
         id: randomUUID(),
         userId,
         title,
+        description: description || null,
         priority,
         status: 'TODO',
         dueDate: dueDate || null,
