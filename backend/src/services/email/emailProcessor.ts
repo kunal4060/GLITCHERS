@@ -2,15 +2,30 @@ import type { EmailSummary, ScheduleChangeExtraction } from '@glitchers/shared';
 
 export function isUniversityEmail(sender: string, universityDomain: string = 'university.edu'): boolean {
   if (!sender) return false;
-  const cleanSender = sender.toLowerCase();
-  const cleanDomain = universityDomain.toLowerCase();
+
+  // Parse the domain from the address (after the last '@'), so heuristics
+  // only ever match against the domain — never the local part or a display name.
+  const atIndex = sender.lastIndexOf('@');
+  if (atIndex <= 0) return false; // missing '@' or empty local part
+
+  const domain = sender
+    .slice(atIndex + 1)
+    .trim()
+    .toLowerCase()
+    .replace(/^[<\s]+|[>\s]+$/g, ''); // strip e.g. "Name <user@domain.edu>"
+  if (!domain) return false;
+
+  const cleanDomain = universityDomain.trim().toLowerCase();
+  if (!cleanDomain) return false; // an empty configured domain must not match everything
+
   return (
-    cleanSender.includes(cleanDomain) ||
-    cleanSender.includes('faculty') ||
-    cleanSender.includes('professor') ||
-    cleanSender.includes('examcell') ||
-    cleanSender.includes('registrar') ||
-    cleanSender.includes('academics')
+    domain === cleanDomain ||
+    domain.endsWith(`.${cleanDomain}`) ||
+    domain.includes('faculty') ||
+    domain.includes('professor') ||
+    domain.includes('examcell') ||
+    domain.includes('registrar') ||
+    domain.includes('academics')
   );
 }
 
