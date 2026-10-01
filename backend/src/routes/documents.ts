@@ -1,5 +1,4 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { inMemoryStore } from '../repositories/inMemoryStore.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { randomUUID } from 'crypto';
 
@@ -9,12 +8,15 @@ interface DocumentRecord {
   title: string;
   type: string;
   fileUrl?: string;
-  extractedDeadline?: string;
-  extractedNotes?: string;
+  content?: string | null;
+  extractedDeadline?: string | null;
+  extractedNotes?: string | null;
   actionItem?: string;
+  processed?: boolean;
   createdAt: string;
 }
 
+// NOTE: in-memory only until a `documents` table migration lands in Supabase.
 const documentsDb = new Map<string, DocumentRecord[]>();
 
 export const documentRoutes: FastifyPluginAsync = async (fastify) => {
@@ -22,28 +24,8 @@ export const documentRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.get('/', async (req) => {
     const userId = req.userId!;
-    const docs = documentsDb.get(userId) || [
-      {
-        id: 'doc_1',
-        userId,
-        title: 'Operating Systems Syllabus & Lab Manual',
-        type: 'PDF',
-        extractedDeadline: 'Week 7 Lab Submission',
-        extractedNotes: '30% internal continuous evaluation weight.',
-        actionItem: 'Submit OS Lab Exercise 1',
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: 'doc_2',
-        userId,
-        title: 'Midterm Examination Circular',
-        type: 'Notice',
-        extractedDeadline: '2026-09-15',
-        extractedNotes: 'Report to Block A & Block B 15 minutes before 10 AM.',
-        actionItem: 'Check room seating chart',
-        createdAt: new Date().toISOString(),
-      },
-    ];
+    // M3 fix: no fake sample documents. Return the user's own uploads, or nothing.
+    const docs = documentsDb.get(userId) || [];
     return { documents: docs };
   });
 
@@ -55,13 +37,16 @@ export const documentRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: 'Document title is required' });
     }
 
+    // M4 fix: actually store the provided content. Never claim AI ran when it didn't.
     const newDoc: DocumentRecord = {
       id: randomUUID(),
       userId,
       title,
       type: type || 'PDF',
-      extractedDeadline: new Date(Date.now() + 86400000 * 6).toISOString(),
-      extractedNotes: 'Extracted key deadlines and academic policy notes via Gemini AI.',
+      content: content ?? null,
+      extractedDeadline: null,
+      extractedNotes: 'Uploaded — AI extraction not run.',
+      processed: false,
       actionItem: `Review submission requirements for ${title}`,
       createdAt: new Date().toISOString(),
     };
