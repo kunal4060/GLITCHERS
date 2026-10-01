@@ -1,5 +1,4 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { inMemoryStore } from '../repositories/inMemoryStore.js';
 import { supabaseStore } from '../repositories/supabaseStore.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { detectScheduleConflicts } from '../services/timetable/conflictDetector.js';
@@ -47,9 +46,15 @@ export const timetableRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-  fastify.post<{ Body: { timetableText?: string } }>('/upload', async (req) => {
+  fastify.post<{ Body: { timetableText?: string } }>('/upload', async (req, reply) => {
     const userId = req.userId!;
-    const text = req.body?.timetableText || 'Monday: 10:00 - 11:00 AM DBMS Lecture Room AB1-204 Dr. Sharma\nMonday: 14:00 - 16:00 OS Lab Room AB2-301 Prof. Verma';
+    const text = req.body?.timetableText;
+
+    // M1 fix: never invent timetable data. The client must provide the text.
+    if (!text || typeof text !== 'string' || !text.trim()) {
+      return reply.status(400).send({ error: 'timetableText is required' });
+    }
+
     const extractedClasses = extractClassesFromText(text, userId);
 
     const currentClasses = await supabaseStore.getClasses(userId);
@@ -99,13 +104,19 @@ export const timetableRoutes: FastifyPluginAsync = async (fastify) => {
     const existing = await supabaseStore.getClasses(userId);
     const merged = [...existing];
 
+    // L6 fix: savedCount must reflect only newly inserted rows, not the merged total.
+    let savedCount = 0;
+
     for (const c of incomingClasses) {
-      if (!merged.some((m) => m.day === c.day && m.startTime === c.startTime && m.subjectName.toLowerCase() === c.subjectName.toLowerCase())) {
+      // Null-guarded name comparison so malformed rows can't crash the dedup check.
+      const incomingName = (c.subjectName || '').toLowerCase();
+      if (!merged.some((m) => m.day === c.day && m.startTime === c.startTime && (m.subjectName || '').toLowerCase() === incomingName)) {
         merged.push({
           ...c,
           id: c.id || randomUUID(),
           userId,
         });
+        savedCount += 1;
       }
     }
 
@@ -114,7 +125,8 @@ export const timetableRoutes: FastifyPluginAsync = async (fastify) => {
 
     return {
       success: true,
-      savedCount: merged.length,
+      savedCount,
+      totalCount: merged.length,
       classes: merged,
       conflicts,
     };
