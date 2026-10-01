@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { inMemoryStore } from '../repositories/inMemoryStore.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { getSupabaseClient } from '../repositories/supabaseClient.js';
+import { googleService } from '../services/google/googleService.js';
 
 export const privacyRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', authMiddleware);
@@ -11,9 +12,9 @@ export const privacyRoutes: FastifyPluginAsync = async (fastify) => {
     const googleConn = inMemoryStore.googleConnections.get(userId);
 
     return {
-      googleConnected: !!googleConn || true,
-      gmailConnected: googleConn?.gmailConnected ?? true,
-      calendarConnected: googleConn?.calendarConnected ?? true,
+      googleConnected: !!googleConn,
+      gmailConnected: googleConn?.gmailConnected ?? false,
+      calendarConnected: googleConn?.calendarConnected ?? false,
       aiProcessingEnabled: true,
       floatingAssistantEnabled: true,
     };
@@ -22,6 +23,12 @@ export const privacyRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/disconnect-google', async (req) => {
     const userId = req.userId!;
     inMemoryStore.googleConnections.delete(userId);
+
+    try {
+      googleService.clearUserToken(userId);
+    } catch (err) {
+      console.warn('Failed to clear cached Google token on disconnect:', err);
+    }
 
     const supabase = getSupabaseClient();
     if (supabase) {
@@ -64,7 +71,9 @@ export const privacyRoutes: FastifyPluginAsync = async (fastify) => {
           classes: classesRes.data || inMemoryStore.classes.get(userId) || [],
           tasks: tasksRes.data || inMemoryStore.tasks.get(userId) || [],
           expenses: expensesRes.data || inMemoryStore.expenses.get(userId) || [],
+          budget: inMemoryStore.budgets.get(userId),
           debts: debtsRes.data || inMemoryStore.debts.get(userId) || [],
+          emails: inMemoryStore.emails.get(userId) || [],
           notifications: notificationsRes.data || inMemoryStore.notifications.get(userId) || [],
         };
       } catch (err) {
@@ -101,6 +110,11 @@ export const privacyRoutes: FastifyPluginAsync = async (fastify) => {
     inMemoryStore.onboardingStates.delete(userId);
     inMemoryStore.initializationJobs.delete(userId);
     inMemoryStore.googleConnections.delete(userId);
+    try {
+      googleService.clearUserToken(userId);
+    } catch (err) {
+      console.warn('Failed to clear cached Google token on account deletion:', err);
+    }
     inMemoryStore.preferences.delete(userId);
     inMemoryStore.subjects.delete(userId);
     inMemoryStore.exams.delete(userId);
