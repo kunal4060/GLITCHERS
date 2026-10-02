@@ -68,6 +68,7 @@ interface DashboardState {
   restoreNotice: (noticeId: string) => void;
   setChatMessages: (chatMessages: ChatMessage[]) => void;
   addChatMessage: (message: ChatMessage) => void;
+  updateChatMessage: (id: string, patch: Partial<ChatMessage>) => void;
   clearChatMessages: () => void;
 
   addTask: (task: Task) => Promise<void>;
@@ -289,6 +290,10 @@ export const useDashboardStore = create<DashboardState>()(
       },
       setChatMessages: (chatMessages) => set({ chatMessages }),
       addChatMessage: (message) => set((s) => ({ chatMessages: [...s.chatMessages, message] })),
+      updateChatMessage: (id, patch) =>
+        set((s) => ({
+          chatMessages: s.chatMessages.map((m) => (m.id === id ? { ...m, ...patch } : m)),
+        })),
       clearChatMessages: () => {
         set({ chatMessages: [] });
         apiClient.clearChatHistory().catch(() => null);
