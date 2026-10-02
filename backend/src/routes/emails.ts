@@ -137,7 +137,12 @@ export const emailRoutes: FastifyPluginAsync = async (fastify) => {
     for (const e of stored) {
       if (e?.id) byId.set(e.id, e);
     }
+    let allEmails: EmailSummary[];
     if (clientEmails && Array.isArray(clientEmails) && clientEmails.length > 0) {
+      // Summarize EXACTLY the notices the client is showing. Merging
+      // server-stored emails here made the home summary describe notices
+      // the user can't see (stale/hidden items).
+      allEmails = clientEmails.filter((e) => e && e.id);
       let added = false;
       for (const e of clientEmails) {
         if (e?.id && !byId.has(e.id)) {
@@ -148,8 +153,9 @@ export const emailRoutes: FastifyPluginAsync = async (fastify) => {
       if (added) {
         await supabaseStore.saveEmails(userId, Array.from(byId.values())).catch(() => null);
       }
+    } else {
+      allEmails = Array.from(byId.values());
     }
-    const allEmails = Array.from(byId.values());
 
     // Only summarize active (non-dismissed) notices
     const emails = allEmails.filter((e) => !e.isDismissed && !(e as any).processed);
