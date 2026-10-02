@@ -1,16 +1,15 @@
-# NEXA — Promotional Website
+# NEXA — Website
 
-Static landing page for NEXA (AI-native OS for student life) with an interactive
-email-intelligence demo and a waitlist form.
+Interactive promotional website for NEXA (NIA — Nexa Intelligent Assistance),
+the AI student companion app. Built from the actual project codebase and the
+app's NIA design system (porcelain / obsidian / eucalyptus / terracotta).
 
 ## Files
 
-- `index.html` — page structure (hero, problem, features, interactive demo,
-  how-it-works, pricing, FAQ, waitlist form, footer)
-- `styles.css` — porcelain / obsidian / eucalyptus / terracotta theme, animations,
-  responsive (mobile-first, works at 375px)
-- `app.js` — scroll reveals, demo animation, pricing toggle, FAQ accordion,
-  waitlist form submission
+- `index.html` — self-contained page (all CSS/JS inlined): dashboard-style
+  hero, 5-module interactive product tour (timetable, tasks, finance, NIA
+  prompts), feature walkthrough, system map, and a **Download App** button
+  linking to the latest production APK build on Expo.
 
 No build step. Serve the folder as-is.
 
@@ -29,18 +28,8 @@ python3 -m http.server 8080
    `nia-redesign` (or run it manually via workflow_dispatch).
 3. The site URL will be shown in the workflow run and under Settings → Pages.
 
-## Waitlist form → backend
+## Previous site
 
-The form POSTs JSON `{ name, email, college }` to:
-
-```
-(window.NEXA_API_URL || 'https://glitchers-backend.onrender.com/api') + '/waitlist'
-```
-
-The backend endpoint is `POST /api/waitlist` (see `backend/src/routes/waitlist.ts`).
-It validates with zod, dedupes on email, and stores rows in the `waitlist` table.
-
-**Database:** apply `database/migrations/003_waitlist.sql` in the Supabase SQL
-editor (same manual process as migrations 001/002 — see `database/README.md`).
-Until the migration is applied, the endpoint returns 503 and the form shows a
-friendly "try again" error — it never fakes a success.
+The older hand-written site (`index.html` + `styles.css` + `app.js` with the
+waitlist form) was replaced by this build on 2026-10-02. It remains in git
+history if ever needed.
