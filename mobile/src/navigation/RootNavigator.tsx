@@ -22,7 +22,9 @@ import { PrivacyScreen } from '../screens/PrivacyScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { useAuthStore } from '../store/authStore';
+import { useDashboardStore } from '../store/dashboardStore';
 import { apiClient } from '../api/client';
+import { initNotifications, refreshReminders } from '../services/notificationService';
 
 import { designTokens } from '../theme/designTokens';
 import { NiaDock } from '../components/NiaDock';
@@ -53,6 +55,18 @@ function MainTabs() {
 export const RootNavigator: React.FC = () => {
   const { isHydrated, isAuthenticated, isOnboardingComplete, completeOnboarding, loginWithGoogle, checkSession, token, user } = useAuthStore();
   const [showManualOnboarding, setShowManualOnboarding] = useState(false);
+  const { classes, tasks, quietHours } = useDashboardStore();
+
+  React.useEffect(() => {
+    // System notifications: permission + Android channel, once per app launch.
+    initNotifications().catch(() => null);
+  }, []);
+
+  React.useEffect(() => {
+    // Rebuild class/task reminders whenever the underlying data changes.
+    if (!isHydrated) return;
+    refreshReminders(classes, tasks, quietHours).catch(() => null);
+  }, [isHydrated, classes, tasks, quietHours]);
 
   React.useEffect(() => {
     // Restore and verify active session on startup once storage is hydrated
