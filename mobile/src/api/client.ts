@@ -339,6 +339,10 @@ class ApiClient {
     return this.get<{ documents: any[] }>('/documents');
   }
 
+  public async uploadDocument(data: { title: string; type?: string; fileBase64?: string; mimeType?: string }) {
+    return this.post<{ document: any }>('/documents/upload', data);
+  }
+
   public async fetchSettings() {
     return this.get<any>('/settings');
   }
