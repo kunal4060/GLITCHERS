@@ -100,6 +100,10 @@ interface DashboardState {
   quietHours: boolean;
   setQuietHours: (enabled: boolean) => void;
 
+  attendance: Record<string, { attended: number; total: number }>;
+  markAttendance: (subjectName: string, present: boolean) => void;
+  resetAttendance: (subjectName: string) => void;
+
   aiMode: 'AUTO' | 'OFFLINE' | 'CLOUD';
   activeOfflineModel: string;
   downloadedModels: string[];
@@ -153,6 +157,27 @@ export const useDashboardStore = create<DashboardState>()(
 
       quietHours: true,
       setQuietHours: (quietHours) => set({ quietHours }),
+
+      attendance: {},
+      markAttendance: (subjectName, present) =>
+        set((s) => {
+          const prev = s.attendance[subjectName] || { attended: 0, total: 0 };
+          return {
+            attendance: {
+              ...s.attendance,
+              [subjectName]: {
+                attended: prev.attended + (present ? 1 : 0),
+                total: prev.total + 1,
+              },
+            },
+          };
+        }),
+      resetAttendance: (subjectName) =>
+        set((s) => {
+          const next = { ...s.attendance };
+          delete next[subjectName];
+          return { attendance: next };
+        }),
 
       aiMode: 'AUTO',
       activeOfflineModel: '',
@@ -492,13 +517,21 @@ export const useDashboardStore = create<DashboardState>()(
             apiClient.getProfile(),
           ]);
 
-          // 1. Classes: merge without data loss
+          // 1. Classes: non-destructive merge (same as tasks — never drop local classes)
           if (classRes.status === 'fulfilled' && classRes.value?.classes) {
-            const incoming = classRes.value.classes;
+            const incoming: ClassSession[] = classRes.value.classes;
+            const localClasses = get().classes;
             if (incoming.length > 0) {
-              set({ classes: incoming, isBackendConnected: true });
-            } else if (get().classes.length > 0) {
-              apiClient.saveTimetableClasses(get().classes).catch(() => null);
+              const backendIds = new Set(incoming.map((c) => c.id));
+              const unsynced = localClasses.filter((c) => c.id && !backendIds.has(c.id));
+              set({ classes: [...incoming, ...unsynced], isBackendConnected: true });
+              if (unsynced.length > 0) {
+                apiClient.saveTimetableClasses(unsynced).catch(() => null);
+              }
+            } else if (localClasses.length > 0) {
+              apiClient.saveTimetableClasses(localClasses).catch(() => null);
+            } else {
+              set({ isBackendConnected: true });
             }
           }
 
@@ -591,18 +624,11 @@ export const useDashboardStore = create<DashboardState>()(
             }
           }
 
-          // 6. Emails / University Circulars: merge & honor dismissed status
+          // 6. Emails / University Circulars: merge & honor dismissed status.
+          // NOTE: no subject-based filtering — the old demo-data filter could
+          // hide REAL university emails with similar subjects.
           if (emailRes.status === 'fulfilled' && emailRes.value?.emails) {
-            const rawList: EmailSummary[] = emailRes.value.emails || [];
-            const incomingEmails: EmailSummary[] = rawList.filter(
-              (e: EmailSummary) =>
-                !e.subject?.includes('Semester End Examination') &&
-                !e.subject?.includes('Continuous Internal Assessment') &&
-                !e.subject?.includes('Annual University Hackathon') &&
-                e.sender !== 'dean.academics@university.edu' &&
-                e.sender !== 'department.head@university.edu' &&
-                e.sender !== 'events@university.edu'
-            );
+            const incomingEmails: EmailSummary[] = emailRes.value.emails || [];
             const dismissedSet = new Set(get().dismissedNoticeIds);
             incomingEmails.forEach((e) => {
               if (e.isDismissed || (e as any).processed) {
@@ -679,6 +705,7 @@ export const useDashboardStore = create<DashboardState>()(
         credits: state.credits,
         avatarUrl: state.avatarUrl,
         quietHours: state.quietHours,
+        attendance: state.attendance,
         aiMode: state.aiMode,
         downloadedModels: state.downloadedModels,
         activeOfflineModel: state.activeOfflineModel,
