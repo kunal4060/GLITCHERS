@@ -105,14 +105,14 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const emailHash = activeEmails.map((e) => e.id).sort().join(',');
   useEffect(() => {
-    const h = activeEmails.map((e) => e.id).sort().join(',');
-    if (h !== hashRef.current) {
-      hashRef.current = h;
+    if (emailHash !== hashRef.current) {
+      hashRef.current = emailHash;
       summarize(activeEmails);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeEmails.length]);
+  }, [emailHash]);
 
   const onTrack = urgentTasks.length === 0;
   const topTasks = [...pendingTasks]
