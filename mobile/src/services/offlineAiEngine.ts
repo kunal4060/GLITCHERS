@@ -424,7 +424,7 @@ export class OfflineAIEngine {
     // 0. Conversational Greetings & Persona
     if (text.match(/^(?:hi|hello|hey|namaste|hola|sup|good morning|good afternoon|good evening|yo)\b/i) || text === 'hi' || text === 'hello') {
       return `### 👋 Hello! I am NIA (Nexa Intelligent Assistance)\n\n` +
-        `I am your AI companion in the NEXA app, running 100% on-device using **${model.name}** (${model.quantization}).\n\n` +
+        `I am your AI companion in the NEXA app, running in offline on-device mode.\n\n` +
         `**Here is what I can do for you offline**:\n` +
         `• **Academic & Science**: Solve math equations, explain CS theory, physics laws, and chemistry.\n` +
         `• **Code Generator**: Write and explain Python, C++, JavaScript, and SQL algorithms.\n` +
@@ -859,83 +859,21 @@ export class OfflineAIEngine {
    * Dynamically constructs answers tailored to question archetype and keywords.
    * NO canned boilerplate!
    */
+  /**
+   * Honest fallback for queries the offline engine cannot genuinely answer.
+   * The on-device engine is a rule-based assistant (math solver, study
+   * knowledge base, app-data queries, offline actions) — it does NOT run a
+   * real LLM, so it must not pretend to synthesize knowledge it doesn't have.
+   */
   public synthesizeUniversalResponse(input: string, model: HuggingFaceModelInfo): string {
-    const raw = input.trim();
-    const clean = raw.replace(/[?!.]+$/, '');
-    const words = clean.split(/\s+/).filter((w) => w.length > 2);
+    const clean = input.trim().replace(/[?!.]+$/, '');
     const title = clean.length > 45 ? clean.slice(0, 42) + '...' : clean;
-    const lower = clean.toLowerCase();
-
-    // Check query archetype
-    const isHowTo = lower.startsWith('how to') || lower.startsWith('how do') || lower.startsWith('how can');
-    const isDifference = lower.includes('difference between') || lower.includes(' vs ') || lower.includes(' versus ');
-    const isWhy = lower.startsWith('why') || lower.includes('reason for');
-    const isWhatIs = lower.startsWith('what is') || lower.startsWith('what are') || lower.startsWith('define') || lower.startsWith('explain');
-
-    let response = `### 💡 ${title}\n\n`;
-
-    if (isDifference) {
-      let itemA = 'First Option';
-      let itemB = 'Second Option';
-      if (lower.includes('difference between')) {
-        const after = clean.replace(/^.*difference between\s+/i, '');
-        const items = after.split(/\s+(?:and|vs\.?|versus)\s+/i);
-        itemA = items[0]?.trim() || 'First Concept';
-        itemB = items[1]?.trim() || 'Second Concept';
-      } else {
-        const items = clean.split(/\s+(?:vs\.?|versus)\s+/i);
-        itemA = items[0]?.trim() || 'First Concept';
-        itemB = items[1]?.trim() || 'Second Concept';
-      }
-
-      response += `**Comparative Analysis: ${itemA} vs. ${itemB}**\n\n` +
-        `When evaluating **${itemA}** and **${itemB}** in technical architecture and engineering, here are the key operational differences:\n\n` +
-        `| Aspect | **${itemA}** | **${itemB}** |\n` +
-        `| :--- | :--- | :--- |\n` +
-        `| **Core Architecture** | Tailored for direct performance, deterministic flow, and focused execution | Emphasizes cross-platform flexibility, modular abstractions, and rapid prototyping |\n` +
-        `| **Resource Footprint** | Low overhead, native memory management, and high computational efficiency | Managed runtime layer with rich standard framework components |\n` +
-        `| **Ideal Scenario** | Systems with strict hardware limits or single-ecosystem specialization | Multi-platform deployment requiring high developer velocity |\n\n` +
-        `**Recommendation for Students & Developers**:\n` +
-        `• Choose **${itemA}** when you need fine-grained control, lower latency, or deep hardware integration.\n` +
-        `• Choose **${itemB}** when prioritizing shared codebases, broad community libraries, and faster feature delivery.\n`;
-    } else if (isHowTo) {
-      response += `**Step-by-Step Implementation Guide**:\n\n` +
-        `1. **Understand Prerequisites & Inputs**:\n` +
-        `   - Identify the primary parameters, data formats, and boundary constraints needed for "${clean}".\n\n` +
-        `2. **Core Execution Strategy**:\n` +
-        `   - Deconstruct the problem into smaller, verifiable units rather than attempting a monolithic solution.\n` +
-        `   - Apply standard library tools or established engineering algorithms to avoid reinventing solved logic.\n\n` +
-        `3. **Validation & Verification**:\n` +
-        `   - Test edge cases (null values, zero inputs, maximum limits) to ensure system stability.\n` +
-        `   - Benchmark performance against expected time and space complexity targets.\n\n` +
-        `4. **Best Practice Tip**:\n` +
-        `   - In academic exams or technical interviews, always explain your reasoning out loud before presenting your final conclusion.\n`;
-    } else if (isWhy) {
-      response += `**Root Cause & Mechanism Analysis**:\n\n` +
-        `The underlying principle behind **"${clean}"** stems from three primary factors:\n\n` +
-        `• **Fundamental Physical or Mathematical Constraint**: Systems prioritize conservation of energy, memory stability, or logical consistency.\n` +
-        `• **Architectural Trade-Off**: Optimizing for speed often trades off memory, while maximizing safety introduces validation latency.\n` +
-        `• **Standardization**: Modern industry standards adopt this approach to guarantee interoperability across diverse platforms.\n\n` +
-        `Understanding this cause-and-effect relationship helps you predict system behavior under stress.\n`;
-    } else if (isWhatIs) {
-      response += `**1. Definition & Core Concept**:\n` +
-        `**${clean}** represents a fundamental topic in technical education and practical system design. At its essence, it provides a structured framework for solving problems, managing states, or executing predictable workflows.\n\n` +
-        `**2. Essential Properties**:\n` +
-        `• **Reliability**: Ensures predictable behavior under defined operating rules.\n` +
-        `• **Scalability**: Capable of handling increased workloads through modular decomposition.\n` +
-        `• **Standardization**: Widely recognized across university curricula and industry benchmarks.\n\n` +
-        `**3. Practical Student Context**:\n` +
-        `When preparing this subject for exams or lab submissions, focus on writing down the mathematical definition or code signature first, followed by one concrete application example.\n`;
-    } else {
-      response += `**In-Depth Knowledge Synthesis**:\n\n` +
-        `In response to your query regarding **"${clean}"**:\n\n` +
-        `• **Core Objective**: Addressing this involves breaking down key components: structured inputs, transformation logic, and verification.\n` +
-        `• **Key Considerations**: Pay attention to edge conditions, computational efficiency, and maintainable implementation.\n` +
-        `• **Practical Takeaway**: Mastering this concept provides a solid building block for exams, lab projects, and technical interviews.\n`;
-    }
-
-    response += `\n*⚡ Generated on-device by ${model.name} (${model.quantization || 'GGUF Local Model'})*`;
-    return response;
+    void model;
+    return `### 💡 ${title}\n\n` +
+      `Ye sawal offline mode me mere bas ka nahi hai\. ` +
+      `Main ek rule-based on-device assistant hoon — math solve karna, app ka data batana ` +
+      `(kharcha, classes, tasks), aur kuch padhai ke topics mere bas me hain\.\n\n` +
+      `Iska sahi jawab chahiye to upar se **Cloud** mode pe switch karo — wahan asli AI jawab dega\.\n`;
   }
 
   /**
