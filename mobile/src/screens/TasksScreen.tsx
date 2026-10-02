@@ -61,7 +61,7 @@ export const TasksScreen = ({ navigation }: { navigation?: any }) => {
     return !Number.isNaN(d.getTime()) && new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() === startOfToday;
   };
 
-  const pending = tasks.filter((t) => t.status === 'TODO');
+  const pending = tasks.filter((t) => t.status === 'TODO' || t.status === 'IN_PROGRESS');
   const completed = tasks.filter((t) => t.status === 'COMPLETED');
 
   const filtered: any[] =
