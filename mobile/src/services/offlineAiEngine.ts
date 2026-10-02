@@ -158,6 +158,8 @@ export interface OfflineAIResponse {
   actionType?: 'TASK' | 'EXPENSE' | 'DEBT';
   actionData?: any;
   offlineModelUsed: string;
+  /** True when the query needs a real LLM — caller should try llama inference first. */
+  needsLlm?: boolean;
 }
 
 export class OfflineAIEngine {
@@ -406,12 +408,15 @@ export class OfflineAIEngine {
       };
     }
 
-    // 10. Universal Dynamic On-Device Synthesis (NEVER gives canned boilerplate)
+    // 10. Real LLM fallback: needs an actual model. The caller tries
+    // llama.rn inference when a model is loaded; otherwise the honest
+    // fallback message below is shown (never a fake template).
     const synthesized = this.synthesizeUniversalResponse(userMessage, model);
     return {
       message: synthesized,
       intent: 'GENERAL_QUERY',
       offlineModelUsed: model.name,
+      needsLlm: true,
     };
   }
 
