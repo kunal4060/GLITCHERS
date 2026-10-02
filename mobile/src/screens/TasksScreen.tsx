@@ -140,6 +140,24 @@ export const TasksScreen = ({ navigation }: { navigation?: any }) => {
           <Text style={styles.title}>Tasks & Focus</Text>
           <Text style={styles.sub}>Your workload, prioritized by NIA</Text>
 
+          {/* AI task creator entry */}
+          <TouchableOpacity
+            style={styles.aiBanner}
+            onPress={() => navigation?.navigate('AITaskCreator')}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Create task with AI chat"
+          >
+            <View style={styles.aiBannerIcon}>
+              <Ionicons name="sparkles" size={18} color="#FFFFFF" />
+            </View>
+            <View style={styles.aiBannerText}>
+              <Text style={styles.aiBannerTitle}>✨ AI se task banao</Text>
+              <Text style={styles.aiBannerSub}>Bas likho — NIA samajh ke task set kar degi</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={C.textSubtle} />
+          </TouchableOpacity>
+
           {/* Filter row */}
           <View style={styles.filterRow}>
             {FILTERS.map((f) => {
@@ -378,6 +396,21 @@ const styles = StyleSheet.create({
   filterCountActive: { color: C.obsidian, backgroundColor: 'rgba(255,255,255,0.9)' },
   bannerCard: { marginHorizontal: 20, marginBottom: 18 },
   bannerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  aiBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginHorizontal: 20, marginTop: 14, marginBottom: 4,
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: C.hairline,
+    borderRadius: 16, padding: 14,
+    shadowColor: '#0F172A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05,
+    shadowRadius: 8, elevation: 2,
+  },
+  aiBannerIcon: {
+    width: 42, height: 42, borderRadius: 21, backgroundColor: C.eucalyptus,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  aiBannerText: { flex: 1 },
+  aiBannerTitle: { fontSize: 15, fontWeight: '700', color: C.ink, letterSpacing: -0.2 },
+  aiBannerSub: { fontSize: 12, color: C.textMuted, marginTop: 2 },
   bannerTitle: { fontSize: 15, fontWeight: '700', color: C.ink, marginBottom: 3 },
   bannerSub: { fontSize: 12, color: C.textMuted },
   sectionHead: {

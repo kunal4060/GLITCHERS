@@ -6,6 +6,7 @@ import { View, Platform, Linking, Alert, ActivityIndicator } from 'react-native'
 import { DashboardScreen } from '../screens/DashboardScreen';
 import { TimetableScreen } from '../screens/TimetableScreen';
 import { TasksScreen } from '../screens/TasksScreen';
+import { AITaskCreatorScreen } from '../screens/AITaskCreatorScreen';
 import { FinanceScreen } from '../screens/FinanceScreen';
 import { AIChatScreen } from '../screens/AIChatScreen';
 
@@ -186,6 +187,11 @@ export const RootNavigator: React.FC = () => {
       <Stack.Screen name="Docs" component={DocumentsScreen} options={{ title: 'Document Intelligence' }} />
       <Stack.Screen name="Search" component={SearchScreen} options={{ title: 'Global Search' }} />
       <Stack.Screen name="Alerts" component={NotificationsScreen} options={{ title: 'Notifications' }} />
+      <Stack.Screen
+        name="AITaskCreator"
+        component={AITaskCreatorScreen}
+        options={{ headerShown: false }}
+      />
       <Stack.Screen name="Privacy" component={PrivacyScreen} options={{ title: 'Privacy & Credentials' }} />
       <Stack.Screen name="Onboarding">
         {() => (
