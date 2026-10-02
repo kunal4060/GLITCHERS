@@ -340,6 +340,7 @@
     .closing-card .button { background: #fff; border-color: #fff; color: #8b1231; position: relative; z-index: 1; }
     footer { padding: 0 0 34px; color: var(--muted); font-size: .75rem; }
     .footer-line { display: flex; justify-content: space-between; gap: 20px; padding-top: 20px; border-top: 1px solid var(--hairline); }
+    .footer-credit { margin: 10px 0 0; text-align: right; font-size: .66rem; color: var(--muted); }
 
     @media (max-width: 900px) {
       .hero-grid, .story-grid, .nia-grid { grid-template-columns: 1fr; }
@@ -694,7 +695,10 @@
   </main>
 
   <footer>
-    <div class="container footer-line"><span>NEXA • AI-native student operating system</span><span>React Native · Fastify · PostgreSQL · Hybrid AI</span></div>
+    <div class="container">
+      <div class="footer-line"><span>NEXA • AI-native student operating system</span><span>React Native · Fastify · PostgreSQL · Hybrid AI</span></div>
+      <p class="footer-credit">Ideated by Kartiki More</p>
+    </div>
   </footer>
 
   <script>
