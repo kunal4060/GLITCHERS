@@ -30,6 +30,26 @@ async function verifyGoogleIdToken(idToken: string): Promise<{ email: string; na
 }
 
 export const authRoutes: FastifyPluginAsync = async (fastify) => {
+  // Access control: only approved emails can log in.
+  // Set ALLOWED_EMAILS="a@x.com,b@y.com" on the server to lock down access.
+  // When unset/empty, login stays open (so the owner never gets locked out
+  // before configuring it).
+  const getAllowedEmails = (): Set<string> =>
+    new Set(
+      (process.env.ALLOWED_EMAILS || '')
+        .split(',')
+        .map((e) => e.trim().toLowerCase())
+        .filter(Boolean)
+    );
+  const isEmailAllowed = (email: string): boolean => {
+    const allowed = getAllowedEmails();
+    if (allowed.size === 0) return true;
+    return allowed.has(email.trim().toLowerCase());
+  };
+  const accessDenied = (reply: any) =>
+    reply.status(403).send({
+      error: 'Access restricted: this email is not on the approved list. Contact the app owner for access.',
+    });
   fastify.get<{ Querystring: { returnUrl?: string } }>('/google/url', async (req) => {
     const returnUrl = req.query.returnUrl || (typeof req.headers.referer === 'string' ? req.headers.referer : 'http://localhost:8082');
     return { url: googleService.getAuthUrl(returnUrl) };
@@ -44,6 +64,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       if (!verified) {
         return reply.status(401).send({ error: 'Invalid Google ID token' });
       }
+      if (!isEmailAllowed(verified.email)) return accessDenied(reply);
       const profile = await supabaseStore.syncOrEnsureUser(verified.email, name || verified.name);
       return {
         accessToken: signToken(profile.id),
@@ -60,6 +81,8 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: 'Valid email is required' });
     }
 
+    if (!isEmailAllowed(email)) return accessDenied(reply);
+
     const profile = await supabaseStore.syncOrEnsureUser(email, name);
     return {
       accessToken: signToken(profile.id),
@@ -72,6 +95,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     const cleanBase = returnUrl.split('?')[0].replace(/\/$/, '');
     const email = req.query.email || 'student@university.edu';
     const name = req.query.name || (email.split('@')[0].charAt(0).toUpperCase() + email.split('@')[0].slice(1));
+    if (!isEmailAllowed(email)) return accessDenied(reply);
     const profile = await supabaseStore.syncOrEnsureUser(email, name);
     return reply.redirect(
       `${cleanBase}/?token=${encodeURIComponent(signToken(profile.id))}&email=${encodeURIComponent(profile.email)}&name=${encodeURIComponent(profile.fullName)}`
@@ -134,6 +158,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const { email, googleId, name, accessToken, refreshToken } = await googleService.exchangeCodeForTokens(code);
+    if (!isEmailAllowed(email)) return accessDenied(reply);
     const profile = await supabaseStore.syncOrEnsureUser(email, name);
 
     if (accessToken) {
