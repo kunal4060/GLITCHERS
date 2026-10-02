@@ -45,9 +45,9 @@ export const NotificationsScreen: React.FC<{ navigation?: any }> = ({ navigation
     });
   }
 
-  // 2. Urgent tasks
+  // 2. Urgent tasks (TODO + IN_PROGRESS — both need attention)
   tasks
-    .filter((t) => t.status === 'TODO')
+    .filter((t) => t.status === 'TODO' || t.status === 'IN_PROGRESS')
     .filter((t) => t.priority === 'EXTREMELY_IMPORTANT' || t.priority === 'HIGH')
     .slice(0, 3)
     .forEach((t) => {
