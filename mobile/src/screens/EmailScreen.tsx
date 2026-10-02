@@ -164,7 +164,7 @@ export const EmailScreen: React.FC = () => {
                       <Ionicons
                         name={isDismissed ? 'checkmark-circle' : 'checkmark-circle-outline'}
                         size={22}
-                        color={isDismissed ? '#3D7A5A' : designTokens.colors.primaryDark}
+                        color={isDismissed ? designTokens.colors.success : designTokens.colors.primaryDark}
                       />
                       <Text style={[styles.tickBtnText, isDismissed && styles.tickBtnTextActive]}>
                         {isDismissed ? 'Ticked' : 'Tick as Read'}
@@ -229,9 +229,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: designTokens.spacing.xs + 2,
     borderRadius: designTokens.radii.pill,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: designTokens.colors.surfaceSecondary,
     borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.08)',
+    borderColor: designTokens.colors.surfaceBorder,
   },
   tabActive: {
     backgroundColor: designTokens.colors.primaryPill,
@@ -243,13 +243,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#E7ECE9',
+    backgroundColor: designTokens.colors.successSoft,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: designTokens.radii.md,
     marginBottom: designTokens.spacing.lg,
     borderWidth: 1,
-    borderColor: 'rgba(117, 167, 165, 0.20)',
+    borderColor: designTokens.colors.aiBorder,
   },
   infoBannerText: {
     fontSize: 11.5,
@@ -261,13 +261,13 @@ const styles = StyleSheet.create({
   emailList: { gap: designTokens.spacing.md },
   emailCard: {
     padding: designTokens.spacing.md,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: designTokens.colors.surface,
     borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.06)',
+    borderColor: designTokens.colors.surfaceBorder,
   },
   emailCardDismissed: {
     opacity: 0.78,
-    backgroundColor: '#FAF8F5',
+    backgroundColor: designTokens.colors.surfaceSubtle,
   },
   cardTopRow: {
     flexDirection: 'row',
@@ -290,16 +290,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#F0ECE4',
+    backgroundColor: designTokens.colors.surfaceSecondary,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: designTokens.radii.pill,
     borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.12)',
+    borderColor: designTokens.colors.surfaceBorder,
   },
   tickBtnActive: {
-    backgroundColor: '#E2F0E7',
-    borderColor: 'rgba(61, 122, 90, 0.3)',
+    backgroundColor: designTokens.colors.successSoft,
+    borderColor: designTokens.colors.aiBorder,
   },
   tickBtnText: {
     fontSize: 11,
@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
     color: designTokens.colors.primaryDark,
   },
   tickBtnTextActive: {
-    color: '#3D7A5A',
+    color: designTokens.colors.success,
   },
   subjectText: {
     ...designTokens.typography.cardTitle,
@@ -319,12 +319,12 @@ const styles = StyleSheet.create({
     color: designTokens.colors.textSecondary,
   },
   summaryBox: {
-    backgroundColor: '#FAF7F2',
+    backgroundColor: designTokens.colors.surfaceSecondary,
     borderRadius: designTokens.radii.md,
     padding: designTokens.spacing.md,
     marginBottom: designTokens.spacing.md,
     borderWidth: 1,
-    borderColor: 'rgba(117, 167, 165, 0.20)',
+    borderColor: designTokens.colors.aiBorder,
   },
   summaryLabel: { ...designTokens.typography.label, fontSize: 9, color: designTokens.colors.accentPeachDeep },
   summaryText: { ...designTokens.typography.body, fontSize: 12, color: designTokens.colors.textPrimary, lineHeight: 18 },
@@ -346,10 +346,10 @@ const styles = StyleSheet.create({
     padding: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FAF7F2',
+    backgroundColor: designTokens.colors.surfaceSecondary,
     borderRadius: designTokens.radii.card,
     borderWidth: 1,
-    borderColor: 'rgba(41, 51, 50, 0.08)',
+    borderColor: designTokens.colors.surfaceBorder,
     marginTop: 10,
   },
   emptyTitle: {
