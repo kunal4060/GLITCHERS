@@ -20,6 +20,7 @@ import { assignmentRoutes } from './routes/assignments.js';
 import { documentRoutes } from './routes/documents.js';
 import { settingsRoutes } from './routes/settings.js';
 import { healthRoutes } from './routes/health.js';
+import { publicRoutes } from './routes/public.js';
 import { waitlistRoutes } from './routes/waitlist.js';
 import { onboardingRoutes } from './routes/onboarding.js';
 
@@ -43,6 +44,9 @@ export function buildApp(): FastifyInstance {
 
   // Health & Diagnostic check
   app.register(healthRoutes);
+
+  // Public homepage + privacy policy (no auth) — required for Google OAuth publishing
+  app.register(publicRoutes);
 
   // Public waitlist (promo site) — no auth
   app.register(waitlistRoutes, { prefix: '/api/waitlist' });
