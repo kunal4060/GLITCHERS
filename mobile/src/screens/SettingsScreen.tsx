@@ -6,6 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { designTokens } from '../theme/designTokens';
 import { useAuthStore } from '../store/authStore';
 import { useDashboardStore } from '../store/dashboardStore';
+import { apiClient } from '../api/client';
 import { NiaHeader, LabelCaps, StatusPill } from '../components/nia';
 import { initials } from '../utils/niaFormat';
 
@@ -83,7 +84,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
     setModalVisible(true);
   };
 
-  const handleSaveAcademics = () => {
+  const handleSaveAcademics = async () => {
     const val = editValue.trim();
     if (editType === 'CGPA') {
       const num = parseFloat(val);
@@ -91,7 +92,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
         Alert.alert('Invalid CGPA', 'Please enter a valid CGPA between 0.00 and 10.00');
         return;
       }
-      setCgpa(num.toFixed(2));
+      const formatted = num.toFixed(2);
+      setCgpa(formatted);
+      // Persist to backend so the next sync doesn't revert it
+      try {
+        await apiClient.updateProfile({ cgpa: formatted });
+      } catch {
+        /* offline: local value stays, will sync later */
+      }
     } else {
       const num = parseInt(val, 10);
       if (isNaN(num) || num < 0 || num > 300) {
@@ -99,6 +107,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
         return;
       }
       setCredits(num);
+      // Persist to backend so the next sync doesn't revert it
+      try {
+        await apiClient.updateProfile({ creditsCompleted: num });
+      } catch {
+        /* offline: local value stays, will sync later */
+      }
     }
     setModalVisible(false);
   };
