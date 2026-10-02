@@ -74,14 +74,18 @@ export const CalendarScreen: React.FC = () => {
     return true;
   });
 
-  const handleSyncGoogleCalendar = () => {
-    // L10: don't claim a sync that never happened — require a real connection, then request it.
+  const handleSyncGoogleCalendar = async () => {
+    // Honest sync: wait for the real result before telling the user anything.
     if (!calendarConnected) {
       Alert.alert('Google Calendar not connected', 'Connect Google Calendar from the Privacy screen first.');
       return;
     }
-    apiClient.syncTimetableToCalendar().catch(() => null);
-    Alert.alert('Sync requested', 'Your classes and deadlines are being pushed to Google Calendar.');
+    try {
+      await apiClient.syncTimetableToCalendar();
+      Alert.alert('Synced', 'Your classes and deadlines were pushed to Google Calendar.');
+    } catch (err: any) {
+      Alert.alert('Sync failed', err?.message || 'Could not reach the server. Try again later.');
+    }
   };
 
   return (
