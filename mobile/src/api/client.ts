@@ -191,6 +191,10 @@ class ApiClient {
     return this.get<{ user: any }>('/auth/me');
   }
 
+  public async updateProfile(data: { cgpa?: string; creditsCompleted?: number; fullName?: string; avatarUrl?: string }) {
+    return this.patch<{ user: any }>('/auth/profile', data);
+  }
+
   public async fetchTimetableClasses() {
     return this.get<{ classes: any[] }>('/timetable/classes');
   }
