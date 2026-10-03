@@ -6,6 +6,61 @@ import { supabaseStore } from '../../repositories/supabaseStore.js';
 import type { AIChatResponse, RouterIntentType, Expense } from '@glitchers/shared';
 import { randomUUID } from 'crypto';
 
+
+/**
+ * Robust JSON extraction from a vision-model response.
+ * The old greedy /\{[\s\S]*\}/ regex produced invalid JSON whenever the model
+ * returned multiple objects or trailing text with braces, silently failing
+ * every model and falling back to fake data. This scans for balanced {...}
+ * blocks and prefers the one carrying a non-empty "classes" array.
+ */
+function extractTimetableJson(text: string): any | null {
+  const tryParse = (s: string): any | null => {
+    try {
+      return JSON.parse(s);
+    } catch {
+      return null;
+    }
+  };
+  // First: a top-level array (some models skip the wrapper object)
+  const arrMatch = text.match(/\[[\s\S]*\]/);
+  if (arrMatch) {
+    const parsed = tryParse(arrMatch[0]);
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+  }
+  const candidates: string[] = [];
+  let depth = 0;
+  let start = -1;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '{') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0 && start >= 0) {
+        candidates.push(text.slice(start, i + 1));
+        start = -1;
+      }
+    }
+  }
+  // Prefer a payload with a non-empty classes array
+  for (const c of candidates) {
+    const parsed = tryParse(c);
+    if (parsed && Array.isArray(parsed.classes) && parsed.classes.length > 0) return parsed;
+  }
+  // Then any parseable object
+  for (const c of candidates) {
+    const parsed = tryParse(c);
+    if (parsed && typeof parsed === 'object') return parsed;
+  }
+  return null;
+}
+
+/**
+ * Gemini Multimodal Vision analysis for timetable photos/PDF scans
+ */
+
 export class GeminiAssistant {
   private genAI: GoogleGenerativeAI | null = null;
   private candidateModels = [
@@ -640,10 +695,6 @@ Format your answer with clean, beautiful Markdown (clear headings with ###, bull
       isBill: false,
     };
   }
-
-  /**
-   * Gemini Multimodal Vision analysis for timetable photos/PDF scans
-   */
   public async analyzeTimetableImage(
     base64Data: string,
     mimeType: string = 'image/jpeg'
@@ -711,14 +762,17 @@ Output schema:
       "endTime": "11:00",
       "room": "AB1-204",
       "faculty": "Dr. Sharma",
-      "classType": "LECTURE"
+      "classType": "LECTURE",
+      "slot": "A1"
     }
   ]
 }
 
 RULES:
+- Extract ONE object per class session (one timetable cell/row = one object). NEVER merge multiple classes into a single object.
 - Day MUST be uppercase English weekday (MONDAY through SUNDAY). If day is not explicitly named, infer from column header or default to MONDAY.
-- Times MUST be in HH:MM format (24-hour, e.g. 09:00, 14:00).
+- Times MUST be in HH:MM format (24-hour, e.g. 09:00, 14:00). Read them from the timetable's own time headers.
+- If the schedule uses slot codes (e.g. A1, B1, TA1, L1-L60 as in VIT timetables), put the slot code in the "slot" field AND map it to the correct day/startTime/endTime using the timetable's time headers.
 - "classType" MUST be "LECTURE" or "LAB".
 - Return raw JSON only with NO markdown code fences.`;
 
@@ -740,9 +794,8 @@ RULES:
           ]);
 
           const rawText = result.response.text();
-          const jsonMatch = rawText.match(/\{[\s\S]*\}/) || rawText.match(/\[[\s\S]*\]/);
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
+          const parsed = extractTimetableJson(rawText);
+          if (parsed) {
             const rawClasses = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.classes) ? parsed.classes : []);
             if (rawClasses.length > 0) {
               classes = rawClasses.map((c: any) => ({
@@ -753,6 +806,7 @@ RULES:
                 room: c.room ? String(c.room).trim() : 'AB1-204',
                 faculty: c.faculty ? String(c.faculty).trim() : 'Faculty Member',
                 classType: String(c.classType || 'LECTURE').toUpperCase().includes('LAB') ? 'LAB' : 'LECTURE',
+                slot: c.slot ? String(c.slot).trim().toUpperCase() : undefined,
               }));
               console.log(`[Timetable Vision] Successfully extracted ${classes.length} classes via ${modelName}`);
               break;
@@ -764,65 +818,11 @@ RULES:
       }
     }
 
-    // If vision extraction failed due to API quota, network, or unrecognizable image,
-    // provide an intelligent structured college timetable so the student schedule is never blank
+    // If vision extraction failed (quota, network, unrecognizable image), return
+    // empty — NEVER invent fake classes. The client shows a "couldn't parse"
+    // notice so the user can retry or enter classes manually.
     if (classes.length === 0) {
-      classes = [
-        {
-          subjectName: 'Database Management Systems',
-          day: 'MONDAY',
-          startTime: '10:00',
-          endTime: '11:00',
-          room: 'AB1-204',
-          faculty: 'Dr. Sharma',
-          classType: 'LECTURE',
-        },
-        {
-          subjectName: 'Operating Systems Lab',
-          day: 'MONDAY',
-          startTime: '14:00',
-          endTime: '16:00',
-          room: 'AB2-301',
-          faculty: 'Prof. Verma',
-          classType: 'LAB',
-        },
-        {
-          subjectName: 'Artificial Intelligence',
-          day: 'TUESDAY',
-          startTime: '11:00',
-          endTime: '12:00',
-          room: 'AB3-105',
-          faculty: 'Dr. Iyer',
-          classType: 'LECTURE',
-        },
-        {
-          subjectName: 'Computer Networks',
-          day: 'WEDNESDAY',
-          startTime: '09:00',
-          endTime: '10:00',
-          room: '120-CB',
-          faculty: 'Prof. Kulkarni',
-          classType: 'LECTURE',
-        },
-        {
-          subjectName: 'Web Development & Cloud',
-          day: 'THURSDAY',
-          startTime: '14:00',
-          endTime: '15:30',
-          room: 'AB2-402',
-          faculty: 'Dr. Nair',
-          classType: 'LECTURE',
-        },
-        {
-          subjectName: 'Machine Learning Seminar',
-          day: 'FRIDAY',
-          startTime: '10:00',
-          endTime: '11:30',
-          room: 'AB1-Auditorium',
-          faculty: 'Prof. Rao',
-          classType: 'LECTURE',
-        },
-      ];
+      console.warn('[Timetable Vision] All vision models failed or returned no classes; returning empty.');
     }
 
     return { classes };
