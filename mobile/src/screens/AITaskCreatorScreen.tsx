@@ -8,6 +8,10 @@
  * Offline-first: taskIntentParser runs on-device. If the rule engine is not
  * confident and an on-device LLM (llama.rn) model is loaded, it asks the model
  * for structured JSON as a fallback.
+ *
+ * Cloud AI: when online, Gemini (via the existing /ai/chat backend endpoint)
+ * analyses the message first for best quality; any failure falls back to the
+ * on-device parser.
  */
 import React, { useRef, useState } from 'react';
 import {
@@ -35,6 +39,7 @@ import {
   type TaskPriorityValue,
 } from '../services/taskIntentParser';
 import { isLlamaModelReady, llamaGenerate } from '../services/llamaInference';
+import { apiClient } from '../api/client';
 
 const C = designTokens.colors;
 
@@ -59,6 +64,47 @@ const now12 = () =>
   new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 const VALID_PRIO: TaskPriorityValue[] = ['LOW', 'NORMAL', 'HIGH', 'EXTREMELY_IMPORTANT'];
+
+/** Ask Gemini (cloud, via existing /ai/chat) to extract a task as strict JSON. Null on any failure. */
+async function refineWithGemini(text: string): Promise<TaskDraft | null> {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const prompt =
+      'TASK_PARSE: Extract one to-do task from the message in quotes. ' +
+      'Reply with ONLY a JSON object, no other text, no markdown, no explanation. ' +
+      'JSON format: {"title":"short task title","dueDate":"YYYY-MM-DDTHH:MM:SS or null","priority":"LOW|NORMAL|HIGH|EXTREMELY_IMPORTANT"}. ' +
+      `Rules: Today is ${today}, timezone Asia/Kolkata. "kal"=tomorrow, "parso"=day after tomorrow. ` +
+      '"subah"=morning (~09:00), "shaam"=evening (~17:00), "raat"=night (~21:00). ' +
+      'Words like urgent/jaldi/asap/important mean HIGH priority. If no date or time is mentioned, dueDate=null. ' +
+      `Message: "${text}"`;
+    const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
+      Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error('gemini-timeout')), ms))]);
+    const res: any = await withTimeout(apiClient.sendAIChat(prompt), 12000);
+    const msg = typeof res?.message === 'string' ? res.message : '';
+    const start = msg.indexOf('{');
+    const end = msg.lastIndexOf('}');
+    if (start === -1 || end === -1 || end <= start) return null;
+    const parsed = JSON.parse(msg.slice(start, end + 1));
+    const title = typeof parsed.title === 'string' ? parsed.title.trim() : '';
+    if (!title) return null;
+    const priority: TaskPriorityValue = VALID_PRIO.includes(parsed.priority) ? parsed.priority : 'NORMAL';
+    let dueDate: string | null = null;
+    if (typeof parsed.dueDate === 'string' && parsed.dueDate && parsed.dueDate !== 'null') {
+      const d = new Date(parsed.dueDate);
+      if (!Number.isNaN(d.getTime())) dueDate = d.toISOString();
+    }
+    return {
+      title: title.charAt(0).toUpperCase() + title.slice(1),
+      description: '',
+      dueDate,
+      priority,
+      confidence: 'high',
+      needsDate: !dueDate,
+    };
+  } catch {
+    return null;
+  }
+}
 
 /** Ask the on-device LLM to extract a task as strict JSON. Null on any failure. */
 async function refineWithLlm(text: string): Promise<TaskDraft | null> {
@@ -205,11 +251,12 @@ export const AITaskCreatorScreen = ({ navigation }: { navigation?: any }) => {
   };
 
   const processNewRequest = async (text: string) => {
-    // --- fresh parse ---
+    // --- fresh parse: Gemini cloud first, on-device parser as fallback ---
     setThinking(true);
-    let draft = parseTaskIntent(text);
+    let draft = await refineWithGemini(text);
+    if (!draft) draft = parseTaskIntent(text);
 
-    // LLM fallback when the rule engine is unsure and a model is loaded.
+    // On-device LLM fallback when the rule engine is unsure and a model is loaded.
     if (draft.confidence === 'low' && isLlamaModelReady()) {
       const llmDraft = await refineWithLlm(text);
       if (llmDraft && llmDraft.title) draft = llmDraft;
