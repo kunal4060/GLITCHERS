@@ -532,9 +532,58 @@
     .notice-card { background: var(--paper-soft); border-radius: var(--r-md); padding: 18px; border: 1px solid var(--hairline); }
     .notice-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-weight: 800; font-size: .85rem; }
 
+    /* ---------- mobile nav ---------- */
+    .nav-menu-btn {
+      display: none; background: var(--paper-strong); border: 1px solid var(--hairline);
+      border-radius: 12px; width: 44px; height: 44px; cursor: pointer;
+      flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+    }
+    .nav-menu-btn span { display: block; width: 20px; height: 2.5px; border-radius: 3px; background: var(--ink); transition: .25s; }
+    .nav-menu-btn.open span:nth-child(1) { transform: translateY(7.5px) rotate(45deg); }
+    .nav-menu-btn.open span:nth-child(2) { opacity: 0; }
+    .nav-menu-btn.open span:nth-child(3) { transform: translateY(-7.5px) rotate(-45deg); }
+
     @media (max-width: 960px) {
-      .hero-grid { grid-template-columns: 1fr; }
-      .phone-stage { order: -1; }
+      .nav-menu-btn { display: flex; }
+      .nav-links {
+        display: none; position: absolute; top: 100%; left: 0; right: 0;
+        background: var(--paper-strong); border-bottom: 1px solid var(--hairline);
+        flex-direction: column; align-items: stretch; padding: 12px 20px 20px; gap: 4px;
+        box-shadow: 0 30px 50px rgba(25,20,35,.14);
+      }
+      .nav-links.open { display: flex; }
+      .nav-links a { padding: 13px 16px; font-size: .95rem; border-radius: 12px; }
+      .nav-links .nav-cta { text-align: center; margin-top: 8px; }
+      .site-nav .container { position: relative; }
+      .hero { padding: 52px 0 44px; }
+      .hero-copy h1 { font-size: clamp(2.1rem, 9.5vw, 2.9rem); }
+      .hero-lede { font-size: 1rem; }
+      .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+      .phone-stage { order: -1; margin-top: 8px; }
+      .phone { width: min(280px, 74vw); }
+      .phone-screen { min-height: 500px; }
+      .tile-a { width: 130px; height: 130px; }
+      .tile-b { width: 105px; height: 105px; }
+      .floating-note { bottom: -14px; font-size: .78rem; padding: 10px 18px; }
+      .hero-proof { gap: 10px; }
+      .proof-item { padding: 12px 8px; }
+      .proof-item strong { font-size: 1.25rem; }
+      .section { padding: 60px 0; }
+      .section-heading h2 { font-size: clamp(1.6rem, 7vw, 2.1rem); }
+      .metric-band { padding: 26px 0; }
+      .metric strong { font-size: 1.5rem; }
+      .metric span { font-size: .74rem; }
+      .story-main { padding: 26px 22px; }
+      .story-side { grid-template-columns: 1fr; }
+      .demo-stage { padding: 20px 16px; }
+      .demo-top h3 { font-size: 1.2rem; }
+      .demo-shell { border-radius: 20px; }
+      .download-card { border-radius: 26px; padding: 34px 24px; }
+      .download-card::after { font-size: 5.5rem; bottom: -24px; }
+      .closing-card { border-radius: 24px; padding: 30px 24px; }
+      .nia-band, .demo-section { border-radius: 26px; }
+      .button { padding: 13px 22px; font-size: .9rem; }
+      .footer-line { flex-direction: column; gap: 6px; }
       .story-grid { grid-template-columns: 1fr; }
       .demo-shell { grid-template-columns: 1fr; }
       .module-rail { border-right: none; border-bottom: 1px solid var(--hairline); }
@@ -558,7 +607,10 @@
   <nav class="site-nav" aria-label="Section navigation">
     <div class="container nav-inner">
       <div class="nav-context"><span class="nav-pulse" aria-hidden="true"></span>Project walkthrough</div>
-      <div class="nav-links">
+      <button class="nav-menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="nav-links" id="mobileMenu">
         <a href="#story">Why it exists</a>
         <a href="#product">Product</a>
         <a href="#nia">NIA</a>
@@ -842,6 +894,25 @@
   </footer>
 
   <script>
+    // Mobile nav toggle
+    (function () {
+      var btn = document.querySelector('.nav-menu-btn');
+      var menu = document.getElementById('mobileMenu');
+      if (!btn || !menu) return;
+      btn.addEventListener('click', function () {
+        var open = menu.classList.toggle('open');
+        btn.classList.toggle('open', open);
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        btn.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+      });
+      menu.querySelectorAll('a').forEach(function (a) {
+        a.addEventListener('click', function () {
+          menu.classList.remove('open');
+          btn.classList.remove('open');
+          btn.setAttribute('aria-expanded', 'false');
+        });
+      });
+    })();
     (function () {
       var tabs = Array.prototype.slice.call(document.querySelectorAll('.module-tab'));
       var panels = Array.prototype.slice.call(document.querySelectorAll('.module-panel'));
