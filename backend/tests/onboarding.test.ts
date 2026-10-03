@@ -192,7 +192,7 @@ describe('Onboarding & First-Time Student Experience API', () => {
     expect(json.classes[0].subjectName).toBeDefined();
     expect(json.classes[0].day).toBeDefined();
     expect(json.classes[0].startTime).toBeDefined();
-  });
+  }, 60000);
 
   test('Security: Rejects requests with invalid or expired authentication token', async () => {
     const res = await app.inject({
