@@ -138,7 +138,7 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
           <View style={styles.statusRow}>
             <View style={styles.statusLeft}>
               <StatusPill label={onTrack ? 'On Track' : 'Action Needed'} tone={onTrack ? 'success' : 'danger'} />
-              <Text style={styles.gpaText}>GPA {cgpa || '—'}</Text>
+              <Text style={styles.gpaText}>CGPA {cgpa || '—'}</Text>
             </View>
             <View style={styles.statusRight}>
               <View style={styles.dayRow}>
@@ -510,7 +510,7 @@ const styles = StyleSheet.create({
   spaceName: { fontSize: 13.5, fontWeight: '700', color: C.ink, marginBottom: 2 },
   spaceSub: { fontSize: 11, color: C.textMuted },
   fab: {
-    position: 'absolute', right: 20, bottom: 104,
+    position: 'absolute', right: 20, bottom: 158,
     width: 58, height: 58, borderRadius: 29, backgroundColor: C.obsidian,
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#0F172A', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25,

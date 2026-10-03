@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { UserProfile, OnboardingStep } from '@glitchers/shared';
-import { apiClient } from '../api/client';
+import { apiClient, AuthError } from '../api/client';
 import { loadAuthToken } from '../utils/tokenStorage';
 import { useDashboardStore } from './dashboardStore';
 
@@ -130,16 +130,14 @@ export const useAuthStore = create<AuthState>()(
               id: `usr_${safeEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
               email: safeEmail,
               fullName: safeName,
-              university: safeEmail.includes('@') && !safeEmail.endsWith('gmail.com')
-                ? safeEmail.split('@')[1].toUpperCase()
-                : 'State Technological University',
-              course: 'Computer Science & Engineering',
-              year: 3,
-              semester: 6,
-              section: 'A',
-              cgpa: '8.71',
-              creditsCompleted: 42,
-              creditsCurrent: 18,
+              university: null,
+              course: null,
+              year: null,
+              semester: null,
+              section: null,
+              cgpa: '',
+              creditsCompleted: null,
+              creditsCurrent: null,
               universityDomain: safeEmail.split('@')[1] || 'university.edu',
               isOnboardingComplete: false,
             };
@@ -196,9 +194,13 @@ export const useAuthStore = create<AuthState>()(
         apiClient.setToken(currentToken);
 
         try {
-          const res = await apiClient.get<{ user: UserProfile }>('/auth/me').catch(() => null);
+          // FIX (repeated-logout bug): never log out on transport failures.
+          // Render free-tier cold starts / offline / 5xx used to resolve as null
+          // here and nuke a perfectly valid session. Only a definitive 401
+          // (AuthError — apiClient already clears auth there) means dead session.
+          const res = await apiClient.get<{ user: UserProfile }>('/auth/me');
           if (!res?.user) {
-            // M20: dead/invalid token — clear stale auth state instead of lingering.
+            // Server answered OK but has no user for this token — session is dead.
             get().logout();
             return;
           }
@@ -238,8 +240,14 @@ export const useAuthStore = create<AuthState>()(
           // Hydrate latest data on session restore
           useDashboardStore.getState().syncWithBackend().catch(() => null);
         } catch (err) {
-          console.warn('Check session error:', err);
-          get().logout();
+          if (err instanceof AuthError) {
+            // Definitive 401: token is dead (apiClient already cleared it).
+            console.warn('Check session: unauthorized, logging out.');
+            get().logout();
+          } else {
+            // Network timeout / cold start / server error — keep the local session.
+            console.warn('Check session: server unreachable, keeping local session.', err);
+          }
         }
       },
 

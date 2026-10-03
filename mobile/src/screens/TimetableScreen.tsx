@@ -420,7 +420,7 @@ const styles = StyleSheet.create({
   },
   miniBtnText: { fontSize: 11.5, fontWeight: '700', color: C.eucalyptus },
   fab: {
-    position: 'absolute', right: 20, bottom: 104,
+    position: 'absolute', right: 20, bottom: 158,
     width: 58, height: 58, borderRadius: 29, backgroundColor: C.obsidian,
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#0F172A', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25,

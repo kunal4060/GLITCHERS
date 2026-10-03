@@ -80,14 +80,14 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
   const [fullName, setFullName] = useState(user?.fullName || '');
   const [university, setUniversity] = useState(user?.university || '');
   const [course, setCourse] = useState(user?.course || '');
-  const [year, setYear] = useState(String(user?.year || '3'));
-  const [semester, setSemester] = useState(String(user?.semester || '6'));
-  const [section, setSection] = useState(user?.section || 'A');
+  const [year, setYear] = useState(user?.year ? String(user.year) : '');
+  const [semester, setSemester] = useState(user?.semester ? String(user.semester) : '');
+  const [section, setSection] = useState(user?.section || '');
 
   // 3. Academics
-  const [cgpa, setCgpa] = useState(user?.cgpa || '8.50');
-  const [creditsCompleted, setCreditsCompleted] = useState(String(user?.creditsCompleted ?? 42));
-  const [creditsCurrent, setCreditsCurrent] = useState(String(user?.creditsCurrent ?? 18));
+  const [cgpa, setCgpa] = useState(user?.cgpa || '');
+  const [creditsCompleted, setCreditsCompleted] = useState(user?.creditsCompleted != null ? String(user.creditsCompleted) : '');
+  const [creditsCurrent, setCreditsCurrent] = useState(user?.creditsCurrent != null ? String(user.creditsCurrent) : '');
   const [studentId, setStudentId] = useState(user?.studentId || '');
 
   // 4 & 5. Timetable & Review

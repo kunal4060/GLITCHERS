@@ -50,7 +50,7 @@ class InMemoryStore {
       year: 3,
       semester: 6,
       section: 'A',
-      cgpa: '8.71',
+      cgpa: null,
       creditsCompleted: 42,
       creditsCurrent: 18,
       universityDomain: 'university.edu',

@@ -17,7 +17,7 @@ interface NinjaAvatarProps {
 
 export const NinjaAvatar: React.FC<NinjaAvatarProps> = ({
   size = 'large',
-  cgpa = '8.71',
+  cgpa = '',
   credits = 42,
   showBadges = true,
   customImageUri,

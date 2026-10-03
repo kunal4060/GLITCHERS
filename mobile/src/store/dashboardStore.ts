@@ -147,8 +147,8 @@ export const useDashboardStore = create<DashboardState>()(
           offlineSyncQueue: [],
         });
       },
-      cgpa: '8.71',
-      credits: 42,
+      cgpa: '',
+      credits: 0,
       setCgpa: (cgpa) => set({ cgpa }),
       setCredits: (credits) => set({ credits }),
       updateAcademics: (cgpa, credits) => set({ cgpa, credits }),
@@ -667,7 +667,7 @@ export const useDashboardStore = create<DashboardState>()(
             const u = profileRes.value.user;
             if (u.id !== '00000000-0000-0000-0000-000000000001') {
               if (u.cgpa) set({ cgpa: String(u.cgpa) });
-              if (u.creditsCompleted !== undefined) set({ credits: Number(u.creditsCompleted) });
+              if (u.creditsCompleted !== undefined && u.creditsCompleted !== null) set({ credits: Number(u.creditsCompleted) });
               if (u.avatarUrl) set({ avatarUrl: u.avatarUrl });
             }
           }
