@@ -9,6 +9,8 @@ import { useDashboardStore } from '../store/dashboardStore';
 import { apiClient } from '../api/client';
 import { NiaHeader, LabelCaps, StatusPill } from '../components/nia';
 import { initials } from '../utils/niaFormat';
+import { THEMES, getCurrentThemeId, persistThemeId } from '../theme/themeStore';
+import * as Updates from 'expo-updates';
 
 const C = designTokens.colors;
 
@@ -37,6 +39,31 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
   const [proactiveTips, setProactiveTips] = useState(true);
   const [chatStyle, setChatStyle] = useState<'concise' | 'detailed'>('concise');
   const [syncing, setSyncing] = useState(false);
+  const [currentThemeId, setCurrentThemeId] = useState(getCurrentThemeId());
+
+  const handleSelectTheme = (id: string) => {
+    const theme = THEMES.find((t) => t.id === id);
+    if (!theme || id === currentThemeId) return;
+    Alert.alert(
+      'Change theme?',
+      `Switch to "${theme.name}"? The app will restart once to apply it.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Apply',
+          onPress: async () => {
+            await persistThemeId(id);
+            setCurrentThemeId(id);
+            try {
+              await Updates.reloadAsync();
+            } catch {
+              Alert.alert('Restart needed', 'Please close and reopen the app to apply the new theme.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editType, setEditType] = useState<'CGPA' | 'CREDITS'>('CGPA');
@@ -329,6 +356,43 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
             <Text style={styles.rowHint}>Quick-access NIA bubble that floats over the app.</Text>
           </View>
 
+          {/* Appearance — Theme gallery */}
+          <View style={styles.sectionHead}>
+            <Text style={styles.sectionTitle}>Appearance</Text>
+            <LabelCaps>Theme</LabelCaps>
+          </View>
+          <View style={[styles.card, styles.themeCard]}>
+            <View style={styles.themeGrid}>
+              {THEMES.map((t) => {
+                const selected = t.id === currentThemeId;
+                return (
+                  <TouchableOpacity
+                    key={t.id}
+                    style={[styles.themeOption, selected && styles.themeOptionSelected]}
+                    onPress={() => handleSelectTheme(t.id)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.themeDots}>
+                      {t.preview.map((c, i) => (
+                        <View key={i} style={[styles.themeDot, { backgroundColor: c }]} />
+                      ))}
+                    </View>
+                    <Text style={[styles.themeName, selected && styles.themeNameSelected]} numberOfLines={1}>
+                      {t.name}
+                    </Text>
+                    <Text style={styles.themeTagline} numberOfLines={1}>{t.tagline}</Text>
+                    {selected && (
+                      <View style={styles.themeCheck}>
+                        <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={styles.rowHint}>Pick a theme — the app restarts once to apply it.</Text>
+          </View>
+
           {/* Account actions */}
           <View style={styles.sectionHead}>
             <Text style={styles.sectionTitle}>Account</Text>
@@ -495,4 +559,20 @@ const styles = StyleSheet.create({
   },
   contributeBtnText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
   contributeNote: { fontSize: 11, color: C.textSubtle, textAlign: 'center', marginTop: 8 },
+  themeCard: { paddingHorizontal: 14, paddingVertical: 14 },
+  themeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 10 },
+  themeOption: {
+    width: '31%', borderRadius: 14, borderWidth: 1.5, borderColor: C.hairline,
+    backgroundColor: C.surfaceSecondary, padding: 10, alignItems: 'center', position: 'relative',
+  },
+  themeOptionSelected: { borderColor: C.eucalyptus, backgroundColor: C.eucalyptusFaint },
+  themeDots: { flexDirection: 'row', gap: 5, marginBottom: 8 },
+  themeDot: { width: 18, height: 18, borderRadius: 9, borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)' },
+  themeName: { fontSize: 12, fontWeight: '700', color: C.textPrimary },
+  themeNameSelected: { color: C.eucalyptusDeep },
+  themeTagline: { fontSize: 10, color: C.textMuted, marginTop: 2 },
+  themeCheck: {
+    position: 'absolute', top: 6, right: 6, width: 20, height: 20, borderRadius: 10,
+    backgroundColor: C.eucalyptus, alignItems: 'center', justifyContent: 'center',
+  },
 });

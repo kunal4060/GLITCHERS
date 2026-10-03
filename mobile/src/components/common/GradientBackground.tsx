@@ -9,13 +9,15 @@ interface GradientBackgroundProps {
 }
 
 export const GradientBackground: React.FC<GradientBackgroundProps> = ({ children, style }) => {
+  // Read at render time (after theme init) so the gradient follows the active theme.
+  const C = designTokens.colors;
   return (
     <LinearGradient
-      colors={['#FAF7F0', '#F7F4EE', '#F4EFE7']}
-      locations={[0, 0.45, 1]}
+      colors={[C.background, C.backgroundElevated]}
+      locations={[0, 1]}
       start={{ x: 0, y: 0 }}
       end={{ x: 0.2, y: 1 }}
-      style={[styles.gradient, style]}
+      style={[styles.gradient, { backgroundColor: C.background }, style]}
     >
       {children}
     </LinearGradient>
@@ -25,6 +27,5 @@ export const GradientBackground: React.FC<GradientBackgroundProps> = ({ children
 const styles = StyleSheet.create({
   gradient: {
     flex: 1,
-    backgroundColor: designTokens.colors.background,
   },
 });
