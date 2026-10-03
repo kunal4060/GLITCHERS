@@ -32,9 +32,7 @@
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
-    "plugins": [
-      "react-native-android-widget"
-    ],
+    "plugins": [],
     "extra": {
       "eas": {
         "projectId": "144aea28-329c-49de-9961-5697f77236c1"
