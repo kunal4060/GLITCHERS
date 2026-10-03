@@ -46,7 +46,9 @@ jobs:
           NODE_ENV: test
           # Dummy values — the backend zod env schema has defaults for
           # everything, tests must not depend on real credentials.
-          GEMINI_API_KEY: test-mock-key
+          # NOTE: GEMINI_API_KEY intentionally unset so tests use the
+          # built-in fallback key — the timetable vision test needs a
+          # real API to extract classes from the test image.
           JWT_SECRET: ci-test-secret-key-32-chars-long
           SUPABASE_URL: https://dummy.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: dev-ci-dummy-key
