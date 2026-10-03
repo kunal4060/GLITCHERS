@@ -3,7 +3,7 @@
     "name": "NEXA",
     "slug": "kunal",
     "scheme": "nexa",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "newArchEnabled": true,
     "icon": "./assets/icon.png",
@@ -32,7 +32,9 @@
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
-    "plugins": [],
+    "plugins": [
+      "react-native-android-widget"
+    ],
     "extra": {
       "eas": {
         "projectId": "144aea28-329c-49de-9961-5697f77236c1"
