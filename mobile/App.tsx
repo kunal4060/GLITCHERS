@@ -2,6 +2,7 @@ import React, { Suspense, useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { initTheme } from './src/theme/themeStore';
+import * as Updates from 'expo-updates';
 
 // Everything that touches designTokens is loaded AFTER the saved theme
 // is applied, so screens' StyleSheet.create() picks up the right palette.
@@ -23,6 +24,18 @@ export default function App() {
 
   useEffect(() => {
     initTheme().then(() => setThemeReady(true));
+    // Silently check for OTA updates on launch; apply on next restart
+    (async () => {
+      try {
+        if (__DEV__) return;
+        const res = await Updates.checkForUpdateAsync();
+        if (res.isAvailable) {
+          await Updates.fetchUpdateAsync();
+        }
+      } catch {
+        // offline or no update — stay on current bundle
+      }
+    })();
   }, []);
 
   if (!themeReady) {

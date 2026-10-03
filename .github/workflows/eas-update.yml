@@ -1,0 +1,38 @@
+name: EAS OTA Update (nia-redesign)
+
+on:
+  push:
+    branches: [nia-redesign]
+    paths:
+      - 'mobile/src/**'
+      - 'mobile/App.tsx'
+      - 'mobile/app.json'
+
+jobs:
+  ota-update:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout nia-redesign
+        uses: actions/checkout@v4
+        with:
+          ref: nia-redesign
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Expo / EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Publish OTA update
+        run: eas update --branch preview --message "${{ github.event.head_commit.message }}" --non-interactive

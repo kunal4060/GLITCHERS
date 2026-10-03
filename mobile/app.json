@@ -40,6 +40,14 @@
         "projectId": "144aea28-329c-49de-9961-5697f77236c1"
       }
     },
-    "owner": "kunal4060s-team"
+    "owner": "kunal4060s-team",
+    "updates": {
+      "url": "https://u.expo.dev/144aea28-329c-49de-9961-5697f77236c1",
+      "enabled": true,
+      "fallbackToCacheTimeout": 0
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    }
   }
 }
