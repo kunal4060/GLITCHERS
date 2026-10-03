@@ -161,28 +161,32 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
 
           {/* Stat cards */}
           <View style={styles.statRow}>
-            <NiaCard style={styles.statCard}>
-              <View style={styles.statTop}>
-                <LabelCaps>Classes</LabelCaps>
-                <Ionicons name="checkmark-circle" size={16} color={C.eucalyptus} />
-              </View>
-              <Text style={styles.statNum}>{doneClasses.length} Done</Text>
-              <Text style={[styles.statSub, { color: C.eucalyptus }]}>
-                {todayClasses.length - doneClasses.length > 0
-                  ? `${todayClasses.length - doneClasses.length} upcoming today`
-                  : 'Complete today'}
-              </Text>
-            </NiaCard>
-            <NiaCard style={styles.statCard}>
-              <View style={styles.statTop}>
-                <LabelCaps>Tasks</LabelCaps>
-                {urgentTasks.length > 0 && <View style={styles.dot} />}
-              </View>
-              <Text style={styles.statNum}>{pendingTasks.length} Due</Text>
-              <Text style={[styles.statSub, urgentTasks.length > 0 && { color: C.terracotta }]}>
-                {urgentTasks.length > 0 ? `${urgentTasks.length} urgent today` : 'All clear'}
-              </Text>
-            </NiaCard>
+            <TouchableOpacity style={styles.statCardTouch} onPress={() => navigation?.navigate('Timetable')} activeOpacity={0.85}>
+              <NiaCard style={styles.statCardInner}>
+                <View style={styles.statTop}>
+                  <LabelCaps>Classes</LabelCaps>
+                  <Ionicons name="checkmark-circle" size={16} color={C.eucalyptus} />
+                </View>
+                <Text style={styles.statNum}>{doneClasses.length} Done</Text>
+                <Text style={[styles.statSub, { color: C.eucalyptus }]}>
+                  {todayClasses.length - doneClasses.length > 0
+                    ? `${todayClasses.length - doneClasses.length} upcoming today`
+                    : 'Complete today'}
+                </Text>
+              </NiaCard>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.statCardTouch} onPress={() => navigation?.navigate('Tasks')} activeOpacity={0.85}>
+              <NiaCard style={styles.statCardInner}>
+                <View style={styles.statTop}>
+                  <LabelCaps>Tasks</LabelCaps>
+                  {urgentTasks.length > 0 && <View style={styles.dot} />}
+                </View>
+                <Text style={styles.statNum}>{pendingTasks.length} Due</Text>
+                <Text style={[styles.statSub, urgentTasks.length > 0 && { color: C.terracotta }]}>
+                  {urgentTasks.length > 0 ? `${urgentTasks.length} urgent today` : 'All clear'}
+                </Text>
+              </NiaCard>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.statCardTouch} onPress={() => navigation?.navigate('Alerts')} activeOpacity={0.85}>
               <NiaCard style={styles.statCardInner}>
                 <View style={styles.statTop}>
@@ -293,7 +297,12 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
               const due = formatDue(t.dueDate);
               const high = t.priority === 'HIGH' || t.priority === 'EXTREMELY_IMPORTANT';
               return (
-                <View key={t.id} style={styles.taskRow}>
+                <TouchableOpacity
+                  key={t.id}
+                  style={styles.taskRow}
+                  onPress={() => navigation?.navigate('Tasks')}
+                  activeOpacity={0.85}
+                >
                   <TouchableOpacity
                     onPress={() => t.id && completeTask(t.id)}
                     style={styles.checkbox}
@@ -312,7 +321,7 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
                     <Text style={[styles.taskDue, due.urgent && { color: C.terracotta }]}>{due.text}</Text>
                   </View>
                   <Ionicons name="reorder-three-outline" size={18} color={C.textSubtle} />
-                </View>
+                </TouchableOpacity>
               );
             })
           )}
