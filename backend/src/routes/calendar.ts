@@ -1,20 +1,8 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { supabaseStore } from '../repositories/supabaseStore.js';
+import type { CustomCalendarEvent } from '../repositories/inMemoryStore.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { randomUUID } from 'crypto';
-
-interface CustomCalendarEvent {
-  id: string;
-  title: string;
-  startTime: string;
-  endTime: string;
-  location: string | null;
-  source: 'MANUAL';
-}
-
-// NOTE: in-memory only. There is no `calendar_events` table in Supabase yet —
-// these custom events are lost on restart until a `calendar_events` migration lands.
-const customEventsDb = new Map<string, CustomCalendarEvent[]>();
 
 export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', authMiddleware);
@@ -25,7 +13,7 @@ export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
     // which itself falls back to its in-memory cache) instead of inMemoryStore alone.
     const classes = await supabaseStore.getClasses(userId);
     const tasks = await supabaseStore.getTasks(userId);
-    const customEvents = customEventsDb.get(userId) || [];
+    const customEvents = await supabaseStore.getCalendarEvents(userId);
 
     // Synthesize calendar events from recurring classes, tasks, and custom events
     const events = [
@@ -78,13 +66,10 @@ export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
         source: 'MANUAL',
       };
 
-      // M8 fix: actually persist the event (in-memory Map keyed by userId,
-      // same pattern as documents.ts) instead of just echoing it back.
-      const userEvents = customEventsDb.get(userId) || [];
-      userEvents.push(event);
-      customEventsDb.set(userId, userEvents);
+      // Persist the event via supabaseStore (Supabase with in-memory fallback).
+      const saved = await supabaseStore.saveCalendarEvent(userId, event);
 
-      return { event };
+      return { event: saved };
     }
   );
 

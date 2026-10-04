@@ -36,7 +36,7 @@ const EnvSchema = z.object({
   SUPABASE_URL: z.string().trim().default(''),
   SUPABASE_SERVICE_ROLE_KEY: z.string().trim().default(''),
   SUPABASE_ANON_KEY: z.string().trim().default(''),
-  GEMINI_API_KEY: z.string().trim().default('').transform((v) => v || decodeFallback('QVEuQWI4Uk42SkExRVBKZ1Rfc2lpendhVkFONDNIUHBvMkhOYkJCQ1R3ckxtS09FYVNPa1E=')),
+  GEMINI_API_KEY: z.string().trim().default(''),
   GOOGLE_CLIENT_ID: z.string().trim().default(''),
   GOOGLE_CLIENT_SECRET: z.string().trim().default(''),
   GOOGLE_REDIRECT_URI: z.string().trim().default(
@@ -44,7 +44,7 @@ const EnvSchema = z.object({
       ? 'https://glitchers-backend.onrender.com/api/auth/google/callback'
       : 'http://localhost:5000/api/auth/google/callback'
   ),
-  JWT_SECRET: z.string().trim().default('nexa-jwt-secret-student-life-companion-2026'),
+  JWT_SECRET: z.string().trim().default(''),
 });
 
 export const env = EnvSchema.parse(process.env);

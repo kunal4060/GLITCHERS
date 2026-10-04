@@ -27,24 +27,26 @@ export const expenseRoutes: FastifyPluginAsync = async (fastify) => {
     Body: { id?: string; text?: string; amount?: number; category?: Expense['category']; description?: string; merchant?: string };
   }>('/', async (req, reply) => {
     const userId = req.userId!;
-    let amount = req.body.amount;
-    let category = req.body.category || 'OTHER';
-    let description = req.body.description;
-    let merchant = req.body.merchant;
+    const body = req.body || {};
+    let amount = body.amount;
+    let category = body.category || 'OTHER';
+    let description = body.description;
+    let merchant = body.merchant;
 
-    if (req.body.text && !amount) {
-      const parsed = geminiAssistant.parseNaturalExpense(req.body.text);
+    if (body.text && !amount) {
+      const parsed = geminiAssistant.parseNaturalExpense(body.text);
       amount = parsed.amount;
       category = parsed.category;
       description = parsed.description;
     }
 
-    if (!amount || amount <= 0) {
+    const numAmount = Number(amount);
+    if (!Number.isFinite(numAmount) || numAmount <= 0) {
       return reply.status(400).send({ error: 'Valid expense amount is required' });
     }
 
     const newExpense: Expense = {
-      id: typeof req.body.id === 'string' && req.body.id.trim().length > 0 ? req.body.id.trim() : randomUUID(),
+      id: typeof body.id === 'string' && body.id.trim().length > 0 ? body.id.trim() : randomUUID(),
       userId,
       amount: Number(amount),
       category,

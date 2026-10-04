@@ -1,18 +1,15 @@
 import type { FastifyPluginAsync } from 'fastify';
+import { supabaseStore } from '../repositories/supabaseStore.js';
 import { authMiddleware } from '../middleware/auth.js';
 import type { Assignment } from '@glitchers/shared';
 import { randomUUID } from 'crypto';
-
-// NOTE: in-memory only. There is no `assignments` table in Supabase yet —
-// assignments are lost on restart until an `assignments` migration lands.
-const assignmentsDb = new Map<string, Assignment[]>();
 
 export const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', authMiddleware);
 
   fastify.get('/', async (req) => {
     const userId = req.userId!;
-    const assignments = assignmentsDb.get(userId) || [];
+    const assignments = await supabaseStore.getAssignments(userId);
     return { assignments };
   });
 
@@ -45,22 +42,26 @@ export const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
       status: 'PENDING',
     };
 
-    const assignments = assignmentsDb.get(userId) || [];
-    assignments.push(newAssignment);
-    assignmentsDb.set(userId, assignments);
+    const assignment = await supabaseStore.saveAssignment(userId, newAssignment);
 
-    return { assignment: newAssignment };
+    return { assignment };
   });
 
   fastify.patch<{ Params: { id: string }; Body: { status?: Assignment['status'] } }>('/:id/status', async (req, reply) => {
     const userId = req.userId!;
     const { id } = req.params;
     const { status } = req.body || {};
-    const assignments = assignmentsDb.get(userId) || [];
-    const assignment = assignments.find((a) => a.id === id);
+
+    if (!status) {
+      const assignments = await supabaseStore.getAssignments(userId);
+      const found = assignments.find((a) => a.id === id);
+      if (!found) return reply.status(404).send({ error: 'Assignment not found' });
+      return { assignment: found };
+    }
+
+    const assignment = await supabaseStore.updateAssignmentStatus(userId, id, status);
 
     if (!assignment) return reply.status(404).send({ error: 'Assignment not found' });
-    if (status) assignment.status = status;
 
     return { assignment };
   });
@@ -68,15 +69,13 @@ export const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.delete<{ Params: { id: string } }>('/:id', async (req, reply) => {
     const userId = req.userId!;
     const { id } = req.params;
-    const assignments = assignmentsDb.get(userId) || [];
-    const index = assignments.findIndex((a) => a.id === id);
 
-    if (index === -1) {
+    const assignments = await supabaseStore.getAssignments(userId);
+    if (!assignments.some((a) => a.id === id)) {
       return reply.status(404).send({ error: 'Assignment not found' });
     }
 
-    assignments.splice(index, 1);
-    assignmentsDb.set(userId, assignments);
+    await supabaseStore.deleteAssignment(userId, id);
     return { success: true, id };
   });
 };

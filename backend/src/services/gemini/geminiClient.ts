@@ -6,6 +6,61 @@ import { supabaseStore } from '../../repositories/supabaseStore.js';
 import type { AIChatResponse, RouterIntentType, Expense } from '@glitchers/shared';
 import { randomUUID } from 'crypto';
 
+
+/**
+ * Robust JSON extraction from a vision-model response.
+ * The old greedy /\{[\s\S]*\}/ regex produced invalid JSON whenever the model
+ * returned multiple objects or trailing text with braces, silently failing
+ * every model and falling back to fake data. This scans for balanced {...}
+ * blocks and prefers the one carrying a non-empty "classes" array.
+ */
+function extractTimetableJson(text: string): any | null {
+  const tryParse = (s: string): any | null => {
+    try {
+      return JSON.parse(s);
+    } catch {
+      return null;
+    }
+  };
+  // First: a top-level array (some models skip the wrapper object)
+  const arrMatch = text.match(/\[[\s\S]*\]/);
+  if (arrMatch) {
+    const parsed = tryParse(arrMatch[0]);
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+  }
+  const candidates: string[] = [];
+  let depth = 0;
+  let start = -1;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '{') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0 && start >= 0) {
+        candidates.push(text.slice(start, i + 1));
+        start = -1;
+      }
+    }
+  }
+  // Prefer a payload with a non-empty classes array
+  for (const c of candidates) {
+    const parsed = tryParse(c);
+    if (parsed && Array.isArray(parsed.classes) && parsed.classes.length > 0) return parsed;
+  }
+  // Then any parseable object
+  for (const c of candidates) {
+    const parsed = tryParse(c);
+    if (parsed && typeof parsed === 'object') return parsed;
+  }
+  return null;
+}
+
+/**
+ * Gemini Multimodal Vision analysis for timetable photos/PDF scans
+ */
+
 export class GeminiAssistant {
   private genAI: GoogleGenerativeAI | null = null;
   private candidateModels = [
@@ -236,6 +291,16 @@ export class GeminiAssistant {
     // 8. Add Debt Action
     if (text.includes('borrowed') || text.includes('lent') || text.includes('owes me') || text.includes('i owe')) {
       const debtParsed = this.parseNaturalDebt(userMessage);
+      if (!debtParsed.person) {
+        return {
+          message: `Who is this debt with? I couldn't tell the person's name — please say it like "Rahul owes me 500" or "I owe Rahul 500".`,
+          intent: 'ADD_DEBT',
+          toolExecuted: 'add_debt',
+          data: null,
+          requiresConfirmation: false,
+          confirmationPayload: null,
+        };
+      }
       const toolResult = await toolRegistry.add_debt(userId, debtParsed);
       return {
         message: toolResult.message || 'Debt record added successfully.',
@@ -247,22 +312,41 @@ export class GeminiAssistant {
       };
     }
 
-    // 9. Calendar Event Action
+    // 9. Calendar Event Action — parse the real event from the user's message.
+    // Never use hardcoded values; if details are missing, ask for them.
     if (text.includes('calendar') && (text.includes('add') || text.includes('event') || text.includes('schedule class'))) {
-      const confirmationPayload = {
-        title: 'Database Management Systems (DBMS)',
-        startTime: '10:00 AM',
-        endTime: '11:00 AM',
-        location: 'AB1-204',
-      };
-      const toolResult = await toolRegistry.create_calendar_event(userId, confirmationPayload);
+      const cal = this.parseCalendarRequest(userMessage);
+      const missing: string[] = [];
+      if (!cal.title) missing.push('a title');
+      if (!cal.startTime) missing.push('a date and time (e.g. "tomorrow at 10 AM")');
+      if (missing.length > 0) {
+        return {
+          message: `To add a calendar event I need ${missing.join(' and ')}. For example: "Add team meeting to my calendar tomorrow at 10 AM".`,
+          intent: 'CREATE_CALENDAR_EVENT',
+          toolExecuted: 'create_calendar_event',
+          data: null,
+          requiresConfirmation: false,
+          confirmationPayload: null,
+        };
+      }
+      const toolResult = await toolRegistry.create_calendar_event(userId, {
+        title: cal.title!,
+        startTime: cal.startTime!,
+        endTime: cal.endTime,
+        location: cal.location,
+      });
       return {
-        message: `Added **${confirmationPayload.title}** (${confirmationPayload.startTime} - ${confirmationPayload.endTime}) in Room ${confirmationPayload.location} to your academic calendar.`,
+        message: toolResult.message || `Added "${cal.title}" to your calendar.`,
         intent: 'CREATE_CALENDAR_EVENT',
         toolExecuted: 'create_calendar_event',
         data: toolResult.result,
         requiresConfirmation: true,
-        confirmationPayload,
+        confirmationPayload: {
+          title: cal.title,
+          startTime: cal.startTime,
+          endTime: cal.endTime,
+          location: cal.location,
+        },
       };
     }
 
@@ -480,6 +564,7 @@ INSTRUCTIONS:
     mimeType: string = 'image/jpeg'
   ): Promise<{
     success: boolean;
+    error?: string;
     expense?: Expense;
     parsed: {
       merchant: string;
@@ -489,13 +574,15 @@ INSTRUCTIONS:
       summary: string;
     };
   }> {
-    let parsedResult = {
-      merchant: 'Receipt Expense',
-      items: [{ name: 'Scanned Bill Item', price: 150, quantity: 1 }],
-      total: 150,
-      category: 'FOOD' as Expense['category'],
-      summary: 'Scanned receipt items',
-    };
+    // ponytail: parsedResult stays null unless a vision model returns usable
+    // data. We never fabricate an expense from a failed OCR read.
+    let parsedResult: {
+      merchant: string;
+      items: Array<{ name: string; price: number; quantity?: number }>;
+      total: number;
+      category: Expense['category'];
+      summary: string;
+    } | null = null;
 
     if (this.genAI) {
       const visionPrompt = `You are an expert OCR receipt and bill analysis AI.
@@ -534,19 +621,42 @@ Rules:
           const parsed = JSON.parse(cleanJson);
 
           if (parsed && (parsed.total || parsed.items)) {
-            parsedResult = {
-              merchant: parsed.merchant || 'Store Receipt',
-              items: Array.isArray(parsed.items) && parsed.items.length > 0 ? parsed.items : [{ name: 'Purchases', price: Number(parsed.total) || 100 }],
-              total: Number(parsed.total) || 100,
-              category: (parsed.category || 'FOOD') as Expense['category'],
-              summary: parsed.summary || `Receipt from ${parsed.merchant || 'Merchant'}`,
-            };
-            break;
+            const items = Array.isArray(parsed.items) && parsed.items.length > 0
+              ? parsed.items.map((i: any) => ({
+                  name: String(i?.name || 'Item'),
+                  price: Number(i?.price) || 0,
+                  ...(i?.quantity ? { quantity: Number(i.quantity) || 1 } : {}),
+                }))
+              : [];
+            const rawTotal = Number(parsed.total);
+            const total = Number.isFinite(rawTotal) && rawTotal > 0
+              ? rawTotal
+              : items.reduce((s: number, i: { price: number }) => s + (Number(i.price) || 0), 0);
+            if (total > 0) {
+              parsedResult = {
+                merchant: parsed.merchant || 'Store Receipt',
+                items: items.length > 0 ? items : [{ name: 'Purchases', price: total }],
+                total,
+                category: (parsed.category || 'OTHER') as Expense['category'],
+                summary: parsed.summary || `Receipt from ${parsed.merchant || 'Merchant'}`,
+              };
+              break;
+            }
           }
         } catch (err: any) {
           console.warn(`Vision model ${modelName} failed (${err.message}), trying next candidate...`);
         }
       }
+    }
+
+    // OCR failed on every model: report failure and write NOTHING to the ledger.
+    // Fabricating an expense here would be silent finance corruption.
+    if (!parsedResult) {
+      return {
+        success: false,
+        error: 'Could not read the bill. Please try a clearer photo.',
+        parsed: { merchant: '', items: [], total: 0, category: 'OTHER', summary: '' },
+      };
     }
 
     // Insert expense into student's Expense Tracker
@@ -640,10 +750,6 @@ Format your answer with clean, beautiful Markdown (clear headings with ###, bull
       isBill: false,
     };
   }
-
-  /**
-   * Gemini Multimodal Vision analysis for timetable photos/PDF scans
-   */
   public async analyzeTimetableImage(
     base64Data: string,
     mimeType: string = 'image/jpeg'
@@ -711,14 +817,17 @@ Output schema:
       "endTime": "11:00",
       "room": "AB1-204",
       "faculty": "Dr. Sharma",
-      "classType": "LECTURE"
+      "classType": "LECTURE",
+      "slot": "A1"
     }
   ]
 }
 
 RULES:
+- Extract ONE object per class session (one timetable cell/row = one object). NEVER merge multiple classes into a single object.
 - Day MUST be uppercase English weekday (MONDAY through SUNDAY). If day is not explicitly named, infer from column header or default to MONDAY.
-- Times MUST be in HH:MM format (24-hour, e.g. 09:00, 14:00).
+- Times MUST be in HH:MM format (24-hour, e.g. 09:00, 14:00). Read them from the timetable's own time headers.
+- If the schedule uses slot codes (e.g. A1, B1, TA1, L1-L60 as in VIT timetables), put the slot code in the "slot" field AND map it to the correct day/startTime/endTime using the timetable's time headers.
 - "classType" MUST be "LECTURE" or "LAB".
 - Return raw JSON only with NO markdown code fences.`;
 
@@ -740,9 +849,8 @@ RULES:
           ]);
 
           const rawText = result.response.text();
-          const jsonMatch = rawText.match(/\{[\s\S]*\}/) || rawText.match(/\[[\s\S]*\]/);
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
+          const parsed = extractTimetableJson(rawText);
+          if (parsed) {
             const rawClasses = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.classes) ? parsed.classes : []);
             if (rawClasses.length > 0) {
               classes = rawClasses.map((c: any) => ({
@@ -753,6 +861,7 @@ RULES:
                 room: c.room ? String(c.room).trim() : 'AB1-204',
                 faculty: c.faculty ? String(c.faculty).trim() : 'Faculty Member',
                 classType: String(c.classType || 'LECTURE').toUpperCase().includes('LAB') ? 'LAB' : 'LECTURE',
+                slot: c.slot ? String(c.slot).trim().toUpperCase() : undefined,
               }));
               console.log(`[Timetable Vision] Successfully extracted ${classes.length} classes via ${modelName}`);
               break;
@@ -764,65 +873,11 @@ RULES:
       }
     }
 
-    // If vision extraction failed due to API quota, network, or unrecognizable image,
-    // provide an intelligent structured college timetable so the student schedule is never blank
+    // If vision extraction failed (quota, network, unrecognizable image), return
+    // empty — NEVER invent fake classes. The client shows a "couldn't parse"
+    // notice so the user can retry or enter classes manually.
     if (classes.length === 0) {
-      classes = [
-        {
-          subjectName: 'Database Management Systems',
-          day: 'MONDAY',
-          startTime: '10:00',
-          endTime: '11:00',
-          room: 'AB1-204',
-          faculty: 'Dr. Sharma',
-          classType: 'LECTURE',
-        },
-        {
-          subjectName: 'Operating Systems Lab',
-          day: 'MONDAY',
-          startTime: '14:00',
-          endTime: '16:00',
-          room: 'AB2-301',
-          faculty: 'Prof. Verma',
-          classType: 'LAB',
-        },
-        {
-          subjectName: 'Artificial Intelligence',
-          day: 'TUESDAY',
-          startTime: '11:00',
-          endTime: '12:00',
-          room: 'AB3-105',
-          faculty: 'Dr. Iyer',
-          classType: 'LECTURE',
-        },
-        {
-          subjectName: 'Computer Networks',
-          day: 'WEDNESDAY',
-          startTime: '09:00',
-          endTime: '10:00',
-          room: '120-CB',
-          faculty: 'Prof. Kulkarni',
-          classType: 'LECTURE',
-        },
-        {
-          subjectName: 'Web Development & Cloud',
-          day: 'THURSDAY',
-          startTime: '14:00',
-          endTime: '15:30',
-          room: 'AB2-402',
-          faculty: 'Dr. Nair',
-          classType: 'LECTURE',
-        },
-        {
-          subjectName: 'Machine Learning Seminar',
-          day: 'FRIDAY',
-          startTime: '10:00',
-          endTime: '11:30',
-          room: 'AB1-Auditorium',
-          faculty: 'Prof. Rao',
-          classType: 'LECTURE',
-        },
-      ];
+      console.warn('[Timetable Vision] All vision models failed or returned no classes; returning empty.');
     }
 
     return { classes };
@@ -975,6 +1030,98 @@ RULES:
     };
   }
 
+  /**
+   * Extracts a calendar event's title, date/time, and location from a natural
+   * message like "Add team meeting to my calendar tomorrow at 10 AM in AB1-204".
+   * Returns only what could actually be parsed — never invented values.
+   * Dates like 05/10 are read as DD/MM (Indian convention).
+   */
+  private parseCalendarRequest(text: string): {
+    title?: string;
+    startTime?: string;
+    endTime?: string;
+    location?: string;
+  } {
+    const out: { title?: string; startTime?: string; endTime?: string; location?: string } = {};
+    const lower = text.toLowerCase();
+
+    // --- time: "10", "10:30", "10am", "10:30 pm" ---
+    const timeMatch = text.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i);
+    let hours: number | null = null;
+    let minutes = 0;
+    if (timeMatch) {
+      const h12 = Number(timeMatch[1]);
+      const isPM = /pm/i.test(timeMatch[3]);
+      hours = (h12 % 12) + (isPM ? 12 : 0);
+      minutes = timeMatch[2] ? Number(timeMatch[2]) : 0;
+    }
+
+    // --- date: today / tomorrow / weekday / DD/MM ---
+    const now = new Date();
+    const target = new Date(now);
+    let dateFound = false;
+    const weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    // ponytail: \b anchors so "AB1-204" is not misread as a date.
+    const dmMatch = lower.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/);
+    if (lower.includes('day after tomorrow')) {
+      target.setDate(target.getDate() + 2);
+      dateFound = true;
+    } else if (lower.includes('tomorrow')) {
+      target.setDate(target.getDate() + 1);
+      dateFound = true;
+    } else if (lower.includes('today')) {
+      dateFound = true;
+    } else if (dmMatch) {
+      const day = Number(dmMatch[1]);
+      const month = Number(dmMatch[2]) - 1;
+      let year = dmMatch[3] ? Number(dmMatch[3]) : now.getFullYear();
+      if (year < 100) year += 2000;
+      if (day >= 1 && day <= 31 && month >= 0 && month <= 11) {
+        target.setFullYear(year, month, day);
+        dateFound = true;
+      }
+    } else {
+      const wdIdx = weekdays.findIndex((d) => new RegExp(`\\b${d}\\b`).test(lower));
+      if (wdIdx !== -1) {
+        let delta = (wdIdx - target.getDay() + 7) % 7;
+        if (delta === 0) delta = 7; // "on monday" said on a monday -> next monday
+        target.setDate(target.getDate() + delta);
+        dateFound = true;
+      }
+    }
+
+    if (hours !== null && dateFound) {
+      target.setHours(hours, minutes, 0, 0);
+      out.startTime = target.toISOString();
+      out.endTime = new Date(target.getTime() + 60 * 60 * 1000).toISOString();
+    }
+
+    // --- location: "in AB1-204", "room 305" (best effort, optional) ---
+    const locMatch =
+      text.match(/\broom\s+([A-Za-z0-9\-]+)/i) || text.match(/\bin\s+([A-Za-z][A-Za-z0-9\-]+)/i);
+    if (locMatch && !/\d\s*(am|pm)/i.test(locMatch[0]) && !/^\d+$/.test(locMatch[1])) {
+      out.location = locMatch[1];
+    }
+
+    // --- title: strip trigger words + the matched date/time/location ---
+    // (location is removed first so later patterns can't mangle "AB1-204")
+    let title = text;
+    if (out.location) {
+      const li = title.indexOf(out.location);
+      if (li !== -1) title = `${title.slice(0, li)} ${title.slice(li + out.location.length)}`;
+    }
+    title = title
+      .replace(/\b(add|calendar|events?|schedules?|class|classes|to|my|me|an?|the|please|on|for|at|in|room)\b/gi, ' ')
+      .replace(/(\d{1,2})(?::\d{2})?\s*(am|pm)/gi, ' ')
+      .replace(/\btoday\b|\btomorrow\b|day after tomorrow/gi, ' ')
+      .replace(/\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/gi, ' ')
+      .replace(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/g, ' ');
+    title = title.replace(/\s+/g, ' ').trim();
+    if (title) out.title = title;
+
+    return out;
+  }
+
   public parseNaturalDebt(text: string): { person: string; type: 'OWES_ME' | 'I_OWE'; amount: number; notes?: string } {
     const amountMatch = text.match(/(?:(?:rs\.?|₹|inr)\s*)?(\d+(?:\.\d{1,2})?)/i);
     const amount = amountMatch ? parseFloat(amountMatch[1]) : 100;
@@ -983,13 +1130,37 @@ RULES:
     const isOwesMe = lower.includes('borrowed from me') || lower.includes('owes me');
     const type = isOwesMe ? 'OWES_ME' : 'I_OWE';
 
-    let person = 'Rahul';
+    // Never invent a person: empty string means "could not parse", and the
+    // caller asks the user for the name instead of recording a wrong debt.
+    // ponytail: tiny heuristic — filler words are skipped, so "borrowed some
+    // money" doesn't invent a person named "some". Ask when unsure.
+    const NON_NAMES = new Set([
+      'me', 'i', 'he', 'she', 'they', 'we', 'you', 'it',
+      'some', 'someone', 'something', 'money', 'rs', 'inr',
+      'to', 'towards', 'from', 'a', 'an', 'the', 'this', 'that',
+      'yesterday', 'today', 'tomorrow',
+    ]);
+    let person = '';
     const words = text.split(/\s+/);
-    for (let i = 0; i < words.length; i++) {
-      if (['borrowed', 'lent', 'owes'].includes(words[i].toLowerCase())) {
-        if (i > 0 && !['me', 'i', 'he'].includes(words[i - 1].toLowerCase())) {
-          person = words[i - 1];
-          break;
+    const clean = (w: string) => w.replace(/[^A-Za-z]/g, '');
+    for (let i = 0; i < words.length && !person; i++) {
+      const w = words[i].toLowerCase();
+      if (!['borrowed', 'lent', 'owe', 'owes'].includes(w)) continue;
+      // "X owes me" / "X borrowed ..." -> person is the word before
+      if (i > 0 && !NON_NAMES.has(words[i - 1].toLowerCase())) {
+        const candidate = clean(words[i - 1]);
+        if (candidate) person = candidate;
+      }
+      // "I owe X" / "lent X 500" / "lent 300 to X" -> scan a few words ahead
+      if (!person) {
+        for (let j = i + 1; j < Math.min(i + 4, words.length); j++) {
+          const cw = words[j].toLowerCase();
+          if (NON_NAMES.has(cw) || /^\d+(\.\d+)?$/.test(words[j])) continue;
+          const candidate = clean(words[j]);
+          if (candidate) {
+            person = candidate;
+            break;
+          }
         }
       }
     }

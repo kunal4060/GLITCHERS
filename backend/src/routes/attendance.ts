@@ -23,9 +23,15 @@ export const attendanceRoutes: FastifyPluginAsync = async (fastify) => {
     return { subjectName: subjectName.trim(), ...record };
   });
 
-  fastify.delete<{ Params: { subjectName: string } }>('/:subjectName', async (req) => {
+  fastify.delete<{ Params: { subjectName: string } }>('/:subjectName', async (req, reply) => {
     const userId = req.userId!;
-    await supabaseStore.resetAttendance(userId, decodeURIComponent(req.params.subjectName));
+    let subjectName: string;
+    try {
+      subjectName = decodeURIComponent(req.params.subjectName);
+    } catch {
+      return reply.status(400).send({ error: 'Invalid subject name' });
+    }
+    await supabaseStore.resetAttendance(userId, subjectName);
     return { success: true };
   });
 };

@@ -20,19 +20,20 @@ export const taskRoutes: FastifyPluginAsync = async (fastify) => {
     '/',
     async (req, reply) => {
       const userId = req.userId!;
-      let title = req.body.title;
-      let description = req.body.description;
-      let priority = req.body.priority || 'NORMAL';
-      let dueDate = req.body.dueDate;
+      const body = req.body || {};
+      let title = body.title;
+      let description = body.description;
+      let priority = body.priority || 'NORMAL';
+      let dueDate = body.dueDate;
 
-      if (req.body.text && !title) {
-        const parsed = geminiAssistant.parseNaturalTask(req.body.text);
+      if (body.text && !title) {
+        const parsed = geminiAssistant.parseNaturalTask(body.text);
         title = parsed.title;
         priority = parsed.priority;
         dueDate = parsed.dueDate;
       }
 
-      if (!title) {
+      if (!title || typeof title !== 'string' || !title.trim()) {
         return reply.status(400).send({ error: 'Task title is required' });
       }
 

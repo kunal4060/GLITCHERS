@@ -17,6 +17,29 @@ import type {
   GoogleConnection,
 } from '@glitchers/shared';
 
+export interface DocumentRecord {
+  id: string;
+  userId: string;
+  title: string;
+  type: string;
+  fileUrl?: string;
+  content?: string | null;
+  extractedDeadline?: string | null;
+  extractedNotes?: string | null;
+  actionItem?: string;
+  processed?: boolean;
+  createdAt: string;
+}
+
+export interface CustomCalendarEvent {
+  id: string;
+  title: string;
+  startTime: string;
+  endTime: string;
+  location: string | null;
+  source: 'MANUAL';
+}
+
 class InMemoryStore {
   public profiles = new Map<string, UserProfile>();
   public subjects = new Map<string, Subject[]>();
@@ -32,6 +55,8 @@ class InMemoryStore {
   public preferences = new Map<string, { quietHours: QuietHours; universityDomain: string }>();
   public attendance = new Map<string, Record<string, { attended: number; total: number }>>();
   public pushTokens = new Map<string, string[]>();
+  public documents = new Map<string, DocumentRecord[]>();
+  public calendarEvents = new Map<string, CustomCalendarEvent[]>();
   public onboardingStates = new Map<string, OnboardingState>();
   public initializationJobs = new Map<string, InitializationJob>();
   public googleConnections = new Map<string, GoogleConnection>();

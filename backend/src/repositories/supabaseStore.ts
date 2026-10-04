@@ -1,6 +1,6 @@
 import { randomUUID, createHash } from 'crypto';
 import { getSupabaseClient } from './supabaseClient.js';
-import { inMemoryStore } from './inMemoryStore.js';
+import { inMemoryStore, type DocumentRecord, type CustomCalendarEvent } from './inMemoryStore.js';
 import type {
   UserProfile,
   ClassSession,
@@ -1722,6 +1722,321 @@ export class SupabaseStore {
       }
     }
     return { sent, total: tokens.length };
+  }
+
+  // ==========================================
+  // ASSIGNMENTS
+  // ==========================================
+
+  public async getAssignments(userId: string): Promise<Assignment[]> {
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        const { data, error } = await supabase
+          .from('assignments')
+          .select('*')
+          .eq('user_id', userId)
+          .order('deadline', { ascending: true });
+
+        if (data && !error) {
+          const list: Assignment[] = data.map((d) => ({
+            id: d.id,
+            userId: d.user_id,
+            title: d.title,
+            subject: d.subject,
+            deadline: d.deadline,
+            description: d.description || null,
+            submissionPlatform: d.submission_platform || 'University Portal',
+            priority: d.priority || 'HIGH',
+            status: d.status || 'PENDING',
+            relatedEmailId: d.related_email_id || null,
+          }));
+          inMemoryStore.assignments.set(userId, list);
+          return list;
+        }
+      } catch (err) {
+        console.warn('SupabaseStore.getAssignments error:', err);
+      }
+    }
+
+    return inMemoryStore.assignments.get(userId) || [];
+  }
+
+  public async saveAssignment(userId: string, assignment: Assignment): Promise<Assignment> {
+    const validId = ensureUUID(assignment.id);
+    const newAssignment: Assignment = { ...assignment, id: validId, userId };
+
+    const list = inMemoryStore.assignments.get(userId) || [];
+    inMemoryStore.assignments.set(userId, [...list.filter((a) => a.id !== validId), newAssignment]);
+
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        await supabase.from('assignments').upsert({
+          id: validId,
+          user_id: userId,
+          title: newAssignment.title,
+          subject: newAssignment.subject,
+          deadline: newAssignment.deadline,
+          description: newAssignment.description || null,
+          submission_platform: newAssignment.submissionPlatform || 'University Portal',
+          priority: newAssignment.priority || 'HIGH',
+          status: newAssignment.status || 'PENDING',
+          related_email_id: newAssignment.relatedEmailId || null,
+        });
+      } catch (err) {
+        console.warn('SupabaseStore.saveAssignment warning:', err);
+      }
+    }
+
+    return newAssignment;
+  }
+
+  public async updateAssignmentStatus(
+    userId: string,
+    assignmentId: string,
+    status: Assignment['status']
+  ): Promise<Assignment | null> {
+    const list = inMemoryStore.assignments.get(userId) || [];
+    const idx = list.findIndex((a) => a.id === assignmentId);
+
+    let existing: Assignment | null = idx !== -1 ? list[idx] : null;
+    if (!existing) {
+      const supabase = getSupabaseClient();
+      if (supabase && UUID_REGEX.test(userId)) {
+        try {
+          const { data, error } = await supabase
+            .from('assignments')
+            .select('*')
+            .eq('id', assignmentId)
+            .eq('user_id', userId)
+            .maybeSingle();
+          if (data && !error) {
+            existing = {
+              id: data.id,
+              userId: data.user_id,
+              title: data.title,
+              subject: data.subject,
+              deadline: data.deadline,
+              description: data.description || null,
+              submissionPlatform: data.submission_platform || 'University Portal',
+              priority: data.priority || 'HIGH',
+              status: data.status || 'PENDING',
+              relatedEmailId: data.related_email_id || null,
+            };
+          }
+        } catch (err) {
+          console.warn('SupabaseStore.updateAssignmentStatus lookup warning:', err);
+        }
+      }
+    }
+
+    // Never fabricate an assignment on update — return null so the route can 404.
+    if (!existing) {
+      return null;
+    }
+
+    const updated: Assignment = { ...existing, status };
+    if (idx !== -1) {
+      list[idx] = updated;
+      inMemoryStore.assignments.set(userId, list);
+    } else {
+      inMemoryStore.assignments.set(userId, [...list, updated]);
+    }
+
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        await supabase
+          .from('assignments')
+          .update({ status })
+          .eq('id', assignmentId)
+          .eq('user_id', userId);
+      } catch (err) {
+        console.warn('SupabaseStore.updateAssignmentStatus warning:', err);
+      }
+    }
+
+    return updated;
+  }
+
+  public async deleteAssignment(userId: string, assignmentId: string): Promise<boolean> {
+    const list = inMemoryStore.assignments.get(userId) || [];
+    inMemoryStore.assignments.set(userId, list.filter((a) => a.id !== assignmentId));
+
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        await supabase.from('assignments').delete().eq('id', assignmentId).eq('user_id', userId);
+        return true;
+      } catch (err) {
+        console.warn('SupabaseStore.deleteAssignment warning:', err);
+      }
+    }
+    return true;
+  }
+
+  // ==========================================
+  // DOCUMENTS
+  // ==========================================
+
+  public async getDocuments(userId: string): Promise<DocumentRecord[]> {
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        const { data, error } = await supabase
+          .from('documents')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
+
+        if (data && !error) {
+          const list: DocumentRecord[] = data.map((d) => ({
+            id: d.id,
+            userId: d.user_id,
+            title: d.title,
+            type: d.type || 'PDF',
+            fileUrl: d.file_url || undefined,
+            content: d.content || null,
+            extractedDeadline: d.extracted_deadline || null,
+            extractedNotes: d.extracted_notes || null,
+            actionItem: d.action_item || undefined,
+            processed: d.processed ?? false,
+            createdAt: d.created_at || new Date().toISOString(),
+          }));
+          inMemoryStore.documents.set(userId, list);
+          return list;
+        }
+      } catch (err) {
+        console.warn('SupabaseStore.getDocuments error:', err);
+      }
+    }
+
+    return inMemoryStore.documents.get(userId) || [];
+  }
+
+  public async saveDocument(userId: string, doc: DocumentRecord): Promise<DocumentRecord> {
+    const validId = ensureUUID(doc.id);
+    const newDoc: DocumentRecord = { ...doc, id: validId, userId };
+
+    // Newest first, matching the route's previous unshift behavior.
+    const list = inMemoryStore.documents.get(userId) || [];
+    inMemoryStore.documents.set(userId, [newDoc, ...list.filter((d) => d.id !== validId)]);
+
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        await supabase.from('documents').upsert({
+          id: validId,
+          user_id: userId,
+          title: newDoc.title,
+          type: newDoc.type,
+          file_url: newDoc.fileUrl || null,
+          content: newDoc.content || null,
+          extracted_deadline: newDoc.extractedDeadline || null,
+          extracted_notes: newDoc.extractedNotes || null,
+          action_item: newDoc.actionItem || null,
+          processed: newDoc.processed ?? false,
+          created_at: newDoc.createdAt,
+        });
+      } catch (err) {
+        console.warn('SupabaseStore.saveDocument warning:', err);
+      }
+    }
+
+    return newDoc;
+  }
+
+  public async deleteDocument(userId: string, documentId: string): Promise<boolean> {
+    const list = inMemoryStore.documents.get(userId) || [];
+    inMemoryStore.documents.set(userId, list.filter((d) => d.id !== documentId));
+
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        await supabase.from('documents').delete().eq('id', documentId).eq('user_id', userId);
+        return true;
+      } catch (err) {
+        console.warn('SupabaseStore.deleteDocument warning:', err);
+      }
+    }
+    return true;
+  }
+
+  // ==========================================
+  // CALENDAR EVENTS
+  // ==========================================
+
+  public async getCalendarEvents(userId: string): Promise<CustomCalendarEvent[]> {
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        const { data, error } = await supabase
+          .from('calendar_events')
+          .select('*')
+          .eq('user_id', userId)
+          .order('start_time', { ascending: true });
+
+        if (data && !error) {
+          const list: CustomCalendarEvent[] = data.map((d) => ({
+            id: d.id,
+            title: d.title,
+            startTime: d.start_time,
+            endTime: d.end_time,
+            location: d.location || null,
+            source: 'MANUAL',
+          }));
+          inMemoryStore.calendarEvents.set(userId, list);
+          return list;
+        }
+      } catch (err) {
+        console.warn('SupabaseStore.getCalendarEvents error:', err);
+      }
+    }
+
+    return inMemoryStore.calendarEvents.get(userId) || [];
+  }
+
+  public async saveCalendarEvent(userId: string, event: CustomCalendarEvent): Promise<CustomCalendarEvent> {
+    const validId = ensureUUID(event.id);
+    const newEvent: CustomCalendarEvent = { ...event, id: validId };
+
+    const list = inMemoryStore.calendarEvents.get(userId) || [];
+    inMemoryStore.calendarEvents.set(userId, [...list.filter((e) => e.id !== validId), newEvent]);
+
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        await supabase.from('calendar_events').upsert({
+          id: validId,
+          user_id: userId,
+          title: newEvent.title,
+          start_time: newEvent.startTime,
+          end_time: newEvent.endTime,
+          location: newEvent.location || null,
+        });
+      } catch (err) {
+        console.warn('SupabaseStore.saveCalendarEvent warning:', err);
+      }
+    }
+
+    return newEvent;
+  }
+
+  public async deleteCalendarEvent(userId: string, eventId: string): Promise<boolean> {
+    const list = inMemoryStore.calendarEvents.get(userId) || [];
+    inMemoryStore.calendarEvents.set(userId, list.filter((e) => e.id !== eventId));
+
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        await supabase.from('calendar_events').delete().eq('id', eventId).eq('user_id', userId);
+        return true;
+      } catch (err) {
+        console.warn('SupabaseStore.deleteCalendarEvent warning:', err);
+      }
+    }
+    return true;
   }
 }
 

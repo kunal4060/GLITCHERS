@@ -25,25 +25,30 @@ export const debtRoutes: FastifyPluginAsync = async (fastify) => {
     Body: { id?: string; text?: string; person?: string; type?: 'OWES_ME' | 'I_OWE'; amount?: number; notes?: string };
   }>('/', async (req, reply) => {
     const userId = req.userId!;
-    let person = req.body.person;
-    let type = req.body.type || 'OWES_ME';
-    let amount = req.body.amount;
-    let notes = req.body.notes;
+    const body = req.body || {};
+    let person = body.person;
+    let type = body.type || 'OWES_ME';
+    let amount = body.amount;
+    let notes = body.notes;
 
-    if (req.body.text && !person) {
-      const parsed = geminiAssistant.parseNaturalDebt(req.body.text);
+    if (body.text && !person) {
+      const parsed = geminiAssistant.parseNaturalDebt(body.text);
       person = parsed.person;
       type = parsed.type;
       amount = parsed.amount;
       notes = parsed.notes;
     }
 
-    if (!person || !amount || amount <= 0) {
+    const numAmount = Number(amount);
+    if (!person || typeof person !== 'string' || !person.trim() || !Number.isFinite(numAmount) || numAmount <= 0) {
       return reply.status(400).send({ error: 'Person and valid amount are required' });
+    }
+    if (type !== 'OWES_ME' && type !== 'I_OWE') {
+      return reply.status(400).send({ error: 'Invalid debt type' });
     }
 
     const newDebt: Debt = {
-      id: typeof req.body.id === 'string' && req.body.id.trim().length > 0 ? req.body.id.trim() : randomUUID(),
+      id: typeof body.id === 'string' && body.id.trim().length > 0 ? body.id.trim() : randomUUID(),
       userId,
       person,
       type,

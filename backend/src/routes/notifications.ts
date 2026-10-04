@@ -48,8 +48,15 @@ export const notificationRoutes: FastifyPluginAsync = async (fastify) => {
     return { success: true };
   });
 
-  // Broadcast a push notification to all registered devices
+  // Broadcast a push notification to all registered devices (admin only)
   fastify.post<{ Body: { title?: string; body?: string } }>('/broadcast', async (req, reply) => {
+    const userId = req.userId!;
+    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+    const profile = await supabaseStore.getProfile(userId);
+    const email = (profile?.email || '').toLowerCase();
+    if (adminEmails.length === 0 || !adminEmails.includes(email)) {
+      return reply.status(403).send({ error: 'Admin access required' });
+    }
     const { title, body } = req.body || {};
     if (!body || typeof body !== 'string' || !body.trim()) {
       return reply.status(400).send({ error: 'body is required' });

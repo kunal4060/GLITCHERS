@@ -30,9 +30,21 @@ export function buildApp(): FastifyInstance {
     bodyLimit: 50 * 1024 * 1024, // 50MB to support high-resolution base64 timetable images/documents
   });
 
-  // CORS
+  // CORS — restrict to known app origins (open CORS + credentials = any site can call the API)
+  const ALLOWED_ORIGINS = [
+    'http://localhost:8082',
+    'http://localhost:19006',
+    'http://localhost:5000',
+    'https://kunal4060.github.io',
+  ];
   app.register(cors, {
-    origin: true,
+    origin: (origin, cb) => {
+      if (!origin || ALLOWED_ORIGINS.some((o) => origin.startsWith(o))) {
+        cb(null, true);
+      } else {
+        cb(new Error('Not allowed by CORS'), false);
+      }
+    },
     credentials: true,
   });
 
