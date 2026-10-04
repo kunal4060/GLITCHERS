@@ -36,4 +36,25 @@ export const notificationRoutes: FastifyPluginAsync = async (fastify) => {
     const updated = await supabaseStore.getUserPreferences(userId);
     return updated;
   });
+
+  // Register this device's Expo push token for broadcasts
+  fastify.post<{ Body: { token?: string } }>('/push-token', async (req, reply) => {
+    const userId = req.userId!;
+    const { token } = req.body || {};
+    if (!token || typeof token !== 'string' || !token.startsWith('ExponentPushToken[')) {
+      return reply.status(400).send({ error: 'Valid Expo push token is required' });
+    }
+    await supabaseStore.savePushToken(userId, token);
+    return { success: true };
+  });
+
+  // Broadcast a push notification to all registered devices
+  fastify.post<{ Body: { title?: string; body?: string } }>('/broadcast', async (req, reply) => {
+    const { title, body } = req.body || {};
+    if (!body || typeof body !== 'string' || !body.trim()) {
+      return reply.status(400).send({ error: 'body is required' });
+    }
+    const result = await supabaseStore.broadcastPush(title?.trim() || 'NEXA', body.trim());
+    return result;
+  });
 };

@@ -19,6 +19,7 @@ import { examRoutes } from './routes/exams.js';
 import { assignmentRoutes } from './routes/assignments.js';
 import { documentRoutes } from './routes/documents.js';
 import { settingsRoutes } from './routes/settings.js';
+import { attendanceRoutes } from './routes/attendance.js';
 import { healthRoutes } from './routes/health.js';
 import { publicRoutes } from './routes/public.js';
 import { onboardingRoutes } from './routes/onboarding.js';
@@ -66,6 +67,7 @@ export function buildApp(): FastifyInstance {
   app.register(assignmentRoutes, { prefix: '/api/assignments' });
   app.register(documentRoutes, { prefix: '/api/documents' });
   app.register(settingsRoutes, { prefix: '/api/settings' });
+  app.register(attendanceRoutes, { prefix: '/api/attendance' });
 
   // Error Handler
   app.setErrorHandler((error: any, request, reply) => {

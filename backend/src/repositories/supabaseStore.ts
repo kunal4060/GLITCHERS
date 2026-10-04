@@ -1573,6 +1573,156 @@ export class SupabaseStore {
 
     return null;
   }
+
+  // ==========================================
+  // ATTENDANCE
+  // ==========================================
+
+  public async getAttendance(userId: string): Promise<Record<string, { attended: number; total: number }>> {
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        const { data, error } = await supabase
+          .from('attendance')
+          .select('*')
+          .eq('user_id', userId);
+
+        if (data && !error) {
+          const map: Record<string, { attended: number; total: number }> = {};
+          for (const d of data) {
+            map[d.subject_name] = { attended: d.attended ?? 0, total: d.total ?? 0 };
+          }
+          inMemoryStore.attendance.set(userId, map);
+          return map;
+        }
+      } catch (err) {
+        console.warn('SupabaseStore.getAttendance error:', err);
+      }
+    }
+
+    return inMemoryStore.attendance.get(userId) || {};
+  }
+
+  public async markAttendance(
+    userId: string,
+    subjectName: string,
+    present: boolean
+  ): Promise<{ attended: number; total: number }> {
+    const current = await this.getAttendance(userId);
+    const prev = current[subjectName] || { attended: 0, total: 0 };
+    const next = { attended: prev.attended + (present ? 1 : 0), total: prev.total + 1 };
+    inMemoryStore.attendance.set(userId, { ...current, [subjectName]: next });
+
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        await supabase.from('attendance').upsert(
+          {
+            user_id: userId,
+            subject_name: subjectName,
+            attended: next.attended,
+            total: next.total,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,subject_name' }
+        );
+      } catch (err) {
+        console.warn('SupabaseStore.markAttendance warning:', err);
+      }
+    }
+    return next;
+  }
+
+  public async resetAttendance(userId: string, subjectName: string): Promise<void> {
+    const current = await this.getAttendance(userId);
+    delete current[subjectName];
+    inMemoryStore.attendance.set(userId, { ...current });
+
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        await supabase.from('attendance').delete().eq('user_id', userId).eq('subject_name', subjectName);
+      } catch (err) {
+        console.warn('SupabaseStore.resetAttendance warning:', err);
+      }
+    }
+  }
+
+  // ==========================================
+  // PUSH NOTIFICATIONS
+  // ==========================================
+
+  public async savePushToken(userId: string, token: string): Promise<void> {
+    const existing = inMemoryStore.pushTokens.get(userId) || [];
+    if (!existing.includes(token)) {
+      inMemoryStore.pushTokens.set(userId, [...existing, token]);
+    }
+
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        await supabase.from('push_tokens').upsert(
+          {
+            user_id: userId,
+            token,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,token' }
+        );
+      } catch (err) {
+        console.warn('SupabaseStore.savePushToken warning:', err);
+      }
+    }
+  }
+
+  public async getAllPushTokens(): Promise<string[]> {
+    const tokens = new Set<string>();
+    for (const list of inMemoryStore.pushTokens.values()) {
+      for (const t of list) tokens.add(t);
+    }
+
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase.from('push_tokens').select('token');
+        if (data && !error) {
+          for (const d of data) {
+            if (d.token) tokens.add(d.token);
+          }
+        }
+      } catch (err) {
+        console.warn('SupabaseStore.getAllPushTokens error:', err);
+      }
+    }
+    return [...tokens];
+  }
+
+  public async broadcastPush(title: string, body: string): Promise<{ sent: number; total: number }> {
+    const tokens = await this.getAllPushTokens();
+    if (tokens.length === 0) return { sent: 0, total: 0 };
+
+    // Expo Push API accepts up to 100 messages per request
+    let sent = 0;
+    for (let i = 0; i < tokens.length; i += 100) {
+      const chunk = tokens.slice(i, i + 100).map((token) => ({
+        to: token,
+        sound: 'default' as const,
+        title,
+        body,
+      }));
+      try {
+        const res = await fetch('https://exp.host/--/api/v2/push/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(chunk),
+        });
+        if (res.ok) sent += chunk.length;
+      } catch (err) {
+        console.warn('SupabaseStore.broadcastPush warning:', err);
+      }
+    }
+    return { sent, total: tokens.length };
+  }
 }
 
 export const supabaseStore = new SupabaseStore();

@@ -30,6 +30,8 @@ class InMemoryStore {
   public emails = new Map<string, EmailSummary[]>();
   public notifications = new Map<string, NotificationItem[]>();
   public preferences = new Map<string, { quietHours: QuietHours; universityDomain: string }>();
+  public attendance = new Map<string, Record<string, { attended: number; total: number }>>();
+  public pushTokens = new Map<string, string[]>();
   public onboardingStates = new Map<string, OnboardingState>();
   public initializationJobs = new Map<string, InitializationJob>();
   public googleConnections = new Map<string, GoogleConnection>();
