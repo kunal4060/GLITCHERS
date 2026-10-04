@@ -198,8 +198,11 @@ export class GeminiAssistant {
       };
     }
 
+    // C3 SECURITY: never fire destructive actions on questions
+    const isQuestion = /\?\s*$/.test(text) || /\b(how|what|why|when|which|can you|could you|do i|should i|is there|are there)\b/.test(text);
+
     // 3. Delete Expense Action
-    if (text.includes('delete') && (text.includes('expense') || text.includes('spending'))) {
+    if (!isQuestion && text.includes('delete') && (text.includes('expense') || text.includes('spending'))) {
       const descMatch = text.replace(/delete|this|the|expense|record|spending/gi, '').trim();
       const toolResult = await toolRegistry.delete_expense(userId, descMatch || 'food');
       return {
@@ -231,6 +234,7 @@ export class GeminiAssistant {
 
     // 5. Complete Task Action
     if (
+      !isQuestion &&
       (text.includes('complete') || text.includes('mark done') || text.includes('finished')) &&
       (text.includes('task') || text.includes('assignment') || text.includes('lab') || text.includes('report') || text.includes('homework') || text.includes('project'))
     ) {
@@ -247,7 +251,7 @@ export class GeminiAssistant {
     }
 
     // 6. Delete Task Action
-    if (text.includes('delete') && (text.includes('task') || text.includes('assignment') || text.includes('todo'))) {
+    if (!isQuestion && text.includes('delete') && (text.includes('task') || text.includes('assignment') || text.includes('todo'))) {
       const taskTitle = text.replace(/delete|that|the|task|assignment|todo/gi, '').trim();
       const toolResult = await toolRegistry.delete_task(userId, taskTitle || 'AI Assignment');
       return {

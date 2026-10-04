@@ -97,9 +97,27 @@ export const timetableRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  fastify.post<{ Body: { classes: ClassSession[] } }>('/classes/bulk', async (req) => {
+  fastify.post<{ Body: { classes: ClassSession[] } }>('/classes/bulk', async (req, reply) => {
     const userId = req.userId!;
-    const incomingClasses = req.body?.classes || [];
+    // C4 SECURITY: validate array and filter malformed items
+    const rawClasses = req.body?.classes;
+    if (!Array.isArray(rawClasses)) {
+      return reply.code(400).send({ error: 'classes must be an array' });
+    }
+    // Filter out null/malformed items and validate required fields
+    const incomingClasses = rawClasses.filter(
+      (c): c is ClassSession =>
+        c != null &&
+        typeof c === 'object' &&
+        typeof c.subjectName === 'string' &&
+        c.subjectName.trim().length > 0 &&
+        typeof c.day === 'string' &&
+        /^[A-Z]+$/.test(c.day) &&
+        typeof c.startTime === 'string' &&
+        /^\d{2}:\d{2}$/.test(c.startTime) &&
+        typeof c.endTime === 'string' &&
+        /^\d{2}:\d{2}$/.test(c.endTime)
+    );
 
     const existing = await supabaseStore.getClasses(userId);
     const merged = [...existing];

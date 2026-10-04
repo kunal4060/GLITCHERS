@@ -125,7 +125,9 @@ export class GoogleService {
     accessToken: string;
     refreshToken?: string;
   }> {
-    if (!this.oauth2Client || code.startsWith('mock_')) {
+    // C1 SECURITY: mock codes only allowed in non-production (dev/testing)
+    const isProd = process.env.NODE_ENV === 'production';
+    if (!isProd && (!this.oauth2Client || code.startsWith('mock_'))) {
       return {
         email: 'student@university.edu',
         googleId: 'google_sub_' + Math.floor(Math.random() * 1000000000),

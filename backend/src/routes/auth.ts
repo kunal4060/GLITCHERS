@@ -99,8 +99,13 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
   const sanitizeRedirect = (url: string): string => {
     const fallback = 'http://localhost:8082';
     try {
-      const clean = url.split('?')[0].replace(/\/$/, '');
-      if (ALLOWED_REDIRECT_ORIGINS.some((o) => clean.startsWith(o))) return clean;
+      // C2 SECURITY: exact origin match (not prefix) to prevent evil.com bypass
+      const parsed = new URL(url);
+      const allowedOrigins = ['http://localhost:8082', 'http://localhost:19006'];
+      const isExp = parsed.protocol === 'exp:';
+      if (allowedOrigins.includes(parsed.origin) || isExp) {
+        return parsed.origin + parsed.pathname;
+      }
     } catch { /* fall through */ }
     return fallback;
   };
