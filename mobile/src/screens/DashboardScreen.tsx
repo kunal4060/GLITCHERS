@@ -115,9 +115,11 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
   };
 
   useEffect(() => {
-    syncWithBackend().then(() => summarize(useDashboardStore.getState().emails.filter(
-      (e) => !e.isDismissed && !useDashboardStore.getState().dismissedNoticeIds.includes(e.id)
-    )));
+    syncWithBackend()
+      .then(() => summarize(useDashboardStore.getState().emails.filter(
+        (e) => !e.isDismissed && !useDashboardStore.getState().dismissedNoticeIds.includes(e.id)
+      )))
+      .catch((e) => console.warn('[DashboardScreen] initial sync failed:', e?.message));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

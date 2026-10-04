@@ -87,10 +87,20 @@ class ApiClient {
         (await AsyncStorage.getItem('nexa-auth-token')) ||
         (await AsyncStorage.getItem('glitchers-auth-token'));
       if (legacy && legacy.trim()) {
-        this.token = legacy.trim();
-        saveAuthToken(this.token).catch(() => null);
-        AsyncStorage.removeItem('nexa-auth-token').catch(() => null);
-        AsyncStorage.removeItem('glitchers-auth-token').catch(() => null);
+        const trimmed = legacy.trim();
+        // Await the SecureStore write AND verify read-back BEFORE deleting
+        // legacy keys — otherwise an app kill mid-migration loses the token everywhere.
+        await saveAuthToken(trimmed);
+        const verified = await loadAuthToken().catch(() => null);
+        if (verified === trimmed) {
+          this.token = trimmed;
+          await AsyncStorage.removeItem('nexa-auth-token').catch(() => null);
+          await AsyncStorage.removeItem('glitchers-auth-token').catch(() => null);
+          return this.token;
+        }
+        // SecureStore write didn't stick — keep legacy keys and use in-memory token.
+        console.warn('[apiClient] token migration: SecureStore verify failed, keeping legacy keys');
+        this.token = trimmed;
         return this.token;
       }
     } catch {
@@ -138,14 +148,20 @@ class ApiClient {
         const errorData = await res.json().catch(() => ({}));
         const serverMessage = errorData.error || errorData.message;
         if (res.status === 401) {
-          this.clearToken();
-          try {
-            const { useAuthStore } = require('../store/authStore');
-            useAuthStore?.getState?.()?.logout?.();
-          } catch {
-            // ignore
+          // A 401 from the login endpoint itself (wrong credentials) is not a
+          // dead session — don't wipe the token or force a logout for it.
+          // Note: /auth/me 401s still clear (checkSession relies on that).
+          const isLoginCall = endpoint.includes('/auth/login');
+          if (!isLoginCall) {
+            this.clearToken();
+            try {
+              const { useAuthStore } = require('../store/authStore');
+              useAuthStore?.getState?.()?.logout?.();
+            } catch {
+              // ignore
+            }
           }
-          throw new AuthError(serverMessage || 'Session expired. Please sign in again.');
+          throw new AuthError(serverMessage || (isLoginCall ? 'Invalid email or password.' : 'Session expired. Please sign in again.'));
         }
         throw new Error(serverMessage || `API error: ${res.status}`);
       }

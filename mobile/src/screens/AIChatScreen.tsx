@@ -721,8 +721,13 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
             <TouchableOpacity
               style={styles.queueSyncBtn}
               onPress={async () => {
-                const res = await flushOfflineQueue();
-                Alert.alert('Dataset Synced', `Pushed ${res.syncedCount} offline record(s) to cloud database!`);
+                try {
+                  const res = await flushOfflineQueue();
+                  Alert.alert('Dataset Synced', `Pushed ${res.syncedCount} offline record(s) to cloud database!`);
+                } catch (e: any) {
+                  console.warn('[AIChatScreen] offline sync failed:', e?.message);
+                  Alert.alert('Sync Failed', 'Could not push offline records. Please try again.');
+                }
               }}
               activeOpacity={0.8}
             >
@@ -1042,10 +1047,15 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
                     style={[styles.customBtn, !customRepoInput.trim() && { opacity: 0.5 }]}
                     disabled={!customRepoInput.trim()}
                     onPress={async () => {
-                      const repo = customRepoInput.trim();
-                      await downloadOfflineModel(repo);
-                      setCustomRepoInput('');
-                      Alert.alert('Model Loaded', `Downloaded & activated "${repo}" from Hugging Face for offline reasoning!`);
+                      try {
+                        const repo = customRepoInput.trim();
+                        await downloadOfflineModel(repo);
+                        setCustomRepoInput('');
+                        Alert.alert('Model Loaded', `Downloaded & activated "${repo}" from Hugging Face for offline reasoning!`);
+                      } catch (e: any) {
+                        console.warn('[AIChatScreen] model download failed:', e?.message);
+                        Alert.alert('Download Failed', 'Could not download the model. Please try again.');
+                      }
                     }}
                     activeOpacity={0.8}
                   >
@@ -1067,8 +1077,13 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
                   <TouchableOpacity
                     style={styles.syncBtn}
                     onPress={async () => {
-                      const res = await flushOfflineQueue();
-                      Alert.alert('Dataset Synced', `Pushed ${res.syncedCount} offline record(s) to cloud database!`);
+                      try {
+                        const res = await flushOfflineQueue();
+                        Alert.alert('Dataset Synced', `Pushed ${res.syncedCount} offline record(s) to cloud database!`);
+                      } catch (e: any) {
+                        console.warn('[AIChatScreen] offline sync failed:', e?.message);
+                        Alert.alert('Sync Failed', 'Could not push offline records. Please try again.');
+                      }
                     }}
                     activeOpacity={0.8}
                   >

@@ -119,28 +119,10 @@ export const useAuthStore = create<AuthState>()(
           }
 
           if (!user) {
-            const res = await apiClient.post<{ accessToken: string; user: UserProfile }>('/auth/google/callback', {
-              code: 'mock_google_oauth_code',
-            }).catch(() => null);
-            if (res?.accessToken) {
-              activeToken = res.accessToken;
-              apiClient.setToken(activeToken);
-            }
-            user = res?.user || {
-              id: `usr_${safeEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
-              email: safeEmail,
-              fullName: safeName,
-              university: null,
-              course: null,
-              year: null,
-              semester: null,
-              section: null,
-              cgpa: '',
-              creditsCompleted: null,
-              creditsCurrent: null,
-              universityDomain: safeEmail.split('@')[1] || 'university.edu',
-              isOnboardingComplete: false,
-            };
+            // No mock OAuth fallback: test backdoors must never hit production auth.
+            // Without a backend-issued user the login fails loudly instead of
+            // fabricating a synthetic local user.
+            throw new Error('Could not sign in. Please check your connection and try again.');
           }
 
           if (!activeToken && user?.id) {
