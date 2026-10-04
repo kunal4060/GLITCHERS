@@ -55,6 +55,13 @@ class InMemoryStore {
   public preferences = new Map<string, { quietHours: QuietHours; universityDomain: string }>();
   public attendance = new Map<string, Record<string, { attended: number; total: number }>>();
   public pushTokens = new Map<string, string[]>();
+  public chatMessages = new Map<string, Array<{
+    id: string;
+    sender: 'user' | 'assistant';
+    text: string;
+    actionCard?: any;
+    timestamp: string;
+  }>>();
   public documents = new Map<string, DocumentRecord[]>();
   public calendarEvents = new Map<string, CustomCalendarEvent[]>();
   public onboardingStates = new Map<string, OnboardingState>();

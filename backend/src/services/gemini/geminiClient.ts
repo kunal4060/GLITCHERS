@@ -3,6 +3,7 @@ import { env } from '../../config/env.js';
 import { toolRegistry, type ToolExecutionResult } from './toolRegistry.js';
 import { inMemoryStore } from '../../repositories/inMemoryStore.js';
 import { supabaseStore } from '../../repositories/supabaseStore.js';
+import { getISTNow, getISTDateStr, getISTDay } from '../../utils/dates.js';
 import type { AIChatResponse, RouterIntentType, Expense } from '@glitchers/shared';
 import { randomUUID } from 'crypto';
 
@@ -82,14 +83,14 @@ export class GeminiAssistant {
    * Builds rich live student context from Supabase and inMemoryStore for Gemini reasoning
    */
   public async buildStudentContext(userId: string) {
-    const now = new Date();
+    const now = getISTNow();
     const days = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
-    const currentDay = days[now.getDay()];
+    const currentDay = days[getISTDay(now)];
 
-    const yesterday = new Date(Date.now() - 86400000);
-    const yesterdayDay = days[yesterday.getDay()];
-    const yesterdayDateStr = yesterday.toISOString().slice(0, 10);
-    const todayDateStr = now.toISOString().slice(0, 10);
+    const yesterday = new Date(now.getTime() - 86400000);
+    const yesterdayDay = days[getISTDay(yesterday)];
+    const yesterdayDateStr = getISTDateStr(yesterday);
+    const todayDateStr = getISTDateStr(now);
 
     const [dbProfile, dbClasses, dbExpenses, dbTasks, dbBudget, dbDebts, dbEmails] = await Promise.all([
       supabaseStore.getProfile(userId).catch(() => null),

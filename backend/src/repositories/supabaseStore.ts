@@ -132,8 +132,24 @@ export class SupabaseStore {
 
     if (supabase) {
       try {
-        const { data: userList } = await supabase.auth.admin.listUsers();
-        let authUser = userList?.users?.find((u) => u.email?.toLowerCase() === safeEmail);
+        // Prefer the profiles table (indexed by email) over paginated listUsers(),
+        // which misses users beyond the first 50 and creates duplicates.
+        let authUser: { id: string; email?: string } | undefined;
+        if (existingProfile?.id && UUID_REGEX.test(existingProfile.id)) {
+          const { data } = await supabase.auth.admin.getUserById(existingProfile.id);
+          if (data?.user) authUser = data.user;
+        }
+        if (!authUser) {
+          // Paginated fallback for users without a profile row yet (safety-capped).
+          let page = 1;
+          const perPage = 100;
+          while (!authUser && page <= 10) {
+            const { data: userList } = await supabase.auth.admin.listUsers({ page, perPage });
+            authUser = userList?.users?.find((u) => u.email?.toLowerCase() === safeEmail);
+            if (!userList?.users || userList.users.length < perPage) break;
+            page++;
+          }
+        }
 
         if (!authUser) {
           const { data: created, error: createErr } = await supabase.auth.admin.createUser({
@@ -879,7 +895,7 @@ export class SupabaseStore {
         }
 
         const newConvId = randomUUID();
-        const { data: created } = await supabase
+        const { data: created, error: insertErr } = await supabase
           .from('ai_conversations')
           .insert({
             id: newConvId,
@@ -890,9 +906,12 @@ export class SupabaseStore {
           .select('id')
           .single();
 
-        const cid = created?.id || newConvId;
-        this.activeConversationIds.set(userId, cid);
-        return cid;
+        if (created?.id && !insertErr) {
+          this.activeConversationIds.set(userId, created.id);
+          return created.id;
+        }
+        // Insert failed — do NOT cache the phantom id (would cause FK violations
+        // on later message inserts). Fall through to a local-only id.
       } catch (err) {
         console.warn('SupabaseStore.getOrCreateConversationId warning:', err);
       }
@@ -934,7 +953,7 @@ export class SupabaseStore {
       }
     }
 
-    return [];
+    return inMemoryStore.chatMessages.get(userId) || [];
   }
 
   public async saveChatMessage(
@@ -944,8 +963,20 @@ export class SupabaseStore {
     actionCard?: any
   ): Promise<string> {
     const messageId = randomUUID();
-    const supabase = getSupabaseClient();
+    const timestamp = new Date().toISOString();
+    const record = {
+      id: messageId,
+      sender: role,
+      text,
+      actionCard: actionCard || undefined,
+      timestamp,
+    };
 
+    // Always keep an inMemory copy so messages survive Supabase failures
+    const existing = inMemoryStore.chatMessages.get(userId) || [];
+    inMemoryStore.chatMessages.set(userId, [...existing, record]);
+
+    const supabase = getSupabaseClient();
     if (supabase && UUID_REGEX.test(userId)) {
       try {
         const convId = await this.getOrCreateConversationId(userId);
@@ -955,7 +986,7 @@ export class SupabaseStore {
           role: role === 'user' ? 'user' : 'model',
           content: text,
           tool_calls: actionCard ? [actionCard] : null,
-          created_at: new Date().toISOString(),
+          created_at: timestamp,
         });
       } catch (err) {
         console.warn('SupabaseStore.saveChatMessage warning:', err);
@@ -966,12 +997,13 @@ export class SupabaseStore {
   }
 
   public async clearChatHistory(userId: string): Promise<boolean> {
+    inMemoryStore.chatMessages.delete(userId);
+    this.activeConversationIds.delete(userId);
     const supabase = getSupabaseClient();
     if (supabase && UUID_REGEX.test(userId)) {
       try {
         const convId = await this.getOrCreateConversationId(userId);
         await supabase.from('ai_messages').delete().eq('conversation_id', convId);
-        this.activeConversationIds.delete(userId);
         return true;
       } catch (err) {
         console.warn('SupabaseStore.clearChatHistory warning:', err);

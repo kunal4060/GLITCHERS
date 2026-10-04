@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { supabaseStore } from '../repositories/supabaseStore.js';
+import { getISTNow, getISTDateStr } from '../utils/dates.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { calculateBudgetStatus, calculateBurnRateForecast } from '../services/finance/calculator.js';
 import type { Budget } from '@glitchers/shared';
@@ -21,9 +22,9 @@ export const budgetRoutes: FastifyPluginAsync = async (fastify) => {
       };
     }
 
-    const now = new Date();
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const daysPassed = now.getDate();
+    const now = getISTNow();
+    const daysInMonth = new Date(now.getUTCFullYear(), now.getUTCMonth() + 1, 0).getUTCDate();
+    const daysPassed = now.getUTCDate();
     const daysRemaining = daysInMonth - daysPassed;
 
     const status = calculateBudgetStatus(budget, expenses);
@@ -45,7 +46,7 @@ export const budgetRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: 'Valid monthlyLimit is required' });
     }
 
-    const currentMonth = new Date().toISOString().slice(0, 7);
+    const currentMonth = getISTDateStr().slice(0, 7);
     const budget: Budget = {
       id: randomUUID(),
       userId,
