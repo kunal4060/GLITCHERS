@@ -180,34 +180,15 @@ export function getNextUpcomingClass(
     };
   }
 
-  // 2. If no more classes today, look ahead in the week (Tomorrow up to 6 days ahead)
-  for (let offset = 1; offset <= 7; offset++) {
-    const targetDayIdx = (currentDayIdx + offset) % 7;
-    const dayClasses = classes
-      .filter((c) => getDayIndex(c.day) === targetDayIdx && !c.isCancelled)
-      .sort((a, b) => parseTimeToMinutes(a.startTime) - parseTimeToMinutes(b.startTime));
-
-    if (dayClasses.length > 0) {
-      const firstClass = dayClasses[0];
-      const dayLabel = offset === 1 ? 'Tomorrow' : DAYS_OF_WEEK[targetDayIdx].slice(0, 3);
-      return {
-        nextClass: firstClass,
-        statusLabel: `${dayLabel} at ${firstClass.startTime}`,
-        badgeVariant: 'countdown',
-        isOngoing: false,
-        isToday: false,
-      };
-    }
-  }
-
-  // Fallback to first available class if schedule is sparse
-  const fallback = classes[0];
+  // 2. No more classes today (or no classes at all today) — show nothing.
+  // The home card is day-scoped by design: it only ever shows today's
+  // ongoing or upcoming class, never a future day's class.
   return {
-    nextClass: fallback,
-    statusLabel: `${fallback.day} at ${fallback.startTime}`,
+    nextClass: null,
+    statusLabel: todayClasses.length > 0 ? 'All classes done for today' : 'No classes scheduled today',
     badgeVariant: 'safe',
     isOngoing: false,
-    isToday: false,
+    isToday: true,
   };
 }
 
