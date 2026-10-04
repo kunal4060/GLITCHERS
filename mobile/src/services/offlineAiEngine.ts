@@ -1,4 +1,5 @@
 import type { Task, Expense, Debt } from '@glitchers/shared';
+import { newUuid } from '../utils/tokenStorage';
 
 const getUserId = () => {
   try {
@@ -193,7 +194,10 @@ export class OfflineAIEngine {
     // 1. Action: Split Expense
     if (text.includes('split') && (/\d+/.test(text) || text.includes('with') || text.includes('half') || text.includes('equally'))) {
       const match = text.match(/(?:(?:rs\.?|₹|inr)\s*)?(\d+(?:\.\d{1,2})?)/i);
-      const totalAmount = match ? parseFloat(match[1]) : 500;
+      const totalAmount = match ? parseFloat(match[1]) : null;
+      if (totalAmount === null) {
+        return { intent: 'question', message: 'Kitne rupaye ka split karna hai? Amount batao.', offlineModelUsed: 'rule' };
+      }
       let person: string | null = null;
       const withMatch = text.match(/with\s+([A-Za-z]+)/i);
       if (withMatch && withMatch[1] && !['the', 'my', 'a', 'an'].includes(withMatch[1].toLowerCase())) {
@@ -210,7 +214,7 @@ export class OfflineAIEngine {
       const myShare = Math.round(totalAmount / 2);
       const activeId = getUserId();
       const newExp: Expense = {
-        id: String(Date.now()),
+        id: newUuid(),
         userId: activeId,
         amount: myShare,
         category: 'FOOD',
@@ -251,7 +255,10 @@ export class OfflineAIEngine {
       text.match(/(?:spent|paid|bought)\s+(?:rs\.?|₹|inr)?\s*\d+/i)
     ) {
       const match = text.match(/(?:(?:rs\.?|₹|inr)\s*)?(\d+(?:\.\d{1,2})?)/i);
-      const amount = match ? parseFloat(match[1]) : 150;
+      const amount = match ? parseFloat(match[1]) : null;
+      if (amount === null) {
+        return { intent: 'question', message: 'Kitne rupaye kharch kiye? Amount batao.', offlineModelUsed: 'rule' };
+      }
       let cat: any = 'FOOD';
       if (text.includes('book') || text.includes('print') || text.includes('stationery') || text.includes('course') || text.includes('pen') || text.includes('xerox')) cat = 'ACADEMICS';
       else if (text.includes('cab') || text.includes('auto') || text.includes('bus') || text.includes('fuel') || text.includes('metro') || text.includes('uber') || text.includes('rapido')) cat = 'TRAVEL';
@@ -263,7 +270,7 @@ export class OfflineAIEngine {
       if (desc.toLowerCase().startsWith('paid')) desc = desc.replace(/^paid\s+/i, '');
 
       const newExp: Expense = {
-        id: String(Date.now()),
+        id: newUuid(),
         userId: getUserId(),
         amount,
         category: cat,
@@ -303,7 +310,7 @@ export class OfflineAIEngine {
       cleanTitle = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
 
       const newTask: Task = {
-        id: String(Date.now()),
+        id: newUuid(),
         userId: getUserId(),
         title: cleanTitle,
         priority,

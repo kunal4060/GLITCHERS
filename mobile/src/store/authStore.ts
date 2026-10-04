@@ -49,7 +49,11 @@ export const useAuthStore = create<AuthState>()(
         set({ user, isAuthenticated: !!user });
       },
       setToken: (token) => {
-        if (token) apiClient.setToken(token);
+        if (token) {
+          apiClient.setToken(token);
+        } else {
+          apiClient.clearToken();
+        }
         set({ token });
       },
       setAuthenticated: (isAuthenticated) => set({ isAuthenticated }),
@@ -89,7 +93,7 @@ export const useAuthStore = create<AuthState>()(
             apiClient.setToken(token);
           }
 
-          const safeEmail = (email || '').trim().toLowerCase() || 'student@university.edu';
+          const safeEmail = (email || '').trim().toLowerCase();
           let safeName = (name || '').trim();
           if (!safeName) {
             const prefix = safeEmail.split('@')[0];

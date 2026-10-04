@@ -102,16 +102,25 @@ function extractDateTime(text: string, now: Date): { date: Date | null; consumed
     const mon = parseInt(m[2], 10) - 1;
     if (dNum >= 1 && dNum <= 31 && mon >= 0 && mon <= 11) {
       const yr = m[3] ? (m[3].length === 2 ? 2000 + parseInt(m[3], 10) : parseInt(m[3], 10)) : now.getFullYear();
-      day = new Date(yr, mon, dNum);
-      if (!m[3] && day.getTime() < startOfDay(now).getTime()) day.setFullYear(day.getFullYear() + 1);
-      eat(m);
+      const candidate = new Date(yr, mon, dNum);
+      // H13: reject impossible dates (31 feb rolls to Mar 3)
+      if (candidate.getDate() !== dNum || candidate.getMonth() !== mon) {
+        day = null; // invalid date, don't set
+      } else {
+        day = candidate;
+        if (!m[3] && day.getTime() < startOfDay(now).getTime()) day.setFullYear(day.getFullYear() + 1);
+        eat(m);
+      }
     }
   }
 
   // --- time ---
   // "5 baje", "5:30 baje", "5pm", "5:30 pm", "17:00"
   if ((m = lower.match(/\b(\d{1,2})(?::(\d{2}))?\s*baje\b/))) {
-    hour = parseInt(m[1], 10); minute = m[2] ? parseInt(m[2], 10) : 0; eat(m);
+    const h = parseInt(m[1], 10); const min = m[2] ? parseInt(m[2], 10) : 0;
+    if (h >= 1 && h <= 12 && min >= 0 && min <= 59) {
+      hour = h; minute = min; eat(m);
+    }
   } else if ((m = lower.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/))) {
     hour = parseInt(m[1], 10); minute = m[2] ? parseInt(m[2], 10) : 0;
     if (m[3] === 'pm' && hour < 12) hour += 12;

@@ -29,10 +29,19 @@ const DAY_INDEX: Record<string, number> = {
 
 /** Next Date when a weekly class occurs (skips occurrences that already passed today). */
 function nextClassOccurrence(day: string, startTime: string, now: Date): Date | null {
-  const targetDay = DAY_INDEX[day];
+  const targetDay = DAY_INDEX[String(day || '').toUpperCase()];
   if (targetDay === undefined) return null;
-  const [hh, mm] = startTime.split(':').map(Number);
-  if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+  let hh: number, mm: number;
+  const ampm = /\b(am|pm)\b/i.exec(startTime);
+  const [hhRaw, mmRaw] = startTime.split(':').map(Number);
+  if (Number.isNaN(hhRaw)) return null;
+  hh = hhRaw; mm = Number.isNaN(mmRaw) ? 0 : mmRaw;
+  if (ampm) {
+    const isPM = ampm[1].toLowerCase() === 'pm';
+    if (hh === 12) hh = isPM ? 12 : 0;
+    else if (isPM) hh += 12;
+  }
+  if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
   const d = new Date(now);
   const delta = (targetDay - d.getDay() + 7) % 7;
   d.setDate(d.getDate() + delta);
