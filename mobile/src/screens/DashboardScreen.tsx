@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Modal,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -39,6 +40,7 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
     expenses,
     budget,
     cgpa,
+    isLoading,
     syncWithBackend,
     setEmailBullets,
     completeTask,
@@ -47,7 +49,21 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
 
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [quickAddVisible, setQuickAddVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const hashRef = useRef('');
+
+  // Pull-to-refresh: re-sync all dashboard data from backend/local updates
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await syncWithBackend();
+      summarize(useDashboardStore.getState().emails.filter(
+        (e) => !e.isDismissed && !useDashboardStore.getState().dismissedNoticeIds.includes(e.id)
+      ));
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const activeEmails = emails.filter((e) => !e.isDismissed && !dismissedNoticeIds.includes(e.id));
   const urgentEmail = activeEmails.find((e) => e.importance === 'CRITICAL' || e.importance === 'HIGH');
@@ -131,7 +147,13 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
   return (
     <View style={styles.root}>
       <SafeAreaView style={styles.root} edges={['top']}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.content}
+          refreshControl={
+            <RefreshControl refreshing={refreshing || isLoading} onRefresh={onRefresh} />
+          }
+        >
           <NiaHeader title="Home" navigation={navigation} />
 
           {/* Status row */}
