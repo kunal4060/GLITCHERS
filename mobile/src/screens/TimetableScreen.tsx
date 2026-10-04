@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  PanResponder,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -51,6 +52,23 @@ export const TimetableScreen = ({ navigation }: { navigation?: any }) => {
     .sort((a, b) => parseTimeToMinutes(a.startTime) - parseTimeToMinutes(b.startTime));
 
   const isToday = selectedDay === DAYS[(new Date().getDay() + 6) % 7];
+
+  // Horizontal swipe on the day's class list moves between days
+  // (swipe left -> next day, swipe right -> previous day, wraps around the week)
+  const goToDay = (dir: 1 | -1) => {
+    const idx = DAYS.indexOf(selectedDay);
+    setSelectedDay(DAYS[(idx + dir + DAYS.length) % DAYS.length]);
+  };
+  const swipeResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_e, g) =>
+        Math.abs(g.dx) > 24 && Math.abs(g.dx) > Math.abs(g.dy) * 1.4,
+      onPanResponderRelease: (_e, g) => {
+        if (g.dx < -60) goToDay(1);
+        else if (g.dx > 60) goToDay(-1);
+      },
+    })
+  ).current;
 
   const resetForm = () => {
     setSubjectName('');
@@ -216,7 +234,8 @@ export const TimetableScreen = ({ navigation }: { navigation?: any }) => {
             </TouchableOpacity>
           </View>
 
-          {/* Timeline */}
+          {/* Timeline — swipe left/right to change day */}
+          <View {...swipeResponder.panHandlers}>
           <View style={styles.timelineHead}>
             <Text style={styles.timelineTitle}>
               {selectedDay === DAYS[(new Date().getDay() + 6) % 7] ? "Today's" : `${selectedDay}'s`} Classes
@@ -311,6 +330,7 @@ export const TimetableScreen = ({ navigation }: { navigation?: any }) => {
             })
           )}
           <View style={{ height: 8 }} />
+          </View>
         </ScrollView>
 
         {/* FAB */}
