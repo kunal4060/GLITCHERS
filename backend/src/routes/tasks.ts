@@ -78,7 +78,10 @@ export const taskRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.delete<{ Params: { id: string } }>('/:id', async (req, reply) => {
     const userId = req.userId!;
     const { id } = req.params;
-    await supabaseStore.deleteTask(userId, id);
+    const ok = await supabaseStore.deleteTask(userId, id);
+    if (!ok) {
+      return reply.status(500).send({ error: 'Delete failed, please try again' });
+    }
     return { success: true };
   });
 

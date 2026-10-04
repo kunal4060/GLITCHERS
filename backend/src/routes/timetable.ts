@@ -139,10 +139,13 @@ export const timetableRoutes: FastifyPluginAsync = async (fastify) => {
     return { conflicts };
   });
 
-  fastify.delete<{ Params: { id: string } }>('/classes/:id', async (req) => {
+  fastify.delete<{ Params: { id: string } }>('/classes/:id', async (req, reply) => {
     const userId = req.userId!;
     const { id } = req.params;
-    await supabaseStore.deleteClass(userId, id);
+    const ok = await supabaseStore.deleteClass(userId, id);
+    if (!ok) {
+      return reply.status(500).send({ error: 'Delete failed, please try again' });
+    }
     return { success: true, id };
   });
 };

@@ -63,7 +63,10 @@ export const expenseRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.delete<{ Params: { id: string } }>('/:id', async (req, reply) => {
     const userId = req.userId!;
     const { id } = req.params;
-    await supabaseStore.deleteExpense(userId, id);
+    const ok = await supabaseStore.deleteExpense(userId, id);
+    if (!ok) {
+      return reply.status(500).send({ error: 'Delete failed, please try again' });
+    }
     return { success: true };
   });
 

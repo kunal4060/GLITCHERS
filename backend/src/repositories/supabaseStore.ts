@@ -348,18 +348,18 @@ export class SupabaseStore {
   }
 
   public async deleteExpense(userId: string, expenseId: string): Promise<boolean> {
-    const list = inMemoryStore.expenses.get(userId) || [];
-    inMemoryStore.expenses.set(userId, list.filter((e) => e.id !== expenseId));
-
     const supabase = getSupabaseClient();
     if (supabase && UUID_REGEX.test(userId)) {
       try {
         await supabase.from('expenses').delete().eq('id', expenseId).eq('user_id', userId);
-        return true;
       } catch (err) {
         console.warn('SupabaseStore.deleteExpense warning:', err);
+        return false;
       }
     }
+    // Only remove from memory AFTER backend confirms (prevents resurrection on next sync)
+    const list = inMemoryStore.expenses.get(userId) || [];
+    inMemoryStore.expenses.set(userId, list.filter((e) => e.id !== expenseId));
     return true;
   }
 
@@ -518,18 +518,18 @@ export class SupabaseStore {
   }
 
   public async deleteTask(userId: string, taskId: string): Promise<boolean> {
-    const list = inMemoryStore.tasks.get(userId) || [];
-    inMemoryStore.tasks.set(userId, list.filter((t) => t.id !== taskId));
-
     const supabase = getSupabaseClient();
     if (supabase && UUID_REGEX.test(userId)) {
       try {
         await supabase.from('tasks').delete().eq('id', taskId).eq('user_id', userId);
-        return true;
       } catch (err) {
         console.warn('SupabaseStore.deleteTask warning:', err);
+        return false;
       }
     }
+    // Only remove from memory AFTER backend confirms (prevents resurrection on next sync)
+    const list = inMemoryStore.tasks.get(userId) || [];
+    inMemoryStore.tasks.set(userId, list.filter((t) => t.id !== taskId));
     return true;
   }
 
@@ -695,18 +695,18 @@ export class SupabaseStore {
   }
 
   public async deleteClass(userId: string, classId: string): Promise<boolean> {
-    const classes = inMemoryStore.classes.get(userId) || [];
-    inMemoryStore.classes.set(userId, classes.filter((c) => c.id !== classId));
-
     const supabase = getSupabaseClient();
     if (supabase && UUID_REGEX.test(userId)) {
       try {
         await supabase.from('classes').delete().eq('id', classId).eq('user_id', userId);
-        return true;
       } catch (err) {
         console.warn('SupabaseStore.deleteClass warning:', err);
+        return false;
       }
     }
+    // Only remove from memory AFTER backend confirms (prevents resurrection on next sync)
+    const classes = inMemoryStore.classes.get(userId) || [];
+    inMemoryStore.classes.set(userId, classes.filter((c) => c.id !== classId));
     return true;
   }
 
