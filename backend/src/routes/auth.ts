@@ -102,9 +102,13 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       // C2 SECURITY: exact origin match (not prefix) to prevent evil.com bypass
       const parsed = new URL(url);
       const allowedOrigins = ['http://localhost:8082', 'http://localhost:19006'];
-      const isExp = parsed.protocol === 'exp:';
-      if (allowedOrigins.includes(parsed.origin) || isExp) {
+      // Allow app deep-link schemes (nexa:// for production app, exp:// for Expo Go)
+      const allowedProtocols = ['nexa:', 'exp:'];
+      if (allowedOrigins.includes(parsed.origin)) {
         return parsed.origin + parsed.pathname;
+      }
+      if (allowedProtocols.includes(parsed.protocol)) {
+        return url.split('?')[0].replace(/\/$/, '');
       }
     } catch { /* fall through */ }
     return fallback;
