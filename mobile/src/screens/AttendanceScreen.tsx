@@ -15,6 +15,16 @@ function pctColor(pct: number): string {
 
 export const AttendanceScreen: React.FC = () => {
   const { classes, attendance, markAttendance, resetAttendance } = useDashboardStore();
+  // H20: 500ms debounce — double-tap Present/Absent must not double-count
+  const lastMarkRef = React.useRef<{ name: string; time: number } | null>(null);
+  const debouncedMark = (name: string, present: boolean) => {
+    const now = Date.now();
+    if (lastMarkRef.current && lastMarkRef.current.name === name && now - lastMarkRef.current.time < 500) {
+      return;
+    }
+    lastMarkRef.current = { name, time: now };
+    markAttendance(name, present);
+  };
 
   // Real subjects come from the user's own timetable — never hardcoded demo data.
   const subjects = React.useMemo(() => {
@@ -77,7 +87,7 @@ export const AttendanceScreen: React.FC = () => {
                 <View style={styles.btnRow}>
                   <TouchableOpacity
                     style={[styles.markBtn, styles.presentBtn]}
-                    onPress={() => markAttendance(s.name, true)}
+                    onPress={() => debouncedMark(s.name, true)}
                     activeOpacity={0.8}
                   >
                     <Ionicons name="checkmark" size={16} color="#FFFFFF" />
@@ -85,7 +95,7 @@ export const AttendanceScreen: React.FC = () => {
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.markBtn, styles.absentBtn]}
-                    onPress={() => markAttendance(s.name, false)}
+                    onPress={() => debouncedMark(s.name, false)}
                     activeOpacity={0.8}
                   >
                     <Ionicons name="close" size={16} color="#FFFFFF" />

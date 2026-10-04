@@ -14,6 +14,7 @@ import { apiClient } from '../api/client';
 import { offlineAiEngine, HUGGINGFACE_OFFLINE_MODELS, type HuggingFaceModelInfo } from '../services/offlineAiEngine';
 import { loadLlamaModel, unloadLlamaModel, isLlamaModelReady, llamaGenerate } from '../services/llamaInference';
 import type { Task, Expense, Debt } from '@glitchers/shared';
+import { newUuid } from '../utils/tokenStorage';
 
 interface ActionCardPayload {
   type: 'EXPENSE' | 'TASK' | 'DEBT' | 'CALENDAR' | 'SCHEDULE';
@@ -77,7 +78,12 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
     if (chatMessages.length === 0) {
       apiClient.getChatHistory().then((res) => {
         if (res?.messages && res.messages.length > 0) {
-          setChatMessages(res.messages as any);
+          // C6: merge instead of replace — keep any rehydrated or in-flight
+          // local messages, dedupe by id (same pattern as dashboardStore sync)
+          const backendMsgs = res.messages as any[];
+          const backendIds = new Set(backendMsgs.map((m) => m.id));
+          const localOnly = useDashboardStore.getState().chatMessages.filter((m) => m.id && !backendIds.has(m.id));
+          setChatMessages([...localOnly, ...backendMsgs]);
         }
       }).catch(() => null);
     }
@@ -94,7 +100,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
   );
 
   // Dynamic contextual prompt chips
-  const lastUserText = messages.filter((m) => m.sender === 'user').slice(-1)[0]?.text.toLowerCase() || '';
+  const lastUserText = messages.filter((m) => m.sender === 'user').slice(-1)[0]?.text?.toLowerCase() ?? '';
   const getContextChips = () => {
     if (lastUserText.includes('spent') || lastUserText.includes('budget') || lastUserText.includes('food')) {
       return [
@@ -128,12 +134,16 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
     ];
   };
 
+  const sendInFlightRef = useRef(false);
   const handleSend = async (customPrompt?: string) => {
+    // C10: ref-based guard — chips bypass the send button's disabled={loading}
+    if (sendInFlightRef.current) return;
     const textToSend = (customPrompt || input).trim();
     if (!textToSend) return;
+    sendInFlightRef.current = true;
 
     const userMessage: ChatMessage = {
-      id: String(Date.now()),
+      id: newUuid(),
       sender: 'user',
       text: textToSend,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -196,7 +206,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
       // Real on-device LLM: if the rule engine couldn't genuinely answer
       // and a GGUF model is actually loaded, generate with llama.rn.
       if (offlineRes.needsLlm && isLlamaModelReady()) {
-        const msgId = String(Date.now() + 1);
+        const msgId = newUuid();
         const modelName = loadedModelFile ? loadedModelFile.name : activeOfflineModel;
         addChatMessage({
           id: msgId,
@@ -219,12 +229,13 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
           });
         }
         setLoading(false);
+        sendInFlightRef.current = false;
         setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
         return;
       }
 
       const assistantMsg: ChatMessage = {
-        id: String(Date.now() + 1),
+        id: newUuid(),
         sender: 'assistant',
         text: offlineRes.message,
         actionCard,
@@ -233,6 +244,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
 
       addChatMessage(assistantMsg);
       setLoading(false);
+      sendInFlightRef.current = false;
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
       return;
     }
@@ -266,7 +278,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
         const expData = resAny.data;
         if (expData) {
           const newExp: Expense = {
-            id: expData.id || String(Date.now()),
+            id: expData.id || newUuid(),
             userId: currentUserId,
             amount: Number(expData.amount) || 100,
             category: expData.category || 'FOOD',
@@ -291,7 +303,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
         const taskData = resAny.data;
         if (taskData) {
           const newTask: Task = {
-            id: taskData.id || String(Date.now()),
+            id: taskData.id || newUuid(),
             userId: currentUserId,
             title: taskData.title || textToSend,
             priority: taskData.priority || 'NORMAL',
@@ -330,7 +342,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
         const debtData = resAny.data;
         if (debtData) {
           const newDebt: Debt = {
-            id: debtData.id || String(Date.now()),
+            id: debtData.id || newUuid(),
             userId: currentUserId,
             person: debtData.person,
             type: debtData.type,
@@ -393,7 +405,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
           if (!desc) desc = cat === 'FOOD' ? 'Dining' : 'Expense';
 
           const newExp: Expense = {
-            id: String(Date.now()),
+            id: newUuid(),
             userId: currentUserId,
             amount: amt,
             category: cat,
@@ -423,7 +435,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
             .trim();
 
           const newTask: Task = {
-            id: String(Date.now()),
+            id: newUuid(),
             userId: currentUserId,
             title: cleanTitle ? cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1) : 'Academic Task',
             priority:
@@ -449,7 +461,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
       }
 
       const assistantMsg: ChatMessage = {
-        id: String(Date.now() + 1),
+        id: newUuid(),
         sender: 'assistant',
         text: response.message,
         actionCard,
@@ -508,7 +520,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
       }
 
       addChatMessage({
-        id: String(Date.now() + 1),
+        id: newUuid(),
         sender: 'assistant',
         text: `${offlineRes.message}\n\n*(Cloud unavailable • Processed by offline ${offlineRes.offlineModelUsed} model. Data saved on phone and will push to dataset when online.)*`,
         actionCard,
@@ -516,6 +528,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
       });
     } finally {
       setLoading(false);
+      sendInFlightRef.current = false;
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
     }
   };
@@ -539,7 +552,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
         setInput('');
 
         const userMsg: ChatMessage = {
-          id: String(Date.now()),
+          id: newUuid(),
           sender: 'user',
           text: userPrompt ? `📷 ${userPrompt}` : '📷 [Uploaded Photo for Analysis]',
           imageUri: photo.uri,
@@ -552,7 +565,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
         if (aiMode === 'OFFLINE') {
           const modelName = loadedModelFile ? loadedModelFile.name : (activeOfflineModel || 'On-Device Model');
           const offlineMsg: ChatMessage = {
-            id: String(Date.now() + 1),
+            id: newUuid(),
             sender: 'assistant',
             text: `### 📷 Image Analyzed Locally (Offline Mode)\n\n` +
               `Received image (**${photo.fileName || 'photo.jpg'}**, ${photo.width || 800}×${photo.height || 600}px).\n\n` +
@@ -572,7 +585,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
           const visionRes = await apiClient.analyzeImage(photo.base64, photo.mimeType || 'image/jpeg', userPrompt);
           if (visionRes && visionRes.message) {
             const assistantMsg: ChatMessage = {
-              id: String(Date.now() + 1),
+              id: newUuid(),
               sender: 'assistant',
               text: visionRes.message,
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -588,7 +601,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
             addChatMessage(assistantMsg);
           } else {
             const fallbackMsg: ChatMessage = {
-              id: String(Date.now() + 1),
+              id: newUuid(),
               sender: 'assistant',
               text: '### 📷 Image Analyzed\n\nI processed your photo. For best results with handwritten notes or formulas, ensure the image is clear and well-lit.',
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -597,7 +610,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
           }
         } catch {
           const errorMsg: ChatMessage = {
-            id: String(Date.now() + 1),
+            id: newUuid(),
             sender: 'assistant',
             text: 'I could not analyze this photo right now. Please check your network connection or try uploading a clearer image.',
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -952,6 +965,9 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
                       style={styles.unloadBtn}
                       onPress={() => {
                         setLoadedModelFile(null);
+                        // C9: reset to AUTO so the app doesn't stay stuck in OFFLINE with no engine
+                        setAiMode('AUTO');
+                        setActiveOfflineModel(null);
                         unloadLlamaModel().catch(() => null);
                         Alert.alert('Model Unloaded', 'On-device model has been released from memory.');
                       }}

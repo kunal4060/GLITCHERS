@@ -261,7 +261,7 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
               <View style={styles.nextCodeRow}>
                 {nextClass ? (
                   <>
-                    <Text style={styles.nextCode}>{nextClass.subjectName.split(' ')[0].toUpperCase().slice(0, 8)}</Text>
+                    <Text style={styles.nextCode}>{(nextClass.subjectName?.split(' ')[0] || '').toUpperCase().slice(0, 8)}</Text>
                     <View style={styles.nextDot} />
                     <Text style={styles.nextWhen}>
                       {nextInfo.isOngoing ? 'NOW' : (nextInfo.statusLabel || '').toUpperCase()}

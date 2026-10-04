@@ -69,6 +69,7 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
   const [formAmount, setFormAmount] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [formCat, setFormCat] = useState<string>('FOOD');
+  const [submitting, setSubmitting] = useState(false);
 
   const totalSpent = expenses.reduce((s, e) => s + Number(e.amount), 0);
   // M25: no phantom default — a fresh user who never set a budget sees an explicit empty state.
@@ -152,7 +153,8 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
   };
 
   const confirmQuickAdd = () => {
-    if (!preview) return;
+    if (!preview || submitting) return;
+    setSubmitting(true);
     addExpense({
       id: newUuid(),
       userId: useAuthStore.getState().user?.id || 'offline-user',
@@ -165,14 +167,17 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
     setPreview(null);
     setQuickInput('');
     Alert.alert('Recorded', `${inr(preview.amount)} logged under ${preview.category}.`);
+    setSubmitting(false);
   };
 
   const submitManualAdd = () => {
+    if (submitting) return;
     const amt = parseFloat(formAmount);
     if (!amt || amt <= 0) {
       Alert.alert('Invalid amount', 'Enter a valid amount.');
       return;
     }
+    setSubmitting(true);
     addExpense({
       id: newUuid(),
       userId: useAuthStore.getState().user?.id || 'offline-user',
@@ -187,20 +192,24 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
     setFormCat('FOOD');
     setAddVisible(false);
     Alert.alert('Recorded', `${inr(amt)} logged under ${formCat}.`);
+    setSubmitting(false);
   };
 
   const submitSplit = () => {
+    if (submitting) return;
     const amt = parseFloat(splitAmount);
     if (!amt || amt <= 0 || !splitPerson.trim()) {
       Alert.alert('Missing info', 'Enter a valid amount and the friend’s name.');
       return;
     }
+    setSubmitting(true);
     splitExpense(amt, splitDesc.trim() || 'Shared bill', splitPerson.trim());
     setSplitAmount('');
     setSplitPerson('');
     setSplitDesc('');
     setSplitVisible(false);
     Alert.alert('Bill split', `Split ${inr(amt)} — ${splitPerson.trim()} owes ${inr(splitShare(amt))}.`);
+    setSubmitting(false);
   };
 
   const handleSetBudget = () => {
@@ -317,7 +326,7 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
                 </Text>
                 <Text style={styles.previewCat}>{preview.category}</Text>
               </View>
-              <TouchableOpacity style={styles.previewYes} onPress={confirmQuickAdd} activeOpacity={0.8}>
+              <TouchableOpacity style={styles.previewYes} onPress={confirmQuickAdd} activeOpacity={0.8} disabled={submitting}>
                 <Text style={styles.previewYesText}>Add</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setPreview(null)} activeOpacity={0.7}>
@@ -469,7 +478,7 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
                   </TouchableOpacity>
                 ))}
               </View>
-              <TouchableOpacity style={styles.saveBtn} onPress={submitManualAdd} activeOpacity={0.85}>
+              <TouchableOpacity style={[styles.saveBtn, submitting && { opacity: 0.5 }]} onPress={submitManualAdd} activeOpacity={0.85} disabled={submitting}>
                 <Text style={styles.saveBtnText}>Add Expense</Text>
               </TouchableOpacity>
             </View>
@@ -501,7 +510,7 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
               <TextInput style={styles.input} placeholder="e.g. Rahul" placeholderTextColor={C.textSubtle} value={splitPerson} onChangeText={setSplitPerson} />
               <Text style={styles.fieldLabel}>Note</Text>
               <TextInput style={styles.input} placeholder="e.g. Pizza night" placeholderTextColor={C.textSubtle} value={splitDesc} onChangeText={setSplitDesc} />
-              <TouchableOpacity style={styles.saveBtn} onPress={submitSplit} activeOpacity={0.85}>
+              <TouchableOpacity style={[styles.saveBtn, submitting && { opacity: 0.5 }]} onPress={submitSplit} activeOpacity={0.85} disabled={submitting}>
                 <Text style={styles.saveBtnText}>Split Evenly</Text>
               </TouchableOpacity>
             </View>

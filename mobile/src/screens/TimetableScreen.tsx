@@ -55,17 +55,19 @@ export const TimetableScreen = ({ navigation }: { navigation?: any }) => {
 
   // Horizontal swipe on the day's class list moves between days
   // (swipe left -> next day, swipe right -> previous day, wraps around the week)
+  const goToDayRef = useRef<(dir: 1 | -1) => void>(() => {});
   const goToDay = (dir: 1 | -1) => {
-    const idx = DAYS.indexOf(selectedDay);
-    setSelectedDay(DAYS[(idx + dir + DAYS.length) % DAYS.length]);
+    // Functional update avoids the PanResponder stale closure
+    setSelectedDay((prev) => DAYS[(DAYS.indexOf(prev) + dir + DAYS.length) % DAYS.length]);
   };
+  goToDayRef.current = goToDay;
   const swipeResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_e, g) =>
         Math.abs(g.dx) > 24 && Math.abs(g.dx) > Math.abs(g.dy) * 1.4,
       onPanResponderRelease: (_e, g) => {
-        if (g.dx < -60) goToDay(1);
-        else if (g.dx > 60) goToDay(-1);
+        if (g.dx < -60) goToDayRef.current(1);
+        else if (g.dx > 60) goToDayRef.current(-1);
       },
     })
   ).current;
@@ -91,7 +93,9 @@ export const TimetableScreen = ({ navigation }: { navigation?: any }) => {
     setAddVisible(true);
   };
 
+  const savingRef = useRef(false);
   const saveClass = () => {
+    if (savingRef.current) return;
     if (!subjectName.trim()) {
       Alert.alert('Missing subject', 'Please enter a subject name.');
       return;
@@ -111,6 +115,7 @@ export const TimetableScreen = ({ navigation }: { navigation?: any }) => {
       Alert.alert('Invalid time', 'End time must be after start time.');
       return;
     }
+    savingRef.current = true;
     if (editingClass) {
       updateClass(editingClass.id, { subjectName, faculty, room, day, startTime, endTime });
       Alert.alert('Updated', 'Class updated.');
@@ -120,6 +125,7 @@ export const TimetableScreen = ({ navigation }: { navigation?: any }) => {
     }
     resetForm();
     setAddVisible(false);
+    setTimeout(() => { savingRef.current = false; }, 500);
   };
 
   const confirmDelete = (c: any) => {

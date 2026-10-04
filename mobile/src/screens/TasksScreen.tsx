@@ -94,7 +94,9 @@ export const TasksScreen = ({ navigation }: { navigation?: any }) => {
     setPriority('NORMAL');
   };
 
+  const savingRef = React.useRef(false);
   const saveTask = () => {
+    if (savingRef.current) return;
     if (!title.trim()) {
       Alert.alert('Missing title', 'Give the task a name.');
       return;
@@ -114,6 +116,7 @@ export const TasksScreen = ({ navigation }: { navigation?: any }) => {
       dueDate: dueIso,
       priority,
     };
+    savingRef.current = true;
     if (editing) {
       updateTask(editing.id, payload);
       Alert.alert('Updated', 'Task updated.');
@@ -123,6 +126,8 @@ export const TasksScreen = ({ navigation }: { navigation?: any }) => {
     }
     resetForm();
     setAddVisible(false);
+    // Reset after alert dismisses (next tick)
+    setTimeout(() => { savingRef.current = false; }, 500);
   };
 
   const confirmDelete = (t: any) => {
@@ -262,7 +267,6 @@ export const TasksScreen = ({ navigation }: { navigation?: any }) => {
               </Text>
             </NiaCard>
           ) : (
-            filter !== 'All' &&
             filtered.map((t) => {
               const pill = pillFor(t);
               const due = formatDue(t.dueDate);

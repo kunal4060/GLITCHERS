@@ -9,6 +9,7 @@ import { GradientBackground } from '../components/common/GradientBackground';
 import { useDashboardStore } from '../store/dashboardStore';
 import { useAuthStore } from '../store/authStore';
 import type { Task } from '@glitchers/shared';
+import { newUuid } from '../utils/tokenStorage';
 
 export const EmailScreen: React.FC = () => {
   const { emails, addTask, dismissedNoticeIds, dismissNotice, restoreNotice } = useDashboardStore();
@@ -30,9 +31,9 @@ export const EmailScreen: React.FC = () => {
 
   const handleCreateTaskFromEmail = (subject: string, summary: string) => {
     const newTask: Task = {
-      id: String(Date.now()),
+      id: newUuid(),
       userId: useAuthStore.getState().user?.id || 'offline-user',
-      title: `Action: ${subject.replace(/🔴|⚠️|📢/g, '').trim()}`,
+      title: `Action: ${(subject || 'Untitled notice').replace(/🔴|⚠️|📢/g, '').trim()}`,
       description: summary,
       priority: 'HIGH',
       status: 'TODO',

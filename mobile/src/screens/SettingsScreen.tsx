@@ -31,6 +31,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
     syncWithBackend,
     quietHours,
     setQuietHours,
+    queueOfflineAction,
   } = useDashboardStore();
 
   const [semester, setSemester] = useState('SEMESTER 5');
@@ -121,12 +122,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
       }
       const formatted = num.toFixed(2);
       setCgpa(formatted);
-      // Persist to backend so the next sync doesn't revert it
-      try {
-        await apiClient.updateProfile({ cgpa: formatted });
-      } catch {
-        /* offline: local value stays, will sync later */
-      }
+      // C5: queue profile update — survives offline and won't be reverted by next sync
+      queueOfflineAction({ type: 'UPDATE_PROFILE', payload: { cgpa: formatted } });
     } else {
       const num = parseInt(val, 10);
       if (isNaN(num) || num < 0 || num > 300) {
@@ -134,12 +131,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
         return;
       }
       setCredits(num);
-      // Persist to backend so the next sync doesn't revert it
-      try {
-        await apiClient.updateProfile({ creditsCompleted: num });
-      } catch {
-        /* offline: local value stays, will sync later */
-      }
+      // C5: queue profile update — survives offline and won't be reverted by next sync
+      queueOfflineAction({ type: 'UPDATE_PROFILE', payload: { creditsCompleted: num } });
     }
     setModalVisible(false);
   };

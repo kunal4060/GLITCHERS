@@ -120,14 +120,14 @@ interface DashboardState {
 
   offlineSyncQueue: Array<{
     id: string;
-    type: 'CREATE_EXPENSE' | 'CREATE_TASK' | 'SPLIT_EXPENSE' | 'CREATE_DEBT' | 'DELETE_TASK' | 'DELETE_EXPENSE' | 'DELETE_CLASS' | 'PAY_DEBT';
+    type: 'CREATE_EXPENSE' | 'CREATE_TASK' | 'SPLIT_EXPENSE' | 'CREATE_DEBT' | 'DELETE_TASK' | 'DELETE_EXPENSE' | 'DELETE_CLASS' | 'PAY_DEBT' | 'UPDATE_PROFILE';
     payload: any;
     timestamp: string;
     synced: boolean;
   }>;
   isOnline: boolean;
   setIsOnline: (online: boolean) => void;
-  queueOfflineAction: (action: { type: 'CREATE_EXPENSE' | 'CREATE_TASK' | 'SPLIT_EXPENSE' | 'CREATE_DEBT' | 'DELETE_TASK' | 'DELETE_EXPENSE' | 'DELETE_CLASS' | 'PAY_DEBT'; payload: any }) => void;
+  queueOfflineAction: (action: { type: 'CREATE_EXPENSE' | 'CREATE_TASK' | 'SPLIT_EXPENSE' | 'CREATE_DEBT' | 'DELETE_TASK' | 'DELETE_EXPENSE' | 'DELETE_CLASS' | 'PAY_DEBT' | 'UPDATE_PROFILE'; payload: any }) => void;
   flushOfflineQueue: () => Promise<{ syncedCount: number }>;
 
   syncWithBackend: () => Promise<void>;
@@ -284,6 +284,8 @@ export const useDashboardStore = create<DashboardState>()(
                 await apiClient.deleteClass(item.payload.id);
               } else if (item.type === 'PAY_DEBT') {
                 await apiClient.payDebt(item.payload.id);
+              } else if (item.type === 'UPDATE_PROFILE') {
+                await apiClient.updateProfile(item.payload);
               }
               succeeded.add(item.id);
             } catch (err) {
