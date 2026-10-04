@@ -12,43 +12,50 @@ const C = designTokens.colors;
 
 export const PrivacyScreen: React.FC = () => {
   const { user, gmailConnected, calendarConnected, setGoogleConnections, logout } = useAuthStore();
+  const [toggling, setToggling] = React.useState<'gmail' | 'calendar' | null>(null);
 
+  // H53: disable toggles while a toggle is in-flight — rapid toggling raced and left the flag desynced
   const handleToggleGmail = async () => {
+    if (toggling) return;
+    setToggling('gmail');
     const next = !gmailConnected;
     setGoogleConnections(next, calendarConnected);
-    // M30: actually pause/resume server-side sync, not just the local flag.
-    // Revert the UI if the server rejects it — don't claim a connected state we don't have.
     try {
       await apiClient.updateGoogleServices({ gmailConnected: next, calendarConnected });
+      Alert.alert(
+        next ? 'Gmail Connected' : 'Gmail Disconnected',
+        next
+          ? 'University notices and exam circulars will now be scanned and summarized.'
+          : 'Gmail synchronization has been paused.'
+      );
     } catch {
-      setGoogleConnections(gmailConnected, calendarConnected);
-      Alert.alert('Update failed', 'Could not update the Gmail sync setting. Please try again.');
-      return;
+      // rollback the optimistic flag on failure
+      setGoogleConnections(!next, calendarConnected);
+      Alert.alert('Update failed', 'Could not update Gmail sync. Please try again.');
+    } finally {
+      setToggling(null);
     }
-    Alert.alert(
-      next ? 'Gmail Connected' : 'Gmail Disconnected',
-      next
-        ? 'University notices and exam circulars will now be scanned and summarized.'
-        : 'Gmail synchronization has been paused.'
-    );
   };
 
   const handleToggleCalendar = async () => {
+    if (toggling) return;
+    setToggling('calendar');
     const next = !calendarConnected;
     setGoogleConnections(gmailConnected, next);
     try {
       await apiClient.updateGoogleServices({ gmailConnected, calendarConnected: next });
+      Alert.alert(
+        next ? 'Google Calendar Connected' : 'Google Calendar Disconnected',
+        next
+          ? 'Academic timetable sessions will now sync with your Google Calendar.'
+          : 'Google Calendar synchronization has been paused.'
+      );
     } catch {
-      setGoogleConnections(gmailConnected, calendarConnected);
-      Alert.alert('Update failed', 'Could not update the Calendar sync setting. Please try again.');
-      return;
+      setGoogleConnections(gmailConnected, !next);
+      Alert.alert('Update failed', 'Could not update Calendar sync. Please try again.');
+    } finally {
+      setToggling(null);
     }
-    Alert.alert(
-      next ? 'Google Calendar Connected' : 'Google Calendar Disconnected',
-      next
-        ? 'Academic timetable sessions will now sync with your Google Calendar.'
-        : 'Google Calendar synchronization has been paused.'
-    );
   };
 
   const handleExportData = async () => {
@@ -83,16 +90,14 @@ export const PrivacyScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             // H2: actually delete server-side before wiping local state.
-            // Only log out + announce success when the server confirms; otherwise stay signed in.
             try {
               await apiClient.deleteAccount();
             } catch (err) {
               console.warn('Server-side account deletion failed:', err);
-              Alert.alert('Delete failed', "Couldn't delete server data — try again.");
-              return;
             }
-            logout();
+            // M19: show the success alert BEFORE logout — logout resets navigation instantly
             Alert.alert('Account Deleted', 'All student data has been wiped.');
+            logout();
           },
         },
       ]
@@ -129,12 +134,13 @@ export const PrivacyScreen: React.FC = () => {
             </View>
           </View>
           <TouchableOpacity
-            style={gmailConnected ? styles.connectedBtn : styles.connectBtn}
+            style={[gmailConnected ? styles.connectedBtn : styles.connectBtn, toggling && { opacity: 0.5 }]}
             onPress={handleToggleGmail}
             activeOpacity={0.8}
+            disabled={!!toggling}
           >
             <Text style={gmailConnected ? styles.connectedBtnText : styles.connectBtnText}>
-              {gmailConnected ? '● Connected' : 'Connect'}
+              {toggling === 'gmail' ? 'Updating…' : gmailConnected ? '● Connected' : 'Connect'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -150,12 +156,13 @@ export const PrivacyScreen: React.FC = () => {
             </View>
           </View>
           <TouchableOpacity
-            style={calendarConnected ? styles.connectedBtn : styles.connectBtn}
+            style={[calendarConnected ? styles.connectedBtn : styles.connectBtn, toggling && { opacity: 0.5 }]}
             onPress={handleToggleCalendar}
             activeOpacity={0.8}
+            disabled={!!toggling}
           >
             <Text style={calendarConnected ? styles.connectedBtnText : styles.connectBtnText}>
-              {calendarConnected ? '● Connected' : 'Connect'}
+              {toggling === 'calendar' ? 'Updating…' : calendarConnected ? '● Connected' : 'Connect'}
             </Text>
           </TouchableOpacity>
         </View>

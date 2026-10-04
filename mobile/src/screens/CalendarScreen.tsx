@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { designTokens } from '../theme/designTokens';
 import { GradientBackground } from '../components/common/GradientBackground';
@@ -36,7 +36,7 @@ export const CalendarScreen: React.FC = () => {
       time: `${c.day} • ${c.startTime} - ${c.endTime}`,
       location: c.room ? `Room ${c.room}` : 'Room TBA',
       type: 'CLASS' as const,
-      day: c.day.toUpperCase(),
+      day: (c.day || '').toUpperCase(),
       dueDate: null as string | null,
     })),
     ...tasks.map((t) => ({
@@ -53,14 +53,7 @@ export const CalendarScreen: React.FC = () => {
   const filteredEvents = events.filter((ev) => {
     if (filter === 'TODAY') {
       if (ev.type === 'CLASS') return ev.day === todayDay;
-      if (ev.type === 'TASK') {
-        if (!ev.dueDate) return false;
-        // Compare in local calendar terms: slicing an ISO string reads the UTC date,
-        // which drifts a day near midnight IST.
-        const d = new Date(ev.dueDate);
-        const localStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        return localStr === todayDateStr;
-      }
+      if (ev.type === 'TASK') return ev.dueDate ? ev.dueDate.slice(0, 10) === todayDateStr : false;
     }
     if (filter === 'WEEK') {
       if (ev.type === 'CLASS') return true;
@@ -81,17 +74,23 @@ export const CalendarScreen: React.FC = () => {
     return true;
   });
 
+  // H14: in-flight guard + spinner — double-tap Sync created duplicate Google Calendar events
+  const [syncing, setSyncing] = useState(false);
   const handleSyncGoogleCalendar = async () => {
-    // Honest sync: wait for the real result before telling the user anything.
+    if (syncing) return;
+    // L10: don't claim a sync that never happened — require a real connection, then request it.
     if (!calendarConnected) {
       Alert.alert('Google Calendar not connected', 'Connect Google Calendar from the Privacy screen first.');
       return;
     }
+    setSyncing(true);
     try {
       await apiClient.syncTimetableToCalendar();
-      Alert.alert('Synced', 'Your classes and deadlines were pushed to Google Calendar.');
-    } catch (err: any) {
-      Alert.alert('Sync failed', err?.message || 'Could not reach the server. Try again later.');
+      Alert.alert('Sync requested', 'Your classes and deadlines are being pushed to Google Calendar.');
+    } catch {
+      Alert.alert('Sync failed', 'Could not sync with Google Calendar. Try again.');
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -106,9 +105,13 @@ export const CalendarScreen: React.FC = () => {
               {calendarConnected ? 'Google Calendar Connected' : 'Google Calendar not connected'}
             </Text>
           </View>
-          <TouchableOpacity style={styles.syncBtn} onPress={handleSyncGoogleCalendar} activeOpacity={0.82}>
-            <Ionicons name="sync-outline" size={13} color={designTokens.colors.primaryDeep} />
-            <Text style={styles.syncBtnText}>Sync</Text>
+          <TouchableOpacity style={[styles.syncBtn, syncing && { opacity: 0.6 }]} onPress={handleSyncGoogleCalendar} activeOpacity={0.82} disabled={syncing}>
+            {syncing ? (
+              <ActivityIndicator size="small" color={designTokens.colors.primaryDeep} />
+            ) : (
+              <Ionicons name="sync-outline" size={13} color={designTokens.colors.primaryDeep} />
+            )}
+            <Text style={styles.syncBtnText}>{syncing ? 'Syncing…' : 'Sync'}</Text>
           </TouchableOpacity>
         </View>
 

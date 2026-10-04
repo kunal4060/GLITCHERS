@@ -185,7 +185,12 @@ export class OfflineAIEngine {
     const yesterdayDateStr = toLocalDateStr(yesterdayLocal);
     const todayDateStr = toLocalDateStr(now);
 
-    const totalSpent = context.expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+    // M10: guard NaN amounts so one bad record can't poison every total.
+    const num = (v: unknown): number => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : 0;
+    };
+    const totalSpent = context.expenses.reduce((sum, e) => sum + num(e.amount), 0);
     const monthlyLimit = context.budget?.monthlyLimit || 10000;
     const remaining = monthlyLimit - totalSpent;
     const daysLeft = Math.max(1, 30 - now.getDate() + 1);
@@ -298,7 +303,8 @@ export class OfflineAIEngine {
       !text.includes('what') && !text.includes('show') && !text.includes('conclude')
     ) {
       let priority: 'LOW' | 'NORMAL' | 'HIGH' | 'EXTREMELY_IMPORTANT' = 'NORMAL';
-      if (text.includes('urgent') || text.includes('exam') || text.includes('important') || text.includes('tomorrow') || text.includes('asap')) {
+      // H11: due-date words like "tomorrow" must not set priority.
+      if (text.includes('urgent') || text.includes('exam') || text.includes('important') || text.includes('asap')) {
         priority = 'HIGH';
       }
       let cleanTitle = userMessage
@@ -309,13 +315,22 @@ export class OfflineAIEngine {
         .replace(/^todo\s+/i, '');
       cleanTitle = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
 
+      // H10: parse relative dates ("next week", "in 2 hours") instead of
+      // hardcoding tomorrow.
+      let parsedDue: string | null = null;
+      try {
+        const { parseTaskIntent } = require('./taskIntentParser');
+        parsedDue = parseTaskIntent(userMessage, now)?.dueDate || null;
+      } catch {
+        /* fall back to tomorrow */
+      }
       const newTask: Task = {
         id: newUuid(),
         userId: getUserId(),
         title: cleanTitle,
         priority,
         status: 'TODO',
-        dueDate: new Date(Date.now() + 86400000).toISOString(),
+        dueDate: parsedDue || new Date(Date.now() + 86400000).toISOString(),
       };
 
       return {
@@ -345,7 +360,9 @@ export class OfflineAIEngine {
 
     // 5. Synthesize in-app data
     if (text.includes('conclude') || text.includes('summarize my app') || text.includes('overall status')) {
-      const todayClasses = context.classes.filter((c) => c.day === currentDay && !c.isCancelled);
+      const todayClasses = context.classes.filter(
+        (c) => String(c.day || '').toUpperCase() === currentDay && !c.isCancelled
+      );
       const pendingTasks = context.tasks.filter((t) => t.status !== 'COMPLETED');
       const urgentTasks = pendingTasks.filter((t) => t.priority === 'HIGH' || t.priority === 'EXTREMELY_IMPORTANT');
 
@@ -370,7 +387,7 @@ export class OfflineAIEngine {
     // 6. Yesterday expenses
     if (text.includes('yesterday') && (text.includes('expense') || text.includes('spent') || text.includes('amount') || text.includes('cost'))) {
       const yExpenses = context.expenses.filter((e) => (e.date?.slice(0, 10) || 'unknown date') === yesterdayDateStr);
-      const sum = yExpenses.reduce((s, e) => s + Number(e.amount), 0);
+      const sum = yExpenses.reduce((s, e) => s + num(e.amount), 0);
       let reply = `### 💳 Yesterday's Expenses\n\n`;
       if (yExpenses.length === 0) {
         reply += `You did not record any expenses yesterday (${yesterdayDateStr}). Great job saving money! 🎉`;
@@ -387,7 +404,9 @@ export class OfflineAIEngine {
 
     // 7. Classes / Timetable query
     if (text.includes('class') || text.includes('classes') || text.includes('schedule') || text.includes('timetable')) {
-      const todayClasses = context.classes.filter((c) => c.day === currentDay && !c.isCancelled);
+      const todayClasses = context.classes.filter(
+        (c) => String(c.day || '').toUpperCase() === currentDay && !c.isCancelled
+      );
       let reply = '';
       if (todayClasses.length === 0) {
         reply = `### 📅 Classes for Today (${currentDay}):\n\nNo classes scheduled today! Enjoy your free time or use it to work on pending assignments.`;
@@ -917,6 +936,16 @@ export class OfflineAIEngine {
       const b = bStr === '' || bStr === '+' ? 1 : bStr === '-' ? -1 : parseFloat(bStr);
       const c = parseFloat(quadMatch[3].replace(/\s+/g, ''));
 
+      // M11: a=0 means it's not quadratic — solve as linear bx + c = 0.
+      if (a === 0) {
+        if (b === 0) {
+          return `### 📐 Equation Check\n\n**${c} = 0** — ` +
+            (c === 0 ? 'this is true for every x (infinite solutions).' : 'this has no solution.');
+        }
+        const x = -c / b;
+        return `### 📐 Linear Equation (a = 0)\n\n**${b}x ${c >= 0 ? '+' : '-'} ${Math.abs(c)} = 0**\n\n**Final Answer**: **x = ${Math.round(x * 1000) / 1000}**`;
+      }
+
       const discriminant = b * b - 4 * a * c;
       let rootsExplanation = '';
 
@@ -955,6 +984,11 @@ export class OfflineAIEngine {
       const b = parseFloat(linearMatch[2].replace(/\s+/g, ''));
       const c = parseFloat(linearMatch[3].replace(/\s+/g, ''));
       const rhs = c - b;
+      // M11: a=0 — no division by zero.
+      if (a === 0) {
+        return `### 📐 Equation Check\n\n**${rhs} = 0** — ` +
+          (rhs === 0 ? 'true for every x (infinite solutions).' : 'no solution (0x can never equal ' + rhs + ').');
+      }
       const x = rhs / a;
 
       return `### 📐 Step-by-Step Math Solution\n\n` +

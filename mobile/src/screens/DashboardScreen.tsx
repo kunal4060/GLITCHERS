@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Modal,
   ActivityIndicator,
-  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -40,7 +39,6 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
     expenses,
     budget,
     cgpa,
-    isLoading,
     syncWithBackend,
     setEmailBullets,
     completeTask,
@@ -49,21 +47,7 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
 
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [quickAddVisible, setQuickAddVisible] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const hashRef = useRef('');
-
-  // Pull-to-refresh: re-sync all dashboard data from backend/local updates
-  const onRefresh = async () => {
-    setRefreshing(true);
-    try {
-      await syncWithBackend();
-      summarize(useDashboardStore.getState().emails.filter(
-        (e) => !e.isDismissed && !useDashboardStore.getState().dismissedNoticeIds.includes(e.id)
-      ));
-    } finally {
-      setRefreshing(false);
-    }
-  };
 
   const activeEmails = emails.filter((e) => !e.isDismissed && !dismissedNoticeIds.includes(e.id));
   const urgentEmail = activeEmails.find((e) => e.importance === 'CRITICAL' || e.importance === 'HIGH');
@@ -115,22 +99,20 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
   };
 
   useEffect(() => {
-    syncWithBackend()
-      .then(() => summarize(useDashboardStore.getState().emails.filter(
-        (e) => !e.isDismissed && !useDashboardStore.getState().dismissedNoticeIds.includes(e.id)
-      )))
-      .catch((e) => console.warn('[DashboardScreen] initial sync failed:', e?.message));
+    syncWithBackend().then(() => summarize(useDashboardStore.getState().emails.filter(
+      (e) => !e.isDismissed && !useDashboardStore.getState().dismissedNoticeIds.includes(e.id)
+    )));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const emailHash = activeEmails.map((e) => e.id).sort().join(',');
   useEffect(() => {
-    if (emailHash !== hashRef.current) {
-      hashRef.current = emailHash;
+    const h = activeEmails.map((e) => e.id).sort().join(',');
+    if (h !== hashRef.current) {
+      hashRef.current = h;
       summarize(activeEmails);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emailHash]);
+  }, [activeEmails.length]);
 
   const onTrack = urgentTasks.length === 0;
   const topTasks = [...pendingTasks]
@@ -149,20 +131,14 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
   return (
     <View style={styles.root}>
       <SafeAreaView style={styles.root} edges={['top']}>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.content}
-          refreshControl={
-            <RefreshControl refreshing={refreshing || isLoading} onRefresh={onRefresh} />
-          }
-        >
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
           <NiaHeader title="Home" navigation={navigation} />
 
           {/* Status row */}
           <View style={styles.statusRow}>
             <View style={styles.statusLeft}>
               <StatusPill label={onTrack ? 'On Track' : 'Action Needed'} tone={onTrack ? 'success' : 'danger'} />
-              <Text style={styles.gpaText}>CGPA {cgpa || '—'}</Text>
+              <Text style={styles.gpaText}>GPA {cgpa || '—'}</Text>
             </View>
             <View style={styles.statusRight}>
               <View style={styles.dayRow}>
@@ -185,32 +161,28 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
 
           {/* Stat cards */}
           <View style={styles.statRow}>
-            <TouchableOpacity style={styles.statCardTouch} onPress={() => navigation?.navigate('Timetable')} activeOpacity={0.85}>
-              <NiaCard style={styles.statCardInner}>
-                <View style={styles.statTop}>
-                  <LabelCaps>Classes</LabelCaps>
-                  <Ionicons name="checkmark-circle" size={16} color={C.eucalyptus} />
-                </View>
-                <Text style={styles.statNum}>{doneClasses.length} Done</Text>
-                <Text style={[styles.statSub, { color: C.eucalyptus }]}>
-                  {todayClasses.length - doneClasses.length > 0
-                    ? `${todayClasses.length - doneClasses.length} upcoming today`
-                    : 'Complete today'}
-                </Text>
-              </NiaCard>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.statCardTouch} onPress={() => navigation?.navigate('Tasks')} activeOpacity={0.85}>
-              <NiaCard style={styles.statCardInner}>
-                <View style={styles.statTop}>
-                  <LabelCaps>Tasks</LabelCaps>
-                  {urgentTasks.length > 0 && <View style={styles.dot} />}
-                </View>
-                <Text style={styles.statNum}>{pendingTasks.length} Due</Text>
-                <Text style={[styles.statSub, urgentTasks.length > 0 && { color: C.terracotta }]}>
-                  {urgentTasks.length > 0 ? `${urgentTasks.length} urgent today` : 'All clear'}
-                </Text>
-              </NiaCard>
-            </TouchableOpacity>
+            <NiaCard style={styles.statCard}>
+              <View style={styles.statTop}>
+                <LabelCaps>Classes</LabelCaps>
+                <Ionicons name="checkmark-circle" size={16} color={C.eucalyptus} />
+              </View>
+              <Text style={styles.statNum}>{doneClasses.length} Done</Text>
+              <Text style={[styles.statSub, { color: C.eucalyptus }]}>
+                {todayClasses.length - doneClasses.length > 0
+                  ? `${todayClasses.length - doneClasses.length} upcoming today`
+                  : 'Complete today'}
+              </Text>
+            </NiaCard>
+            <NiaCard style={styles.statCard}>
+              <View style={styles.statTop}>
+                <LabelCaps>Tasks</LabelCaps>
+                {urgentTasks.length > 0 && <View style={styles.dot} />}
+              </View>
+              <Text style={styles.statNum}>{pendingTasks.length} Due</Text>
+              <Text style={[styles.statSub, urgentTasks.length > 0 && { color: C.terracotta }]}>
+                {urgentTasks.length > 0 ? `${urgentTasks.length} urgent today` : 'All clear'}
+              </Text>
+            </NiaCard>
             <TouchableOpacity style={styles.statCardTouch} onPress={() => navigation?.navigate('Alerts')} activeOpacity={0.85}>
               <NiaCard style={styles.statCardInner}>
                 <View style={styles.statTop}>
@@ -261,7 +233,7 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
               <View style={styles.nextCodeRow}>
                 {nextClass ? (
                   <>
-                    <Text style={styles.nextCode}>{(nextClass.subjectName?.split(' ')[0] || '').toUpperCase().slice(0, 8)}</Text>
+                    <Text style={styles.nextCode}>{(nextClass.subjectName || '').split(' ')[0].toUpperCase().slice(0, 8)}</Text>
                     <View style={styles.nextDot} />
                     <Text style={styles.nextWhen}>
                       {nextInfo.isOngoing ? 'NOW' : (nextInfo.statusLabel || '').toUpperCase()}
@@ -321,12 +293,7 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
               const due = formatDue(t.dueDate);
               const high = t.priority === 'HIGH' || t.priority === 'EXTREMELY_IMPORTANT';
               return (
-                <TouchableOpacity
-                  key={t.id}
-                  style={styles.taskRow}
-                  onPress={() => navigation?.navigate('Tasks')}
-                  activeOpacity={0.85}
-                >
+                <View key={t.id} style={styles.taskRow}>
                   <TouchableOpacity
                     onPress={() => t.id && completeTask(t.id)}
                     style={styles.checkbox}
@@ -345,7 +312,7 @@ export const DashboardScreen = ({ navigation }: { navigation?: any }) => {
                     <Text style={[styles.taskDue, due.urgent && { color: C.terracotta }]}>{due.text}</Text>
                   </View>
                   <Ionicons name="reorder-three-outline" size={18} color={C.textSubtle} />
-                </TouchableOpacity>
+                </View>
               );
             })
           )}
@@ -543,7 +510,7 @@ const styles = StyleSheet.create({
   spaceName: { fontSize: 13.5, fontWeight: '700', color: C.ink, marginBottom: 2 },
   spaceSub: { fontSize: 11, color: C.textMuted },
   fab: {
-    position: 'absolute', right: 20, bottom: 158,
+    position: 'absolute', right: 20, bottom: 104,
     width: 58, height: 58, borderRadius: 29, backgroundColor: C.obsidian,
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#0F172A', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25,

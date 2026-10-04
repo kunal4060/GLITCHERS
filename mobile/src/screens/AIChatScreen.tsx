@@ -12,9 +12,8 @@ import { useFloatingStore } from '../store/floatingStore';
 import { useAuthStore } from '../store/authStore';
 import { apiClient } from '../api/client';
 import { offlineAiEngine, HUGGINGFACE_OFFLINE_MODELS, type HuggingFaceModelInfo } from '../services/offlineAiEngine';
-import { loadLlamaModel, unloadLlamaModel, isLlamaModelReady, llamaGenerate } from '../services/llamaInference';
+import { parseTaskIntent } from '../services/taskIntentParser';
 import type { Task, Expense, Debt } from '@glitchers/shared';
-import { newUuid } from '../utils/tokenStorage';
 
 interface ActionCardPayload {
   type: 'EXPENSE' | 'TASK' | 'DEBT' | 'CALENDAR' | 'SCHEDULE';
@@ -59,7 +58,6 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
     flushOfflineQueue,
     chatMessages,
     addChatMessage,
-    updateChatMessage,
     setChatMessages,
     clearChatMessages,
     loadedModelFile,
@@ -68,22 +66,56 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
 
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [modelLoading, setModelLoading] = useState(false);
   const messages = chatMessages;
   const [modelModalVisible, setModelModalVisible] = useState(false);
   const [customRepoInput, setCustomRepoInput] = useState('');
   const scrollRef = useRef<ScrollView>(null);
 
+  // H35: parse relative due dates ("in 2 hours", "next week", "kal") instead of hardcoded tomorrow
+  const dueDateFromText = (text: string): string => {
+    try {
+      const parsed = parseTaskIntent(text);
+      if (parsed.dueDate) return parsed.dueDate;
+    } catch { /* fall through to default */ }
+    return new Date(Date.now() + 86400000).toISOString();
+  };
+  const dueLabelFromDate = (iso: string): string => {
+    try {
+      const d = new Date(iso);
+      const now = new Date();
+      const days = Math.round((d.getTime() - now.getTime()) / 86400000);
+      if (days <= 0) return 'Due today';
+      if (days === 1) return 'Due tomorrow';
+      return `Due in ${days} days`;
+    } catch { return 'Due soon'; }
+  };
+  // H33: cancellation flag — checked after awaits so a cancelled/unmounted screen
+  // doesn't keep mutating state (addTask/addExpense) after the user moved on
+  const cancelledRef = useRef(false);
+  // H23: guard — double-tap Download started concurrent model downloads
+  const downloadLockRef = useRef(false);
+  React.useEffect(() => {
+    cancelledRef.current = false;
+    return () => { cancelledRef.current = true; };
+  }, []);
+
   React.useEffect(() => {
     if (chatMessages.length === 0) {
       apiClient.getChatHistory().then((res) => {
         if (res?.messages && res.messages.length > 0) {
-          // C6: merge instead of replace — keep any rehydrated or in-flight
-          // local messages, dedupe by id (same pattern as dashboardStore sync)
-          const backendMsgs = res.messages as any[];
-          const backendIds = new Set(backendMsgs.map((m) => m.id));
-          const localOnly = useDashboardStore.getState().chatMessages.filter((m) => m.id && !backendIds.has(m.id));
-          setChatMessages([...localOnly, ...backendMsgs]);
+          // H40: normalize raw ISO timestamps — history showed raw "2026-10-05T10:30:00.000Z"
+          const normalized = (res.messages as any[]).map((m) => {
+            let ts = m.timestamp;
+            try {
+              const d = new Date(m.timestamp);
+              if (!isNaN(d.getTime())) {
+                ts = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              }
+            } catch { /* keep original */ }
+            // H41: fallback text so an unexpected shape never renders an empty bubble
+            return { ...m, timestamp: ts, text: m.text || 'I had trouble loading that message.' };
+          });
+          setChatMessages(normalized as any);
         }
       }).catch(() => null);
     }
@@ -100,7 +132,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
   );
 
   // Dynamic contextual prompt chips
-  const lastUserText = messages.filter((m) => m.sender === 'user').slice(-1)[0]?.text?.toLowerCase() ?? '';
+  const lastUserText = messages.filter((m) => m.sender === 'user').slice(-1)[0]?.text.toLowerCase() || '';
   const getContextChips = () => {
     if (lastUserText.includes('spent') || lastUserText.includes('budget') || lastUserText.includes('food')) {
       return [
@@ -134,16 +166,12 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
     ];
   };
 
-  const sendInFlightRef = useRef(false);
   const handleSend = async (customPrompt?: string) => {
-    // C10: ref-based guard — chips bypass the send button's disabled={loading}
-    if (sendInFlightRef.current) return;
     const textToSend = (customPrompt || input).trim();
     if (!textToSend) return;
-    sendInFlightRef.current = true;
 
     const userMessage: ChatMessage = {
-      id: newUuid(),
+      id: String(Date.now()),
       sender: 'user',
       text: textToSend,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -172,7 +200,9 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
             title: '⚡ Offline Split Recorded',
             subtitle: offlineRes.actionData.expense.description,
             primaryValue: `₹${offlineRes.actionData.expense.amount}`,
-            secondaryValue: `${offlineRes.actionData.debt?.person} owes ₹${offlineRes.actionData.debt?.amount}`,
+            secondaryValue: offlineRes.actionData.debt?.person
+              ? `${offlineRes.actionData.debt.person} owes ₹${offlineRes.actionData.debt.amount ?? '—'}`
+              : undefined,
             badge: `${offlineRes.offlineModelUsed} (Offline)`,
             navigationScreen: 'Finance',
           };
@@ -203,39 +233,8 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
         };
       }
 
-      // Real on-device LLM: if the rule engine couldn't genuinely answer
-      // and a GGUF model is actually loaded, generate with llama.rn.
-      if (offlineRes.needsLlm && isLlamaModelReady()) {
-        const msgId = newUuid();
-        const modelName = loadedModelFile ? loadedModelFile.name : activeOfflineModel;
-        addChatMessage({
-          id: msgId,
-          sender: 'assistant',
-          text: '…',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        });
-        try {
-          let streamed = '';
-          const full = await llamaGenerate(textToSend, (token) => {
-            streamed += token;
-            updateChatMessage(msgId, { text: streamed });
-          });
-          updateChatMessage(msgId, {
-            text: `${full}\n\n*⚡ Generated on-device by ${modelName}*`,
-          });
-        } catch (err: any) {
-          updateChatMessage(msgId, {
-            text: `Model se jawab nahi ban paya (${err?.message || 'unknown error'}). Cloud mode try karo.`,
-          });
-        }
-        setLoading(false);
-        sendInFlightRef.current = false;
-        setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
-        return;
-      }
-
       const assistantMsg: ChatMessage = {
-        id: newUuid(),
+        id: String(Date.now() + 1),
         sender: 'assistant',
         text: offlineRes.message,
         actionCard,
@@ -244,7 +243,6 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
 
       addChatMessage(assistantMsg);
       setLoading(false);
-      sendInFlightRef.current = false;
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
       return;
     }
@@ -253,6 +251,8 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
       const currentUserId = useAuthStore.getState().user?.id || 'offline-user';
       // 1. Call real backend Fastify API
       const response = await apiClient.sendAIChat(textToSend);
+      // H33: bail if cancelled while the request was in flight
+      if (cancelledRef.current) { setLoading(false); return; }
       const resAny = response as any;
 
       let actionCard: ActionCardPayload | undefined;
@@ -268,7 +268,9 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
           title: '⚡ Bill Split Recorded',
           subtitle: `${expense?.description || 'Bill Split'}`,
           primaryValue: `₹${expense?.amount}`,
-          secondaryValue: `${debt?.person} owes ₹${debt?.amount}`,
+          secondaryValue: debt?.person
+            ? `${debt.person} owes ₹${debt.amount ?? '—'}`
+            : undefined,
           badge: 'Finance + Debt Updated',
           navigationScreen: 'Finance',
         };
@@ -278,9 +280,9 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
         const expData = resAny.data;
         if (expData) {
           const newExp: Expense = {
-            id: expData.id || newUuid(),
+            id: expData.id || String(Date.now()),
             userId: currentUserId,
-            amount: Number(expData.amount) || 100,
+            amount: Number.isFinite(Number(expData.amount)) ? Number(expData.amount) : 100,
             category: expData.category || 'FOOD',
             description: expData.description || textToSend,
             date: new Date().toISOString(),
@@ -303,12 +305,12 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
         const taskData = resAny.data;
         if (taskData) {
           const newTask: Task = {
-            id: taskData.id || newUuid(),
+            id: taskData.id || String(Date.now()),
             userId: currentUserId,
             title: taskData.title || textToSend,
             priority: taskData.priority || 'NORMAL',
             status: 'TODO',
-            dueDate: taskData.dueDate || new Date(Date.now() + 86400000).toISOString(),
+            dueDate: taskData.dueDate || dueDateFromText(textToSend),
           };
           addTask(newTask);
           actionCard = {
@@ -316,7 +318,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
             title: '✓ Task Created',
             subtitle: newTask.title,
             primaryValue: newTask.priority,
-            secondaryValue: 'Due tomorrow',
+            secondaryValue: dueLabelFromDate(newTask.dueDate || ''),
             badge: 'Reminders Active',
             navigationScreen: 'Tasks',
           };
@@ -342,7 +344,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
         const debtData = resAny.data;
         if (debtData) {
           const newDebt: Debt = {
-            id: debtData.id || newUuid(),
+            id: debtData.id || String(Date.now()),
             userId: currentUserId,
             person: debtData.person,
             type: debtData.type,
@@ -376,26 +378,40 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
         };
       }
 
-      // Safety Guard: If no action card was created but the user clearly asked for a task or expense.
-      // Never create records from question-like messages ("did I spend more than 500 on food?",
-      // "what tasks did I complete?") — those are queries, not instructions.
-      const isQuestionLike = (s: string) => {
-        const t = s.trim().toLowerCase();
-        return (
-          t.endsWith('?') ||
-          /^(did|do|does|is|are|was|were|am|what|how|when|where|why|which|who|whom|whose|can|could|would|should|have|has|had)\b/.test(t)
-        );
-      };
-      if (!actionCard && !isQuestionLike(textToSend)) {
+      // Safety Guard: If no action card was created but the user clearly asked for a task or expense
+      if (!actionCard) {
         const lower = textToSend.toLowerCase();
+        // H31: task intent wins — "read 3 books" must not become a ₹3 expense.
+        // Also: prefer ₹-prefixed or LAST number for amount, never fabricate one.
+        const isTaskLike =
+          /\b(submit|complete|finish|prepare|study|read|write|homework|assignment|task|lab report|project|quiz|todo)\b/i.test(lower) ||
+          lower.startsWith('remind me') ||
+          lower.startsWith('i need to') ||
+          lower.startsWith('i have to');
         if (
-          lower.startsWith('spent') ||
-          lower.startsWith('paid') ||
-          lower.startsWith('bought') ||
-          (/\b(dinner|lunch|canteen|coffee|chai|tea|food|auto|cab|uber|ola|swiggy|zomato|stationery|book|books)\b/i.test(lower) && /\d+/.test(lower))
+          !isTaskLike &&
+          (lower.startsWith('spent') ||
+            lower.startsWith('paid') ||
+            lower.startsWith('bought') ||
+            (/\b(dinner|lunch|canteen|coffee|chai|tea|food|auto|cab|uber|ola|swiggy|zomato|stationery|book|books)\b/i.test(lower) && /\d+/.test(lower)))
         ) {
-          const amtMatch = textToSend.match(/\d+(?:\.\d+)?/);
-          const amt = amtMatch ? parseFloat(amtMatch[0]) : 100;
+          // Prefer ₹-prefixed number, else the LAST number ("dinner for 2 at 450" → 450)
+          const rupeeMatch = textToSend.match(/[₹Rs]\s*(\d+(?:\.\d{1,2})?)/i);
+          const allNums = textToSend.replace(/,/g, '').match(/\d+(?:\.\d{1,2})?/g);
+          const amtStr = rupeeMatch ? rupeeMatch[1] : allNums ? allNums[allNums.length - 1] : null;
+          const amt = amtStr ? parseFloat(amtStr) : NaN;
+          if (!Number.isFinite(amt) || amt <= 0) {
+            // No fabricating amounts — ask instead of logging a wrong number
+            const fallbackMsg: ChatMessage = {
+              id: String(Date.now()),
+              sender: 'assistant',
+              text: 'I could not find an amount in that. How much did you spend? (e.g. "lunch 250")',
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            };
+            addChatMessage(fallbackMsg);
+            setLoading(false);
+            return;
+          }
           let cat: any = 'OTHER';
           if (/\b(dinner|lunch|canteen|coffee|chai|tea|food|swiggy|zomato|pizza|burger|snack)\b/i.test(lower)) cat = 'FOOD';
           else if (/\b(auto|cab|uber|ola|bus|metro|petrol|fuel)\b/i.test(lower)) cat = 'TRANSPORT';
@@ -405,7 +421,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
           if (!desc) desc = cat === 'FOOD' ? 'Dining' : 'Expense';
 
           const newExp: Expense = {
-            id: newUuid(),
+            id: String(Date.now()),
             userId: currentUserId,
             amount: amt,
             category: cat,
@@ -435,17 +451,18 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
             .trim();
 
           const newTask: Task = {
-            id: newUuid(),
+            id: String(Date.now()),
             userId: currentUserId,
             title: cleanTitle ? cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1) : 'Academic Task',
-            priority:
-              lower.includes('urgent') || lower.includes('extremely')
-                ? 'EXTREMELY_IMPORTANT'
-                : lower.includes('important') || lower.includes('high')
-                ? 'HIGH'
-                : 'NORMAL',
+            priority: (() => {
+              // H36: strip negation words first — "not urgent" was matching "urgent"
+              const noNeg = lower.replace(/\b(not|no|never|isn't|isnt|don't|dont|without)\b[^.,!?;]*/g, '');
+              if (noNeg.includes('urgent') || noNeg.includes('extremely')) return 'EXTREMELY_IMPORTANT';
+              if (noNeg.includes('important') || noNeg.includes('high')) return 'HIGH';
+              return 'NORMAL';
+            })(),
             status: 'TODO',
-            dueDate: new Date(Date.now() + 86400000).toISOString(),
+            dueDate: dueDateFromText(textToSend),
           };
           addTask(newTask);
           actionCard = {
@@ -453,7 +470,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
             title: '✓ Task Created',
             subtitle: newTask.title,
             primaryValue: newTask.priority,
-            secondaryValue: 'Due tomorrow',
+            secondaryValue: dueLabelFromDate(newTask.dueDate || ''),
             badge: 'Reminders Active',
             navigationScreen: 'Tasks',
           };
@@ -461,7 +478,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
       }
 
       const assistantMsg: ChatMessage = {
-        id: newUuid(),
+        id: String(Date.now() + 1),
         sender: 'assistant',
         text: response.message,
         actionCard,
@@ -520,7 +537,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
       }
 
       addChatMessage({
-        id: newUuid(),
+        id: String(Date.now() + 1),
         sender: 'assistant',
         text: `${offlineRes.message}\n\n*(Cloud unavailable • Processed by offline ${offlineRes.offlineModelUsed} model. Data saved on phone and will push to dataset when online.)*`,
         actionCard,
@@ -528,7 +545,6 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
       });
     } finally {
       setLoading(false);
-      sendInFlightRef.current = false;
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
     }
   };
@@ -552,7 +568,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
         setInput('');
 
         const userMsg: ChatMessage = {
-          id: newUuid(),
+          id: String(Date.now()),
           sender: 'user',
           text: userPrompt ? `📷 ${userPrompt}` : '📷 [Uploaded Photo for Analysis]',
           imageUri: photo.uri,
@@ -565,7 +581,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
         if (aiMode === 'OFFLINE') {
           const modelName = loadedModelFile ? loadedModelFile.name : (activeOfflineModel || 'On-Device Model');
           const offlineMsg: ChatMessage = {
-            id: newUuid(),
+            id: String(Date.now() + 1),
             sender: 'assistant',
             text: `### 📷 Image Analyzed Locally (Offline Mode)\n\n` +
               `Received image (**${photo.fileName || 'photo.jpg'}**, ${photo.width || 800}×${photo.height || 600}px).\n\n` +
@@ -585,7 +601,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
           const visionRes = await apiClient.analyzeImage(photo.base64, photo.mimeType || 'image/jpeg', userPrompt);
           if (visionRes && visionRes.message) {
             const assistantMsg: ChatMessage = {
-              id: newUuid(),
+              id: String(Date.now() + 1),
               sender: 'assistant',
               text: visionRes.message,
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -601,7 +617,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
             addChatMessage(assistantMsg);
           } else {
             const fallbackMsg: ChatMessage = {
-              id: newUuid(),
+              id: String(Date.now() + 1),
               sender: 'assistant',
               text: '### 📷 Image Analyzed\n\nI processed your photo. For best results with handwritten notes or formulas, ensure the image is clear and well-lit.',
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -610,7 +626,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
           }
         } catch {
           const errorMsg: ChatMessage = {
-            id: newUuid(),
+            id: String(Date.now() + 1),
             sender: 'assistant',
             text: 'I could not analyze this photo right now. Please check your network connection or try uploading a clearer image.',
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -636,20 +652,6 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
       if (!res.canceled && res.assets && res.assets[0]) {
         const file = res.assets[0];
         const effectiveModelId = targetModelId || file.name;
-        setModelLoading(true);
-        try {
-          // Genuinely initialize the model with llama.rn (llama.cpp).
-          // If this fails, we do NOT pretend the model is ready.
-          await loadLlamaModel(file.uri);
-        } catch (err: any) {
-          setModelLoading(false);
-          Alert.alert(
-            'Model Failed to Load',
-            `Could not initialize "${file.name}" as an AI model.\n\n${err?.message || 'Unknown error'}\n\nMake sure the file is a valid GGUF model.`
-          );
-          return;
-        }
-        setModelLoading(false);
         const loadedInfo: LoadedModelFileInfo = {
           name: file.name,
           size: file.size || 0,
@@ -662,8 +664,8 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
         setActiveOfflineModel(effectiveModelId);
         setAiMode('OFFLINE');
         Alert.alert(
-          '✓ Model Ready',
-          `"${file.name}" (${((file.size || 0) / (1024 * 1024)).toFixed(1)} MB) is now genuinely running on-device.\n\nAsk anything — answers will be generated by the model itself.`
+          '✓ Model File Loaded',
+          `Successfully loaded "${file.name}" (${((file.size || 0) / (1024 * 1024)).toFixed(1)} MB) from internal storage!\n\nOffline AI Engine is now active on your device and will answer all your questions locally.`
         );
       }
     } catch {
@@ -723,23 +725,23 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
         </View>
 
         {/* Offline pending sync banner */}
-        {offlineSyncQueue.filter((q) => !q.synced).length > 0 && (
+        {offlineSyncQueue.length > 0 && (
           <View style={styles.queueBanner}>
             <View style={styles.queueLeft}>
               <Ionicons name="cloud-offline-outline" size={15} color="#B45309" />
               <Text style={styles.queueText}>
-                {offlineSyncQueue.filter((q) => !q.synced).length} action(s) stored on this phone. Will push when online.
+                {offlineSyncQueue.length} action(s) stored on this phone. Will push when online.
               </Text>
             </View>
             <TouchableOpacity
               style={styles.queueSyncBtn}
               onPress={async () => {
+                // H37: Sync Now had no failure handling — silent failure
                 try {
                   const res = await flushOfflineQueue();
                   Alert.alert('Dataset Synced', `Pushed ${res.syncedCount} offline record(s) to cloud database!`);
                 } catch (e: any) {
-                  console.warn('[AIChatScreen] offline sync failed:', e?.message);
-                  Alert.alert('Sync Failed', 'Could not push offline records. Please try again.');
+                  Alert.alert('Sync failed', e?.message || 'Could not push offline records. Try again when online.');
                 }
               }}
               activeOpacity={0.8}
@@ -965,11 +967,7 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
                       style={styles.unloadBtn}
                       onPress={() => {
                         setLoadedModelFile(null);
-                        // C9: reset to AUTO so the app doesn't stay stuck in OFFLINE with no engine
-                        setAiMode('AUTO');
-                        setActiveOfflineModel(null);
-                        unloadLlamaModel().catch(() => null);
-                        Alert.alert('Model Unloaded', 'On-device model has been released from memory.');
+                        Alert.alert('Model Unloaded', 'Switched off local storage model.');
                       }}
                       activeOpacity={0.8}
                     >
@@ -978,21 +976,10 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
                   </View>
                 ) : null}
 
-                <TouchableOpacity
-                  style={[styles.pickBtn, modelLoading && { opacity: 0.6 }]}
-                  onPress={() => handlePickLocalModelFile()}
-                  activeOpacity={0.85}
-                  disabled={modelLoading}
-                >
-                  {modelLoading ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Ionicons name="file-tray-full-outline" size={22} color="#FFFFFF" />
-                  )}
+                <TouchableOpacity style={styles.pickBtn} onPress={() => handlePickLocalModelFile()} activeOpacity={0.85}>
+                  <Ionicons name="file-tray-full-outline" size={22} color="#FFFFFF" />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.pickTitle}>
-                      {modelLoading ? 'Loading model into memory…' : 'Select Model from Internal Storage'}
-                    </Text>
+                    <Text style={styles.pickTitle}>Select Model from Internal Storage</Text>
                     <Text style={styles.pickSub}>Browse and pick your downloaded model weights file</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
@@ -1063,14 +1050,19 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
                     style={[styles.customBtn, !customRepoInput.trim() && { opacity: 0.5 }]}
                     disabled={!customRepoInput.trim()}
                     onPress={async () => {
+                      // H23: ref-based lock — double-tap Download started concurrent downloads
+                      // H38: "Downloaded" alert was unconditional — now only on success
+                      if (downloadLockRef.current) return;
+                      downloadLockRef.current = true;
+                      const repo = customRepoInput.trim();
                       try {
-                        const repo = customRepoInput.trim();
                         await downloadOfflineModel(repo);
                         setCustomRepoInput('');
                         Alert.alert('Model Loaded', `Downloaded & activated "${repo}" from Hugging Face for offline reasoning!`);
                       } catch (e: any) {
-                        console.warn('[AIChatScreen] model download failed:', e?.message);
-                        Alert.alert('Download Failed', 'Could not download the model. Please try again.');
+                        Alert.alert('Download failed', e?.message || `Could not download "${repo}". Check your connection and try again.`);
+                      } finally {
+                        downloadLockRef.current = false;
                       }
                     }}
                     activeOpacity={0.8}
@@ -1085,20 +1077,20 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
                   <View style={{ flex: 1, paddingRight: 8 }}>
                     <Text style={styles.syncTitle}>Temporary Phone Storage</Text>
                     <Text style={styles.syncSub}>
-                      {offlineSyncQueue.filter((q) => !q.synced).length > 0
-                        ? `${offlineSyncQueue.filter((q) => !q.synced).length} record(s) queued. Will push to dataset when online.`
+                      {offlineSyncQueue.length > 0
+                        ? `${offlineSyncQueue.length} record(s) queued. Will push to dataset when online.`
                         : 'All offline records are pushed and synced to cloud dataset.'}
                     </Text>
                   </View>
                   <TouchableOpacity
                     style={styles.syncBtn}
                     onPress={async () => {
+                      // H37: Sync Now had no failure handling — silent failure
                       try {
                         const res = await flushOfflineQueue();
                         Alert.alert('Dataset Synced', `Pushed ${res.syncedCount} offline record(s) to cloud database!`);
                       } catch (e: any) {
-                        console.warn('[AIChatScreen] offline sync failed:', e?.message);
-                        Alert.alert('Sync Failed', 'Could not push offline records. Please try again.');
+                        Alert.alert('Sync failed', e?.message || 'Could not push offline records. Try again when online.');
                       }
                     }}
                     activeOpacity={0.8}

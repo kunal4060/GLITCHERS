@@ -74,12 +74,22 @@ export function formatDue(dueIso?: string | null): { text: string; urgent: boole
 }
 
 export function initials(name?: string | null): string {
-  if (!name) return '•';
-  const parts = name.trim().split(/\s+/);
+  // M16: blank/whitespace names used to produce "UNDEFINED".
+  if (!name || !name.trim()) return '•';
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '•';
   return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
 }
 
 export function inr(n: number): string {
-  const v = Math.round(Math.abs(n));
+  // M17: NaN/Infinity used to render as "₹NaN".
+  const safe = Number.isFinite(n) ? n : 0;
+  const v = Math.round(Math.abs(safe));
   return '₹' + v.toLocaleString('en-IN');
+}
+
+/** H47: exact amount with paise (inr rounds) */
+export function inrExact(n: number): string {
+  const v = Math.abs(Number(n) || 0);
+  return '₹' + v.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }

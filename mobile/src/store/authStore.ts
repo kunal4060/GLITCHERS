@@ -90,7 +90,8 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         try {
           if (token) {
-            apiClient.setToken(token);
+            // M19: await persist so a kill right after login can't lose the token.
+            await apiClient.setToken(token);
           }
 
           const safeEmail = (email || '').trim().toLowerCase();
@@ -115,7 +116,7 @@ export const useAuthStore = create<AuthState>()(
             }
             if (loginRes?.accessToken) {
               activeToken = loginRes.accessToken;
-              apiClient.setToken(activeToken);
+              await apiClient.setToken(activeToken);
             }
           } catch {
             const meRes = await apiClient.get<{ user: UserProfile }>('/auth/me').catch(() => null);
@@ -172,12 +173,14 @@ export const useAuthStore = create<AuthState>()(
       },
 
       checkSession: async () => {
-        const currentToken = get().token;
-        if (!currentToken) {
+        // H5: consult SecureStore too — the in-memory token may be empty after
+        // a fresh launch even though a valid token is persisted.
+        const effectiveToken = (await apiClient.getEffectiveToken().catch(() => '')) || get().token;
+        if (!effectiveToken) {
           // No token: already logged out, nothing to validate.
           return;
         }
-        apiClient.setToken(currentToken);
+        await apiClient.setToken(effectiveToken);
 
         try {
           // FIX (repeated-logout bug): never log out on transport failures.
@@ -215,7 +218,7 @@ export const useAuthStore = create<AuthState>()(
           set({
             isAuthenticated: true,
             user: res.user,
-            token: currentToken,
+            token: get().token,
             isOnboardingComplete: isComplete,
             currentOnboardingStep: step,
             onboardingData: statusRes?.state?.data || {},

@@ -19,7 +19,7 @@ import { useAuthStore } from '../store/authStore';
 import { apiClient } from '../api/client';
 import { newUuid } from '../utils/tokenStorage';
 import { NiaHeader, LabelCaps, StatusPill, NiaCard } from '../components/nia';
-import { monthCycleLabel, inr, timeAgo } from '../utils/niaFormat';
+import { monthCycleLabel, inr, inrExact, timeAgo } from '../utils/niaFormat';
 
 const C = designTokens.colors;
 
@@ -66,10 +66,11 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
   const [splitPerson, setSplitPerson] = useState('');
   const [splitDesc, setSplitDesc] = useState('');
   const [addVisible, setAddVisible] = useState(false);
+  // H19: guard BEFORE the picker opens — double-tap opened two pickers
+  const scanLockRef = React.useRef(false);
   const [formAmount, setFormAmount] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [formCat, setFormCat] = useState<string>('FOOD');
-  const [submitting, setSubmitting] = useState(false);
 
   const totalSpent = expenses.reduce((s, e) => s + Number(e.amount), 0);
   // M25: no phantom default — a fresh user who never set a budget sees an explicit empty state.
@@ -96,6 +97,8 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
 
   // ---- scan receipt ----
   const handleScan = async () => {
+    if (scanLockRef.current) return;
+    scanLockRef.current = true;
     try {
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) {
@@ -115,7 +118,7 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
             addExpense(scanRes.expense, { skipRemote: true });
             Alert.alert(
               'Bill scanned & logged',
-              `Logged ${inr(Number(scanRes.parsed?.total || scanRes.expense.amount))} from ${
+              `Logged ${inr(Number(scanRes.parsed?.total ?? scanRes.expense.amount) || 0)} from ${
                 scanRes.parsed?.merchant || 'merchant'
               }.`
             );
@@ -130,14 +133,43 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
       }
     } catch {
       Alert.alert('Error', 'Could not open the image picker.');
+    } finally {
+      scanLockRef.current = false;
     }
   };
 
   // ---- quick add ----
   const handleQuickAdd = () => {
     if (!quickInput.trim()) return;
-    const match = quickInput.replace(/,/g, '').match(/(\d+(?:\.\d{1,2})?)/);
-    const amount = match ? parseFloat(match[1]) : 150;
+    // H43: prefer ₹-prefixed number, else the LAST number ("dinner for 2 at 450" → 450, not 2)
+    // H44: detect negatives ("-500 refund") and reject them
+    // M9: strict amount validation — no amount, no expense
+    const cleaned = quickInput.replace(/,/g, '');
+    const rupeeMatch = cleaned.match(/[₹Rs]\s*(\d+(?:\.\d{1,2})?)/i);
+    let numStr: string | null = null;
+    if (rupeeMatch) {
+      numStr = rupeeMatch[1];
+    } else {
+      const all = cleaned.match(/-?\d+(?:\.\d{1,2})?/g);
+      numStr = all ? all[all.length - 1] : null;
+    }
+    if (!numStr) {
+      Alert.alert('No amount found', 'Tell me the amount, e.g. "lunch 250" or "₹450 dinner".');
+      return;
+    }
+    const amount = parseFloat(numStr);
+    if (!Number.isFinite(amount)) {
+      Alert.alert('Invalid amount', 'Could not understand the amount. Try again.');
+      return;
+    }
+    if (amount < 0) {
+      Alert.alert('Negative amount', 'That looks like a refund or income — use the income option instead of logging it as an expense.');
+      return;
+    }
+    if (amount === 0) {
+      Alert.alert('Invalid amount', 'Enter an amount greater than zero.');
+      return;
+    }
     const lower = quickInput.toLowerCase();
     let category = 'OTHER';
     if (/(food|dinner|lunch|canteen|coffee|tea|biryani|snack)/.test(lower)) category = 'FOOD';
@@ -153,8 +185,7 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
   };
 
   const confirmQuickAdd = () => {
-    if (!preview || submitting) return;
-    setSubmitting(true);
+    if (!preview) return;
     addExpense({
       id: newUuid(),
       userId: useAuthStore.getState().user?.id || 'offline-user',
@@ -167,17 +198,14 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
     setPreview(null);
     setQuickInput('');
     Alert.alert('Recorded', `${inr(preview.amount)} logged under ${preview.category}.`);
-    setSubmitting(false);
   };
 
   const submitManualAdd = () => {
-    if (submitting) return;
     const amt = parseFloat(formAmount);
     if (!amt || amt <= 0) {
       Alert.alert('Invalid amount', 'Enter a valid amount.');
       return;
     }
-    setSubmitting(true);
     addExpense({
       id: newUuid(),
       userId: useAuthStore.getState().user?.id || 'offline-user',
@@ -192,24 +220,20 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
     setFormCat('FOOD');
     setAddVisible(false);
     Alert.alert('Recorded', `${inr(amt)} logged under ${formCat}.`);
-    setSubmitting(false);
   };
 
   const submitSplit = () => {
-    if (submitting) return;
     const amt = parseFloat(splitAmount);
     if (!amt || amt <= 0 || !splitPerson.trim()) {
       Alert.alert('Missing info', 'Enter a valid amount and the friend’s name.');
       return;
     }
-    setSubmitting(true);
     splitExpense(amt, splitDesc.trim() || 'Shared bill', splitPerson.trim());
     setSplitAmount('');
     setSplitPerson('');
     setSplitDesc('');
     setSplitVisible(false);
-    Alert.alert('Bill split', `Split ${inr(amt)} — ${splitPerson.trim()} owes ${inr(splitShare(amt))}.`);
-    setSubmitting(false);
+    Alert.alert('Bill split', `Split ${inrExact(amt)} — ${splitPerson.trim()} owes ${inrExact(splitShare(amt))}.`);
   };
 
   const handleSetBudget = () => {
@@ -326,7 +350,7 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
                 </Text>
                 <Text style={styles.previewCat}>{preview.category}</Text>
               </View>
-              <TouchableOpacity style={styles.previewYes} onPress={confirmQuickAdd} activeOpacity={0.8} disabled={submitting}>
+              <TouchableOpacity style={styles.previewYes} onPress={confirmQuickAdd} activeOpacity={0.8}>
                 <Text style={styles.previewYesText}>Add</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setPreview(null)} activeOpacity={0.7}>
@@ -388,7 +412,7 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
                       {(e.category || 'OTHER')}{e.date ? ` • ${timeAgo(e.date)}` : ''}
                     </Text>
                   </View>
-                  <Text style={styles.txAmt}>-{inr(Number(e.amount))}</Text>
+                  <Text style={styles.txAmt}>-{inr(Number(e.amount) || 0)}</Text>
                   <TouchableOpacity
                     onPress={() => {
                       Alert.alert('Delete expense', `Remove "${e.description}"?`, [
@@ -478,7 +502,7 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
                   </TouchableOpacity>
                 ))}
               </View>
-              <TouchableOpacity style={[styles.saveBtn, submitting && { opacity: 0.5 }]} onPress={submitManualAdd} activeOpacity={0.85} disabled={submitting}>
+              <TouchableOpacity style={styles.saveBtn} onPress={submitManualAdd} activeOpacity={0.85}>
                 <Text style={styles.saveBtnText}>Add Expense</Text>
               </TouchableOpacity>
             </View>
@@ -510,7 +534,7 @@ export const FinanceScreen = ({ navigation }: { navigation?: any }) => {
               <TextInput style={styles.input} placeholder="e.g. Rahul" placeholderTextColor={C.textSubtle} value={splitPerson} onChangeText={setSplitPerson} />
               <Text style={styles.fieldLabel}>Note</Text>
               <TextInput style={styles.input} placeholder="e.g. Pizza night" placeholderTextColor={C.textSubtle} value={splitDesc} onChangeText={setSplitDesc} />
-              <TouchableOpacity style={[styles.saveBtn, submitting && { opacity: 0.5 }]} onPress={submitSplit} activeOpacity={0.85} disabled={submitting}>
+              <TouchableOpacity style={styles.saveBtn} onPress={submitSplit} activeOpacity={0.85}>
                 <Text style={styles.saveBtnText}>Split Evenly</Text>
               </TouchableOpacity>
             </View>

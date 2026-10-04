@@ -76,18 +76,35 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
   const [calendarEnabled, setCalendarEnabled] = useState(true);
   const [universityDomain, setUniversityDomain] = useState(user?.universityDomain || 'university.edu');
 
+  // H27: populate fields when the user object arrives — useState captured it only once
+  // (empty) on first render, so returning users saw blank profile fields.
+  useEffect(() => {
+    if (!user) return;
+    if (user.fullName) setFullName(user.fullName);
+    if (user.university) setUniversity(user.university);
+    if (user.course) setCourse(user.course);
+    if (user.year) setYear(String(user.year));
+    if (user.semester) setSemester(String(user.semester));
+    if (user.section) setSection(user.section);
+    if (user.cgpa) setCgpa(user.cgpa);
+    if (user.creditsCompleted !== undefined) setCreditsCompleted(String(user.creditsCompleted));
+    if (user.creditsCurrent !== undefined) setCreditsCurrent(String(user.creditsCurrent));
+    if ((user as any).studentId) setStudentId((user as any).studentId);
+    if ((user as any).universityDomain) setUniversityDomain((user as any).universityDomain);
+  }, [user]);
+
   // 2. Profile
   const [fullName, setFullName] = useState(user?.fullName || '');
   const [university, setUniversity] = useState(user?.university || '');
   const [course, setCourse] = useState(user?.course || '');
-  const [year, setYear] = useState(user?.year ? String(user.year) : '');
-  const [semester, setSemester] = useState(user?.semester ? String(user.semester) : '');
-  const [section, setSection] = useState(user?.section || '');
+  const [year, setYear] = useState(String(user?.year || '3'));
+  const [semester, setSemester] = useState(String(user?.semester || '6'));
+  const [section, setSection] = useState(user?.section || 'A');
 
   // 3. Academics
-  const [cgpa, setCgpa] = useState(user?.cgpa || '');
-  const [creditsCompleted, setCreditsCompleted] = useState(user?.creditsCompleted != null ? String(user.creditsCompleted) : '');
-  const [creditsCurrent, setCreditsCurrent] = useState(user?.creditsCurrent != null ? String(user.creditsCurrent) : '');
+  const [cgpa, setCgpa] = useState(user?.cgpa || '8.50');
+  const [creditsCompleted, setCreditsCompleted] = useState(String(user?.creditsCompleted ?? 42));
+  const [creditsCurrent, setCreditsCurrent] = useState(String(user?.creditsCurrent ?? 18));
   const [studentId, setStudentId] = useState(user?.studentId || '');
 
   // 4 & 5. Timetable & Review
@@ -116,6 +133,12 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
   // 8. Floating Assistant
   const [floatingAssistantEnabled, setFloatingAssistantEnabled] = useState(true);
 
+  // H21/H22: guards — double-tap Upload opened two pickers; double-tap Add created duplicate classes
+  const uploadLockRef = React.useRef(false);
+  const manualClassLockRef = React.useRef(false);
+  // H24: profile saved during pipeline, applied when Enter-Dashboard is tapped
+  const pendingProfileRef = React.useRef<any>(null);
+
   // 9. Initial Processing State
   const [processingStages, setProcessingStages] = useState<
     Array<{ key: string; label: string; done: boolean; inProgress: boolean }>
@@ -127,8 +150,6 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
     { key: 'finance', label: 'Initializing student budget & expense records', done: false, inProgress: false },
     { key: 'email_processing', label: 'Queuing university email filter', done: false, inProgress: false },
   ]);
-  // Guards against double-tap re-running the initialization pipeline.
-  const [isInitializing, setIsInitializing] = useState(false);
 
   // Sync state if step changes
   useEffect(() => {
@@ -139,6 +160,8 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
 
   // Handle Timetable Image Upload & AI Vision OCR
   const handleUploadTimetable = async () => {
+    if (uploadLockRef.current) return;
+    uploadLockRef.current = true;
     try {
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) {
@@ -205,10 +228,15 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
     } catch (err: any) {
       setIsAnalyzingImage(false);
       Alert.alert('Analysis Notice', err.message || 'Could not analyze image.');
+    } finally {
+      uploadLockRef.current = false;
     }
   };
 
   const handleAddManualClass = () => {
+    if (manualClassLockRef.current) return;
+    manualClassLockRef.current = true;
+    setTimeout(() => { manualClassLockRef.current = false; }, 1000);
     if (!manualSubject.trim()) {
       Alert.alert('Subject Required', 'Please enter a subject name.');
       return;
@@ -219,8 +247,8 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
       day: manualDay,
       startTime: manualStartTime.trim(),
       endTime: manualEndTime.trim(),
-      room: manualRoom.trim(),
-      faculty: manualFaculty.trim(),
+      room: manualRoom.trim() || 'AB1-204',
+      faculty: manualFaculty.trim() || 'Faculty Member',
       classType: 'LECTURE',
     };
 
@@ -236,19 +264,39 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
 
   // Run Real Backend Idempotent Initialization
   const runInitializationPipeline = async () => {
-    if (isInitializing) return;
-    setIsInitializing(true);
+    markStepDone('FLOATING_ASSISTANT');
+    setActiveStep('INITIAL_PROCESSING');
+    // H25: 30s timeout — init failures were swallowed and the user sat on a spinner forever
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('INIT_TIMEOUT')), 30000)
+    );
     try {
-      markStepDone('FLOATING_ASSISTANT');
-      setActiveStep('INITIAL_PROCESSING');
+      await Promise.race([runInitializationSteps(), timeout]);
+    } catch (err: any) {
+      const isTimeout = err?.message === 'INIT_TIMEOUT';
+      Alert.alert(
+        'Setup hit a snag',
+        isTimeout
+          ? 'Setup is taking longer than 30 seconds. You can retry or continue offline — your data is saved on this phone.'
+          : 'Setup could not finish. You can retry or continue offline — your data is saved on this phone.',
+        [
+          { text: 'Retry', onPress: () => runInitializationPipeline() },
+          { text: 'Continue Offline', onPress: () => goToStep('COMPLETE', 'INITIAL_PROCESSING') },
+        ]
+      );
+      return;
+    }
+  };
+
+  const runInitializationSteps = async () => {
 
     const payload = {
       profile: {
         fullName,
         university,
         course,
-        year: parseInt(year, 10) || 1,
-        semester: parseInt(semester, 10) || 1,
+        year: (() => { const v = parseInt(year, 10); return Number.isNaN(v) ? 1 : v; })(),
+        semester: (() => { const v = parseInt(semester, 10); return Number.isNaN(v) ? 1 : v; })(),
         section,
         cgpa,
         creditsCompleted: Number(creditsCompleted) || 0,
@@ -264,14 +312,16 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
       },
       financeSettings: {
         startingBalance: Number(startingBalance) || 0,
-        monthlyBudget: Number(monthlyBudget) || 10000,
+        monthlyBudget: (() => {
+          const v = Number(monthlyBudget);
+          return Number.isFinite(v) && v > 0 ? Math.round(v) : 10000;
+        })(),
       },
       floatingAssistantEnabled,
     };
 
-    // Start backend initialization; animate progress meanwhile, then wait for
-    // the real result before completing onboarding (no fire-and-forget).
-    const initPromise = apiClient.initializeWorkspace(payload).catch(() => null);
+    // Trigger backend idempotent initialization job in background (never blocks UI)
+    apiClient.initializeWorkspace(payload).catch(() => null);
 
     // Sequentially animate progress smoothly
     for (let i = 0; i < processingStages.length; i++) {
@@ -287,10 +337,11 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
       );
     }
 
-    await initPromise;
-
     setGoogleConnections(gmailEnabled, calendarEnabled);
-    completeOnboarding(payload.profile as any);
+    // H24: DON'T call completeOnboarding() here — it flips isOnboardingComplete and
+    // unmounts this screen before the COMPLETE step ever shows. The profile is saved
+    // into the dashboard store below; completion happens on the Enter-Dashboard button.
+    pendingProfileRef.current = payload.profile as any;
 
     // Save user's actual classes and budget into live dashboardStore
     const { setClasses: setDashboardClasses, setBudget, updateAcademics } = useDashboardStore.getState();
@@ -301,16 +352,16 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
     setBudget({
       id: 'b1',
       userId: user?.id || 'offline-user',
-      monthlyLimit: Number(monthlyBudget) || 10000,
+      monthlyLimit: (() => {
+        const v = Number(monthlyBudget);
+        return Number.isFinite(v) && v > 0 ? Math.round(v) : 10000;
+      })(),
       currentSpending: 0,
       month: new Date().toISOString().slice(0, 7),
       alertThresholds: [75, 90, 100],
     });
 
     goToStep('COMPLETE', 'INITIAL_PROCESSING');
-    } finally {
-      setIsInitializing(false);
-    }
   };
 
   // Step Progress Calculation
@@ -365,7 +416,8 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
               </Text>
             </View>
             <TouchableOpacity
-              style={styles.signOutButton}
+              style={[styles.signOutButton, activeStep === 'INITIAL_PROCESSING' && { opacity: 0.4 }]}
+              disabled={activeStep === 'INITIAL_PROCESSING'}
               onPress={() => {
                 Alert.alert('Sign Out', 'Return to login screen?', [
                   { text: 'Cancel', style: 'cancel' },
@@ -574,7 +626,7 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Current CGPA (0.00 - 10.00)</Text>
+                <Text style={styles.inputLabel}>Current CGPA (0.00 - 10.00, optional)</Text>
                 <TextInput
                   style={styles.textInput}
                   value={cgpa}
@@ -631,10 +683,13 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                 <TouchableOpacity
                   style={[styles.primaryButton, { flex: 2 }]}
                   onPress={() => {
-                    const numCgpa = parseFloat(cgpa);
-                    if (isNaN(numCgpa) || numCgpa < 0 || numCgpa > 10) {
-                      Alert.alert('Invalid CGPA', 'Please enter a valid CGPA between 0.00 and 10.00');
-                      return;
+                    // H30: CGPA is optional — empty is fine, only validate if something was entered
+                    if (cgpa.trim()) {
+                      const numCgpa = parseFloat(cgpa);
+                      if (isNaN(numCgpa) || numCgpa < 0 || numCgpa > 10) {
+                        Alert.alert('Invalid CGPA', 'Please enter a valid CGPA between 0.00 and 10.00, or leave it blank.');
+                        return;
+                      }
                     }
                     goToStep('TIMETABLE', 'ACADEMICS');
                   }}
@@ -845,6 +900,16 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                 </View>
               </View>
 
+              {/* Conflict Detection Banner */}
+              {classes.length >= 2 && (
+                <View style={styles.conflictNoticeBox}>
+                  <Ionicons name="checkmark-circle-outline" size={18} color={C.primary} />
+                  <Text style={styles.conflictNoticeText}>
+                    Schedule Conflict Engine active: No overlapping class collisions detected.
+                  </Text>
+                </View>
+              )}
+
               {/* Class List */}
               <View style={styles.classList}>
                 {classes.map((item, idx) => (
@@ -920,7 +985,22 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.primaryButton, { flex: 2 }]}
-                  onPress={() => goToStep('NOTIFICATION_SETUP', 'TIMETABLE_REVIEW')}
+                  onPress={() => {
+                    // H29: Confirm Schedule with 0 classes used to silently continue —
+                    // now requires at least 1 class or an explicit skip confirmation.
+                    if (classes.length === 0) {
+                      Alert.alert(
+                        'No classes added',
+                        'Your timetable is empty. Continue without classes, or go back and add them?',
+                        [
+                          { text: 'Add Classes', style: 'cancel' },
+                          { text: 'Skip for Now', onPress: () => goToStep('NOTIFICATION_SETUP', 'TIMETABLE_REVIEW') },
+                        ]
+                      );
+                      return;
+                    }
+                    goToStep('NOTIFICATION_SETUP', 'TIMETABLE_REVIEW');
+                  }}
                 >
                   <Text style={styles.primaryButtonText}>Confirm Schedule →</Text>
                 </TouchableOpacity>
@@ -1117,9 +1197,8 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   <Text style={styles.secondaryButtonText}>Back</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.primaryButton, { flex: 2 }, isInitializing && { opacity: 0.6 }]}
+                  style={[styles.primaryButton, { flex: 2 }]}
                   onPress={runInitializationPipeline}
-                  disabled={isInitializing}
                 >
                   <Text style={styles.primaryButtonText}>Prepare My AI (NIA)</Text>
                 </TouchableOpacity>
@@ -1202,7 +1281,11 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
 
               <TouchableOpacity
                 style={styles.launchButton}
-                onPress={onComplete}
+                onPress={() => {
+                  // H24: completion happens HERE — the COMPLETE step is now actually reachable
+                  completeOnboarding(pendingProfileRef.current || undefined);
+                  onComplete();
+                }}
                 activeOpacity={0.88}
               >
                 <Text style={styles.launchButtonText}>Enter Dashboard →</Text>

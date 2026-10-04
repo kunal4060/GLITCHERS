@@ -31,6 +31,9 @@ function resolveDefaultHost(): string {
 
 const DEFAULT_HOST = resolveDefaultHost();
 
+// M18: process-wide lock for the one-time legacy token migration.
+let migrationPromise: Promise<void> | null = null;
+
 class ApiClient {
   private baseUrl: string = DEFAULT_HOST;
   private token: string = '';
@@ -47,10 +50,17 @@ class ApiClient {
     return this.baseUrl;
   }
 
-  public setToken(token: string) {
+  // M19: async so callers CAN await the SecureStore persist — a kill between
+  // setToken and the write used to lose the token. Sync callers still work
+  // (unawaited), but login paths should await this.
+  public async setToken(token: string): Promise<void> {
     this.token = token;
     if (token) {
-      saveAuthToken(token).catch(() => null);
+      try {
+        await saveAuthToken(token);
+      } catch (err) {
+        console.warn('[apiClient] setToken: SecureStore persist failed:', err);
+      }
     }
   }
 
@@ -63,6 +73,44 @@ class ApiClient {
     clearAuthToken().catch(() => null);
     AsyncStorage.removeItem('nexa-auth-token').catch(() => null);
     AsyncStorage.removeItem('glitchers-auth-token').catch(() => null);
+  }
+
+  // M18: lock for the one-time legacy token migration.
+  private async runLegacyMigrationLocked(): Promise<void> {
+    if (migrationPromise) {
+      await migrationPromise;
+      return;
+    }
+    migrationPromise = this.runLegacyMigration().finally(() => {
+      migrationPromise = null;
+    });
+    await migrationPromise;
+  }
+
+  private async runLegacyMigration(): Promise<void> {
+    try {
+      const legacy =
+        (await AsyncStorage.getItem('nexa-auth-token')) ||
+        (await AsyncStorage.getItem('glitchers-auth-token'));
+      if (legacy && legacy.trim()) {
+        const trimmed = legacy.trim();
+        // Await the SecureStore write AND verify read-back BEFORE deleting
+        // legacy keys — otherwise an app kill mid-migration loses the token everywhere.
+        await saveAuthToken(trimmed);
+        const verified = await loadAuthToken().catch(() => null);
+        if (verified === trimmed) {
+          this.token = trimmed;
+          await AsyncStorage.removeItem('nexa-auth-token').catch(() => null);
+          await AsyncStorage.removeItem('glitchers-auth-token').catch(() => null);
+          return;
+        }
+        // SecureStore write didn't stick — keep legacy keys and use in-memory token.
+        console.warn('[apiClient] token migration: SecureStore verify failed, keeping legacy keys');
+        this.token = trimmed;
+      }
+    } catch {
+      // ignore
+    }
   }
 
   public async getEffectiveToken(): Promise<string> {
@@ -82,29 +130,10 @@ class ApiClient {
     }
 
     // 2. One-time migration from legacy plain-AsyncStorage keys
-    try {
-      const legacy =
-        (await AsyncStorage.getItem('nexa-auth-token')) ||
-        (await AsyncStorage.getItem('glitchers-auth-token'));
-      if (legacy && legacy.trim()) {
-        const trimmed = legacy.trim();
-        // Await the SecureStore write AND verify read-back BEFORE deleting
-        // legacy keys — otherwise an app kill mid-migration loses the token everywhere.
-        await saveAuthToken(trimmed);
-        const verified = await loadAuthToken().catch(() => null);
-        if (verified === trimmed) {
-          this.token = trimmed;
-          await AsyncStorage.removeItem('nexa-auth-token').catch(() => null);
-          await AsyncStorage.removeItem('glitchers-auth-token').catch(() => null);
-          return this.token;
-        }
-        // SecureStore write didn't stick — keep legacy keys and use in-memory token.
-        console.warn('[apiClient] token migration: SecureStore verify failed, keeping legacy keys');
-        this.token = trimmed;
-        return this.token;
-      }
-    } catch {
-      // ignore
+    // M18: serialized via migrationPromise so concurrent calls can't double-migrate.
+    await this.runLegacyMigrationLocked();
+    if (this.token && this.token.trim()) {
+      return this.token.trim();
     }
 
     // 3. In-memory authStore token (set during this session)
@@ -261,6 +290,11 @@ class ApiClient {
 
   public async updateBudget(monthlyLimit: number) {
     return this.post<{ budget: any }>('/budgets/', { monthlyLimit });
+  }
+
+  // M1: clear the backend budget (paired with setBudget(null)).
+  public async clearBudget() {
+    return this.delete<{ ok: boolean }>('/budgets/');
   }
 
   public async deleteAccount() {

@@ -5,13 +5,17 @@ import type { ClassSession, Task, Expense, Budget, Debt, EmailSummary } from '@g
 import { apiClient } from '../api/client';
 import { newUuid } from '../utils/tokenStorage';
 
-const getActiveUserId = () => {
+const getActiveUserId = (): string => {
+  // M3: never silently link data to 'offline-user' — a missing user id is a
+  // programming error and must be loud, not hidden.
   try {
     const { useAuthStore } = require('./authStore');
-    return useAuthStore?.getState?.()?.user?.id || 'offline-user';
+    const id = useAuthStore?.getState?.()?.user?.id;
+    if (id && typeof id === 'string') return id;
   } catch {
-    return 'offline-user';
+    /* fall through to throw */
   }
+  throw new Error('[dashboardStore] getActiveUserId: no logged-in user');
 };
 
 // Real UUIDs for every client-minted entity id (L3). Backend accepts the
@@ -27,6 +31,15 @@ export const splitShare = (totalAmount: number): number =>
 // C7: in-flight guard for flushOfflineQueue — prevents overlapping flushes
 // from double-sending the same queued actions.
 let isFlushingQueue = false;
+
+// H2: serialize whole-list class saves — concurrent addClass/updateClass calls
+// would interleave and overwrite each other.
+let classSaveChain: Promise<void> = Promise.resolve();
+
+// H3: last-seen backend IDs per entity. Lets sync distinguish "never synced"
+// (push up) from "synced before but now gone" (deleted on another device —
+// drop locally instead of resurrecting by pushing back up).
+let lastBackendIds: Record<string, Set<string>> = {};
 
 export interface ChatMessage {
   id: string;
@@ -54,6 +67,7 @@ interface DashboardState {
   budget: Budget | null;
   debts: Debt[];
   emails: EmailSummary[];
+  emailsLoaded: boolean;
   emailBullets: string[];
   dismissedNoticeIds: string[];
   chatMessages: ChatMessage[];
@@ -120,14 +134,13 @@ interface DashboardState {
 
   offlineSyncQueue: Array<{
     id: string;
-    type: 'CREATE_EXPENSE' | 'CREATE_TASK' | 'SPLIT_EXPENSE' | 'CREATE_DEBT' | 'DELETE_TASK' | 'DELETE_EXPENSE' | 'DELETE_CLASS' | 'PAY_DEBT' | 'UPDATE_PROFILE';
+    type: 'CREATE_EXPENSE' | 'CREATE_TASK' | 'SPLIT_EXPENSE' | 'CREATE_DEBT' | 'DELETE_TASK' | 'DELETE_EXPENSE' | 'DELETE_CLASS' | 'PAY_DEBT' | 'UPDATE_PROFILE' | 'UPDATE_TASK';
     payload: any;
     timestamp: string;
-    synced: boolean;
   }>;
   isOnline: boolean;
   setIsOnline: (online: boolean) => void;
-  queueOfflineAction: (action: { type: 'CREATE_EXPENSE' | 'CREATE_TASK' | 'SPLIT_EXPENSE' | 'CREATE_DEBT' | 'DELETE_TASK' | 'DELETE_EXPENSE' | 'DELETE_CLASS' | 'PAY_DEBT' | 'UPDATE_PROFILE'; payload: any }) => void;
+  queueOfflineAction: (action: { type: 'CREATE_EXPENSE' | 'CREATE_TASK' | 'SPLIT_EXPENSE' | 'CREATE_DEBT' | 'DELETE_TASK' | 'DELETE_EXPENSE' | 'DELETE_CLASS' | 'PAY_DEBT' | 'UPDATE_PROFILE' | 'UPDATE_TASK'; payload: any }) => void;
   flushOfflineQueue: () => Promise<{ syncedCount: number }>;
 
   syncWithBackend: () => Promise<void>;
@@ -145,6 +158,7 @@ export const useDashboardStore = create<DashboardState>()(
           budget: null,
           debts: [],
           emails: [],
+          emailsLoaded: false,
           emailBullets: [],
           dismissedNoticeIds: [],
           chatMessages: [],
@@ -229,11 +243,10 @@ export const useDashboardStore = create<DashboardState>()(
       setIsOnline: (isOnline) => set({ isOnline }),
       queueOfflineAction: (action) => {
         const item = {
-          id: String(Date.now()) + Math.random().toString(36).slice(2, 6),
+          id: newUuid(),
           type: action.type,
           payload: action.payload,
           timestamp: new Date().toISOString(),
-          synced: false,
         };
         set((s) => ({ offlineSyncQueue: [...s.offlineSyncQueue, item] }));
       },
@@ -243,7 +256,7 @@ export const useDashboardStore = create<DashboardState>()(
         if (isFlushingQueue) return { syncedCount: 0 };
         isFlushingQueue = true;
         try {
-          const pending = get().offlineSyncQueue.filter((q) => !q.synced);
+          const pending = get().offlineSyncQueue;
           if (pending.length === 0) return { syncedCount: 0 };
 
           // H3: only items that actually synced are removed — failures
@@ -263,9 +276,13 @@ export const useDashboardStore = create<DashboardState>()(
                 // instead of creating duplicates. (Older queued items without
                 // ids fall back to fresh UUIDs.)
                 const { expenseId, debtId, totalAmount, description, person } = item.payload;
+                const splitTotal = Number(totalAmount);
+                if (!Number.isFinite(splitTotal) || splitTotal <= 0) {
+                  throw new Error('invalid split amount');
+                }
                 await apiClient.createExpense({
                   id: expenseId || newUuid(),
-                  amount: totalAmount,
+                  amount: splitTotal,
                   category: 'FOOD',
                   description: `${description} (Split with ${person})`,
                 });
@@ -286,6 +303,8 @@ export const useDashboardStore = create<DashboardState>()(
                 await apiClient.payDebt(item.payload.id);
               } else if (item.type === 'UPDATE_PROFILE') {
                 await apiClient.updateProfile(item.payload);
+              } else if (item.type === 'UPDATE_TASK') {
+                await apiClient.updateTask(item.payload.id, item.payload.updates);
               }
               succeeded.add(item.id);
             } catch (err) {
@@ -311,6 +330,7 @@ export const useDashboardStore = create<DashboardState>()(
       budget: null,
       debts: [],
       emails: [],
+      emailsLoaded: false,
       emailBullets: ['All university circulars and notices have been acknowledged & cleared! 🎉'],
       dismissedNoticeIds: [],
       chatMessages: [],
@@ -323,8 +343,15 @@ export const useDashboardStore = create<DashboardState>()(
       setBudget: (budget) => {
         set({ budget });
         // E3: persist to backend — budget must survive reinstall/logout.
+        // M1: null clears the backend budget too (was silently kept).
         if (budget) {
-          apiClient.updateBudget(budget.monthlyLimit).catch(() => null);
+          apiClient.updateBudget(budget.monthlyLimit).catch((e) =>
+            console.warn('[dashboardStore] setBudget failed:', e?.message)
+          );
+        } else {
+          apiClient.clearBudget().catch((e) =>
+            console.warn('[dashboardStore] clearBudget failed:', e?.message)
+          );
         }
       },
       setDebts: (debts) => set({ debts }),
@@ -377,7 +404,10 @@ export const useDashboardStore = create<DashboardState>()(
         set((s) => ({
           tasks: s.tasks.map((t) => (t.id === taskId ? { ...t, priority } : t)),
         }));
-        apiClient.updateTask(taskId, { priority }).catch(() => null);
+        apiClient.updateTask(taskId, { priority }).catch((e) => {
+          console.warn('[dashboardStore] updateTaskPriority failed:', e?.message);
+          get().queueOfflineAction({ type: 'UPDATE_TASK', payload: { id: taskId, updates: { priority } } });
+        });
       },
 
       completeTask: (taskId) => {
@@ -387,7 +417,10 @@ export const useDashboardStore = create<DashboardState>()(
             t.id === taskId ? { ...t, status: 'COMPLETED', completedAt } : t
           ),
         }));
-        apiClient.updateTask(taskId, { status: 'COMPLETED', completedAt }).catch(() => null);
+        apiClient.updateTask(taskId, { status: 'COMPLETED', completedAt }).catch((e) => {
+          console.warn('[dashboardStore] completeTask failed:', e?.message);
+          get().queueOfflineAction({ type: 'UPDATE_TASK', payload: { id: taskId, updates: { status: 'COMPLETED', completedAt } } });
+        });
       },
 
       deleteTask: (taskId) => {
@@ -406,7 +439,10 @@ export const useDashboardStore = create<DashboardState>()(
         set((s) => ({
           tasks: s.tasks.map((t) => (t.id === taskId ? { ...t, ...updates } : t)),
         }));
-        apiClient.updateTask(taskId, updates).catch(() => null);
+        apiClient.updateTask(taskId, updates).catch((e) => {
+          console.warn('[dashboardStore] updateTask failed:', e?.message);
+          get().queueOfflineAction({ type: 'UPDATE_TASK', payload: { id: taskId, updates } });
+        });
       },
 
       addClass: async (c) => {
@@ -414,18 +450,28 @@ export const useDashboardStore = create<DashboardState>()(
         set((s) => ({
           classes: [...s.classes.filter((x) => x.id !== newClass.id), newClass],
         }));
-        try {
-          await apiClient.saveTimetableClasses(get().classes);
-        } catch {
-          /* offline: stays local, syncs on next syncWithBackend */
-        }
+        // H2: chain whole-list saves so concurrent calls can't interleave.
+        const run = classSaveChain.then(async () => {
+          try {
+            await apiClient.saveTimetableClasses(get().classes);
+          } catch {
+            /* offline: stays local, syncs on next syncWithBackend */
+          }
+        });
+        classSaveChain = run.catch(() => undefined);
+        await run;
       },
 
       updateClass: (classId, updates) => {
         set((s) => ({
           classes: s.classes.map((c) => (c.id === classId ? { ...c, ...updates } : c)),
         }));
-        apiClient.saveTimetableClasses(get().classes).catch(() => null);
+        const run = classSaveChain.then(() =>
+          apiClient.saveTimetableClasses(get().classes).catch((e) =>
+            console.warn('[dashboardStore] updateClass save failed:', e?.message)
+          )
+        );
+        classSaveChain = run.catch(() => undefined);
       },
 
       deleteClass: (classId) => {
@@ -448,10 +494,13 @@ export const useDashboardStore = create<DashboardState>()(
           // E1: backend already saved this record (e.g. scanned bill) — don't POST again.
           return;
         }
+        // H4: never send NaN to backend — default to 0.
+        const safeAmount = Number(normalized.amount);
+        normalized.amount = Number.isFinite(safeAmount) ? safeAmount : 0;
         try {
           await apiClient.createExpense({
             id: normalized.id,
-            amount: Number(normalized.amount),
+            amount: normalized.amount,
             category: normalized.category,
             description: normalized.description,
             merchant: normalized.merchant || undefined,
@@ -473,6 +522,11 @@ export const useDashboardStore = create<DashboardState>()(
       },
 
       splitExpense: (totalAmount, description, person) => {
+        // H4: reject non-finite amounts instead of recording garbage.
+        if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+          console.warn('[dashboardStore] splitExpense: invalid amount', totalAmount);
+          return;
+        }
         const half = splitShare(totalAmount);
         const currentUserId = getActiveUserId();
         const newExp: Expense = {
@@ -529,11 +583,13 @@ export const useDashboardStore = create<DashboardState>()(
       addDebt: async (debt) => {
         const normalized = { ...debt, id: ensureUuid(debt.id) };
         set((s) => ({ debts: [normalized, ...s.debts.filter((d) => d.id !== normalized.id)] }));
+        const debtAmt = Number(normalized.amount);
+        normalized.amount = Number.isFinite(debtAmt) ? debtAmt : 0;
         try {
           await apiClient.createDebt({
             id: normalized.id,
             person: normalized.person,
-            amount: Number(normalized.amount),
+            amount: normalized.amount,
             type: normalized.type,
             notes: normalized.notes || undefined,
           });
@@ -573,119 +629,92 @@ export const useDashboardStore = create<DashboardState>()(
             apiClient.getProfile(),
           ]);
 
-          // 1. Classes: non-destructive merge (same as tasks — never drop local classes)
+          // 1. Classes: merge — empty backend list is valid (H3). Items synced
+          // before but now missing were deleted elsewhere: drop them locally
+          // instead of pushing them back up (resurrection).
           if (classRes.status === 'fulfilled' && classRes.value?.classes) {
             const incoming: ClassSession[] = classRes.value.classes;
             const localClasses = get().classes;
-            if (incoming.length > 0) {
-              const backendIds = new Set(incoming.map((c) => c.id));
-              const unsynced = localClasses.filter((c) => c.id && !backendIds.has(c.id));
-              set({ classes: [...incoming, ...unsynced], isBackendConnected: true });
-              if (unsynced.length > 0) {
-                apiClient.saveTimetableClasses(unsynced).catch((e) => console.warn('[dashboardStore] syncWithBackend saveTimetableClasses failed:', e?.message));
-              }
-            } else if (localClasses.length > 0) {
-              apiClient.saveTimetableClasses(localClasses).catch((e) => console.warn('[dashboardStore] syncWithBackend saveTimetableClasses failed:', e?.message));
-            } else {
-              set({ isBackendConnected: true });
+            const backendIds = new Set(incoming.map((c) => c.id));
+            const prevIds = lastBackendIds.classes || new Set<string>();
+            const unsynced = localClasses.filter((c) => {
+              if (!c.id) return true;
+              if (backendIds.has(c.id)) return false;
+              return !prevIds.has(c.id); // seen on backend before → deleted elsewhere, drop
+            });
+            set({ classes: [...incoming, ...unsynced], isBackendConnected: true });
+            lastBackendIds.classes = backendIds;
+            if (unsynced.length > 0) {
+              apiClient.saveTimetableClasses(unsynced).catch((e) => console.warn('[dashboardStore] syncWithBackend saveTimetableClasses failed:', e?.message));
             }
           }
 
-          // 2. Tasks: non-destructive merge (retain local offline tasks & push up)
+          // 2. Tasks: merge — empty backend list is valid (H3).
           if (taskRes.status === 'fulfilled' && taskRes.value?.tasks) {
             const backendTasks: Task[] = taskRes.value.tasks;
             const localTasks = get().tasks;
-            if (backendTasks.length > 0) {
-              const backendIds = new Set(backendTasks.map((t) => t.id));
-              // S10: dedupe by id only — two different tasks may share a title.
-              const unsynced = localTasks.filter((t) => !backendIds.has(t.id));
-              set({ tasks: [...backendTasks, ...unsynced] });
-              for (const t of unsynced) {
-                apiClient.createTask({
-                  id: t.id,
-                  title: t.title,
-                  priority: t.priority,
-                  dueDate: t.dueDate,
-                  description: t.description,
-                }).catch((e) => console.warn('[dashboardStore] syncWithBackend createTask failed:', e?.message));
-              }
-            } else if (localTasks.length > 0) {
-              for (const t of localTasks) {
-                apiClient.createTask({
-                  id: t.id,
-                  title: t.title,
-                  priority: t.priority,
-                  dueDate: t.dueDate,
-                  description: t.description,
-                }).catch((e) => console.warn('[dashboardStore] syncWithBackend createTask failed:', e?.message));
-              }
+            const backendIds = new Set(backendTasks.map((t) => t.id));
+            const prevIds = lastBackendIds.tasks || new Set<string>();
+            // S10: dedupe by id only — two different tasks may share a title.
+            const unsynced = localTasks.filter((t) => !backendIds.has(t.id) && !prevIds.has(t.id));
+            set({ tasks: [...backendTasks, ...unsynced] });
+            lastBackendIds.tasks = backendIds;
+            for (const t of unsynced) {
+              apiClient.createTask({
+                id: t.id,
+                title: t.title,
+                priority: t.priority,
+                dueDate: t.dueDate,
+                description: t.description,
+              }).catch((e) => console.warn('[dashboardStore] syncWithBackend createTask failed:', e?.message));
             }
           }
 
-          // 3. Expenses: non-destructive merge
+          // 3. Expenses: merge — empty backend list is valid (H3).
           if (expRes.status === 'fulfilled' && expRes.value?.expenses) {
             const backendExps: Expense[] = expRes.value.expenses;
             const localExps = get().expenses;
-            if (backendExps.length > 0) {
-              const backendIds = new Set(backendExps.map((e) => e.id));
-              const unsynced = localExps.filter((e) => !backendIds.has(e.id));
-              set({ expenses: [...backendExps, ...unsynced] });
-              for (const e of unsynced) {
-                apiClient.createExpense({
-                  id: e.id,
-                  amount: Number(e.amount),
-                  category: e.category,
-                  description: e.description,
-                  merchant: e.merchant || undefined,
-                }).catch((err) => console.warn('[dashboardStore] syncWithBackend createExpense failed:', err?.message));
-              }
-            } else if (localExps.length > 0) {
-              for (const e of localExps) {
-                apiClient.createExpense({
-                  id: e.id,
-                  amount: Number(e.amount),
-                  category: e.category,
-                  description: e.description,
-                  merchant: e.merchant || undefined,
-                }).catch((err) => console.warn('[dashboardStore] syncWithBackend createExpense failed:', err?.message));
-              }
+            const backendIds = new Set(backendExps.map((e) => e.id));
+            const prevIds = lastBackendIds.expenses || new Set<string>();
+            const unsynced = localExps.filter((e) => !backendIds.has(e.id) && !prevIds.has(e.id));
+            set({ expenses: [...backendExps, ...unsynced] });
+            lastBackendIds.expenses = backendIds;
+            for (const e of unsynced) {
+              const amt = Number(e.amount);
+              apiClient.createExpense({
+                id: e.id,
+                amount: Number.isFinite(amt) ? amt : 0,
+                category: e.category,
+                description: e.description,
+                merchant: e.merchant || undefined,
+              }).catch((err) => console.warn('[dashboardStore] syncWithBackend createExpense failed:', err?.message));
             }
           }
 
-          // 4. Budget
-          if (budgetRes.status === 'fulfilled' && budgetRes.value?.budget) {
-            set({ budget: budgetRes.value.budget });
+          // 4. Budget — M4: clear local when backend has none (was kept stale).
+          if (budgetRes.status === 'fulfilled') {
+            set({ budget: budgetRes.value?.budget ?? null });
           }
 
-          // 5. Debts: non-destructive merge
+          // 5. Debts: merge — empty backend list is valid (H3).
           if (debtRes.status === 'fulfilled' && debtRes.value?.debts) {
             const backendDebts: Debt[] = debtRes.value.debts;
             const localDebts = get().debts;
-            if (backendDebts.length > 0) {
-              const backendIds = new Set(backendDebts.map((d) => d.id));
-              const unsynced = localDebts.filter((d) => !backendIds.has(d.id));
-              set({ debts: [...backendDebts, ...unsynced] });
-              // S8: always push unsynced local debts — previously they were
-              // only pushed when the backend returned zero debts.
-              for (const d of unsynced) {
-                apiClient.createDebt({
-                  id: d.id,
-                  person: d.person,
-                  amount: Number(d.amount),
-                  type: d.type,
-                  notes: d.notes || undefined,
-                }).catch((e) => console.warn('[dashboardStore] syncWithBackend createDebt failed:', e?.message));
-              }
-            } else if (localDebts.length > 0) {
-              for (const d of localDebts) {
-                apiClient.createDebt({
-                  id: d.id,
-                  person: d.person,
-                  amount: Number(d.amount),
-                  type: d.type,
-                  notes: d.notes || undefined,
-                }).catch((e) => console.warn('[dashboardStore] syncWithBackend createDebt failed:', e?.message));
-              }
+            const backendIds = new Set(backendDebts.map((d) => d.id));
+            const prevIds = lastBackendIds.debts || new Set<string>();
+            const unsynced = localDebts.filter((d) => !backendIds.has(d.id) && !prevIds.has(d.id));
+            set({ debts: [...backendDebts, ...unsynced] });
+            lastBackendIds.debts = backendIds;
+            // S8: always push unsynced local debts.
+            for (const d of unsynced) {
+              const amt = Number(d.amount);
+              apiClient.createDebt({
+                id: d.id,
+                person: d.person,
+                amount: Number.isFinite(amt) ? amt : 0,
+                type: d.type,
+                notes: d.notes || undefined,
+              }).catch((e) => console.warn('[dashboardStore] syncWithBackend createDebt failed:', e?.message));
             }
           }
 
@@ -696,7 +725,7 @@ export const useDashboardStore = create<DashboardState>()(
             const incomingEmails: EmailSummary[] = emailRes.value.emails || [];
             const dismissedSet = new Set(get().dismissedNoticeIds);
             incomingEmails.forEach((e) => {
-              if (e.isDismissed || (e as any).processed) {
+              if ((e.isDismissed || (e as any).processed) && e.id) {
                 dismissedSet.add(e.id);
               }
             });
@@ -712,6 +741,7 @@ export const useDashboardStore = create<DashboardState>()(
             );
             set({
               emails: mergedEmails,
+              emailsLoaded: true,
               dismissedNoticeIds: Array.from(dismissedSet),
               ...(hasPredefinedBullets || activeList.length === 0
                 ? { emailBullets: ['All university circulars and notices have been acknowledged & cleared! 🎉'] }
@@ -723,11 +753,9 @@ export const useDashboardStore = create<DashboardState>()(
           // Dedupe by id: local-only messages first, then backend messages.
           if (chatRes.status === 'fulfilled' && chatRes.value?.messages) {
             const backendMsgs: ChatMessage[] = chatRes.value.messages;
-            if (backendMsgs.length > 0) {
-              const backendIds = new Set(backendMsgs.map((m) => m.id));
-              const localOnly = get().chatMessages.filter((m) => m.id && !backendIds.has(m.id));
-              set({ chatMessages: [...localOnly, ...backendMsgs] });
-            }
+            const backendIds = new Set(backendMsgs.map((m) => m.id));
+            const localOnly = get().chatMessages.filter((m) => m.id && !backendIds.has(m.id));
+            set({ chatMessages: [...localOnly, ...backendMsgs] });
           }
 
           // 8. Profile
@@ -735,7 +763,10 @@ export const useDashboardStore = create<DashboardState>()(
             const u = profileRes.value.user;
             if (u.id !== '00000000-0000-0000-0000-000000000001') {
               if (u.cgpa) set({ cgpa: String(u.cgpa) });
-              if (u.creditsCompleted !== undefined && u.creditsCompleted !== null) set({ credits: Number(u.creditsCompleted) });
+              if (u.creditsCompleted !== undefined && u.creditsCompleted !== null) {
+                const cr = Number(u.creditsCompleted);
+                if (Number.isFinite(cr)) set({ credits: cr });
+              }
               if (u.avatarUrl) set({ avatarUrl: u.avatarUrl });
             }
           }
@@ -743,9 +774,17 @@ export const useDashboardStore = create<DashboardState>()(
           // Automatically push temporary offline queued actions to cloud dataset
           set({ isOnline: true });
           await get().flushOfflineQueue();
-        } catch {
-          // Offline fallback
-          set({ isOnline: false });
+        } catch (err: any) {
+          // M2: only treat transport failures as offline — a code bug throwing
+          // here must not be misreported as "no internet".
+          const msg = String(err?.message || '').toLowerCase();
+          const isNetwork = err?.name === 'AbortError' || err?.name === 'TypeError' ||
+            /network|fetch|timeout|aborted|econn|offline/.test(msg);
+          if (isNetwork) {
+            set({ isOnline: false });
+          } else {
+            console.warn('[dashboardStore] syncWithBackend code error:', err);
+          }
         } finally {
           set({ isLoading: false });
         }

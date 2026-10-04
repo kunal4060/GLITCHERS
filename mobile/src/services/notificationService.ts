@@ -77,10 +77,14 @@ export async function initNotifications(): Promise<boolean> {
  * and sends it to the backend so broadcasts can reach this device.
  */
 export async function registerForPush(): Promise<void> {
-  const { data } = await Notifications.getExpoPushTokenAsync({ projectId: EXPO_PROJECT_ID });
-  const token = data;
-  if (token) {
-    await apiClient.registerPushToken(token);
+  // M8: never throw — simulators and denied permissions used to crash callers.
+  try {
+    const { data } = await Notifications.getExpoPushTokenAsync({ projectId: EXPO_PROJECT_ID });
+    if (data) {
+      await apiClient.registerPushToken(data);
+    }
+  } catch (err) {
+    console.warn('[notifications] registerForPush failed:', (err as Error)?.message);
   }
 }
 
@@ -98,9 +102,9 @@ export async function cancelAllReminders(): Promise<void> {
  * reminders that would fire between 11 PM – 7 AM are deferred to 7:00 AM
  * instead of being dropped.
  *
- * Build-then-swap: the full request list is computed first, then old
- * reminders are cancelled and the new ones scheduled — so a kill mid-loop
- * can't leave the user with zero reminders.
+ * Build-then-swap: new reminders are scheduled first, then stale ones are
+ * cancelled — so a kill mid-loop can't leave the user with zero reminders.
+ * Capped at 64 (iOS silently drops beyond that), soonest first.
  */
 export async function refreshReminders(
   classes: ClassSession[],
@@ -165,16 +169,33 @@ export async function refreshReminders(
     });
   }
 
-  // Swap: cancel old only after the new list is fully computed.
-  await cancelAllReminders();
-  for (const r of requests) {
+  // H8: iOS silently drops scheduled notifications beyond 64 — cap the list
+  // and keep the soonest ones so the nearest reminders always survive.
+  requests.sort((a, b) => a.fireAt.getTime() - b.fireAt.getTime());
+  const capped = requests.slice(0, 64);
+  if (requests.length > 64) {
+    console.warn(`[notifications] capped ${requests.length} reminders to 64 (iOS limit)`);
+  }
+
+  // M9: true build-then-swap — schedule the new set first, then cancel only
+  // the old ones. A kill mid-loop can no longer leave zero reminders.
+  const before = await Notifications.getAllScheduledNotificationsAsync().catch(() => []);
+  const oldIds = new Set((before || []).map((n) => n.identifier));
+  const newIds = new Set<string>();
+  for (const r of capped) {
     try {
-      await Notifications.scheduleNotificationAsync({
+      const id = await Notifications.scheduleNotificationAsync({
         content: r.content,
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: r.fireAt },
       });
+      if (id) newIds.add(id);
     } catch {
       /* keep scheduling the rest */
+    }
+  }
+  for (const id of oldIds) {
+    if (!newIds.has(id)) {
+      await Notifications.cancelScheduledNotificationAsync(id).catch(() => null);
     }
   }
 }

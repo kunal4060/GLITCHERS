@@ -39,15 +39,15 @@ export const NotificationsScreen: React.FC<{ navigation?: any }> = ({ navigation
     dynamicNotifs.push({
       id: 'class-' + c.id,
       title: `${c.subjectName} • ${nextClassInfo.statusLabel}`,
-      message: `Room ${c.room || '—'} • ${c.faculty || 'Faculty'} (${c.startTime?.slice(0, 5)} – ${c.endTime?.slice(0, 5)})`,
+      message: `Room ${c.room || '—'} • ${c.faculty || 'Faculty'} (${c.startTime ? c.startTime.slice(0, 5) : '—'} – ${c.endTime ? c.endTime.slice(0, 5) : '—'})`,
       time: nextClassInfo.isOngoing ? 'Right now' : 'Upcoming',
       priority: nextClassInfo.isOngoing ? 'HIGH' : 'NORMAL',
     });
   }
 
-  // 2. Urgent tasks (TODO + IN_PROGRESS — both need attention)
+  // 2. Urgent tasks
   tasks
-    .filter((t) => t.status === 'TODO' || t.status === 'IN_PROGRESS')
+    .filter((t) => t.status === 'TODO')
     .filter((t) => t.priority === 'EXTREMELY_IMPORTANT' || t.priority === 'HIGH')
     .slice(0, 3)
     .forEach((t) => {

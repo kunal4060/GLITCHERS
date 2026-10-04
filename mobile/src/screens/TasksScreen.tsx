@@ -61,7 +61,7 @@ export const TasksScreen = ({ navigation }: { navigation?: any }) => {
     return !Number.isNaN(d.getTime()) && new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() === startOfToday;
   };
 
-  const pending = tasks.filter((t) => t.status === 'TODO' || t.status === 'IN_PROGRESS');
+  const pending = tasks.filter((t) => t.status === 'TODO');
   const completed = tasks.filter((t) => t.status === 'COMPLETED');
 
   const filtered: any[] =
@@ -94,29 +94,17 @@ export const TasksScreen = ({ navigation }: { navigation?: any }) => {
     setPriority('NORMAL');
   };
 
-  const savingRef = React.useRef(false);
   const saveTask = () => {
-    if (savingRef.current) return;
     if (!title.trim()) {
       Alert.alert('Missing title', 'Give the task a name.');
       return;
     }
-    let dueIso: string | undefined;
-    if (dueDate) {
-      const parsed = new Date(dueDate + 'T23:59:00');
-      if (isNaN(parsed.getTime())) {
-        Alert.alert('Invalid date', 'Please enter a valid date (YYYY-MM-DD).');
-        return;
-      }
-      dueIso = parsed.toISOString();
-    }
     const payload = {
       title: title.trim(),
       description: description.trim(),
-      dueDate: dueIso,
+      dueDate: dueDate ? new Date(dueDate.includes('T') ? dueDate : dueDate + 'T23:59:00').toISOString() : undefined,
       priority,
     };
-    savingRef.current = true;
     if (editing) {
       updateTask(editing.id, payload);
       Alert.alert('Updated', 'Task updated.');
@@ -126,8 +114,6 @@ export const TasksScreen = ({ navigation }: { navigation?: any }) => {
     }
     resetForm();
     setAddVisible(false);
-    // Reset after alert dismisses (next tick)
-    setTimeout(() => { savingRef.current = false; }, 500);
   };
 
   const confirmDelete = (t: any) => {
@@ -153,24 +139,6 @@ export const TasksScreen = ({ navigation }: { navigation?: any }) => {
 
           <Text style={styles.title}>Tasks & Focus</Text>
           <Text style={styles.sub}>Your workload, prioritized by NIA</Text>
-
-          {/* AI task creator entry */}
-          <TouchableOpacity
-            style={styles.aiBanner}
-            onPress={() => navigation?.navigate('AITaskCreator')}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel="Create task with AI chat"
-          >
-            <View style={styles.aiBannerIcon}>
-              <Ionicons name="sparkles" size={18} color="#FFFFFF" />
-            </View>
-            <View style={styles.aiBannerText}>
-              <Text style={styles.aiBannerTitle}>✨ AI se task banao</Text>
-              <Text style={styles.aiBannerSub}>Bas likho — NIA samajh ke task set kar degi</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={C.textSubtle} />
-          </TouchableOpacity>
 
           {/* Filter row */}
           <View style={styles.filterRow}>
@@ -267,6 +235,7 @@ export const TasksScreen = ({ navigation }: { navigation?: any }) => {
               </Text>
             </NiaCard>
           ) : (
+            filter !== 'All' &&
             filtered.map((t) => {
               const pill = pillFor(t);
               const due = formatDue(t.dueDate);
@@ -409,21 +378,6 @@ const styles = StyleSheet.create({
   filterCountActive: { color: C.obsidian, backgroundColor: 'rgba(255,255,255,0.9)' },
   bannerCard: { marginHorizontal: 20, marginBottom: 18 },
   bannerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  aiBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    marginHorizontal: 20, marginTop: 14, marginBottom: 4,
-    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: C.hairline,
-    borderRadius: 16, padding: 14,
-    shadowColor: '#0F172A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05,
-    shadowRadius: 8, elevation: 2,
-  },
-  aiBannerIcon: {
-    width: 42, height: 42, borderRadius: 21, backgroundColor: C.eucalyptus,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  aiBannerText: { flex: 1 },
-  aiBannerTitle: { fontSize: 15, fontWeight: '700', color: C.ink, letterSpacing: -0.2 },
-  aiBannerSub: { fontSize: 12, color: C.textMuted, marginTop: 2 },
   bannerTitle: { fontSize: 15, fontWeight: '700', color: C.ink, marginBottom: 3 },
   bannerSub: { fontSize: 12, color: C.textMuted },
   sectionHead: {
@@ -472,7 +426,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   fab: {
-    position: 'absolute', right: 20, bottom: 158,
+    position: 'absolute', right: 20, bottom: 104,
     width: 58, height: 58, borderRadius: 29, backgroundColor: C.obsidian,
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#0F172A', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25,

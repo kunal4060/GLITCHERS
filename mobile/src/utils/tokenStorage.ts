@@ -7,11 +7,9 @@ const TOKEN_KEY = 'nexa-auth-token-secure';
  * Auth tokens must never live in plain AsyncStorage.
  */
 export async function saveAuthToken(token: string): Promise<void> {
-  try {
-    await SecureStore.setItemAsync(TOKEN_KEY, token);
-  } catch (err) {
-    console.warn('SecureStore save failed:', err);
-  }
+  // M15: failures propagate — callers (setToken/migration) decide how loud to
+  // be. Swallowing here made "saved" a lie and logged users out on relaunch.
+  await SecureStore.setItemAsync(TOKEN_KEY, token);
 }
 
 export async function loadAuthToken(): Promise<string | null> {

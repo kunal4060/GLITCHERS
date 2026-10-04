@@ -240,7 +240,8 @@ export function isConfirmation(text: string): boolean {
 
 /** Quick check: is this message a cancellation ("nahi", "no", "cancel")? */
 export function isCancellation(text: string): boolean {
-  return /^(nahi+|nhi|no+|nope|cancel|ruko|rehn de|rehne do|mat karo)\s*[.!]*$/i.test(text.trim());
+  // M14: word boundaries so "nahi karo" and "nahi, rehne do" match too.
+  return /\b(nahi+|nhi|no+|nope|cancel|ruko|rehn de|rehne do|mat karo)\b/i.test(text.trim());
 }
 
 /**

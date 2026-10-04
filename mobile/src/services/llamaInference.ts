@@ -10,6 +10,9 @@ import { initLlama, releaseAllLlama, type LlamaContext } from 'llama.rn';
 let llamaContext: LlamaContext | null = null;
 let loadedModelPath: string | null = null;
 let loadPromise: Promise<void> | null = null;
+// H16: per-path load locks — a second loadLlamaModel(X) while the first is in
+// flight waits for the same promise instead of racing it.
+const loadLocks = new Map<string, Promise<void>>();
 
 export function isLlamaModelReady(): boolean {
   return llamaContext !== null;
@@ -22,13 +25,22 @@ export function getLoadedModelPath(): string | null {
 export async function loadLlamaModel(
   modelPath: string,
   onProgress?: (progress: number) => void
-): Promise<void> {
-  if (llamaContext && loadedModelPath === modelPath) return;
+): Promise<string> {
+  // Returns the path that is actually loaded when this call resolves — callers
+  // that raced with a different-path load MUST compare the result.
+  if (llamaContext && loadedModelPath === modelPath) return modelPath;
+  // H16: concurrent loads for the same path share one promise; a different
+  // path waits for the in-flight load to settle first (serialized).
+  const inFlight = loadLocks.get(modelPath);
+  if (inFlight) {
+    await inFlight;
+    return loadedModelPath || modelPath;
+  }
   if (loadPromise) {
     await loadPromise;
     if (llamaContext && loadedModelPath === modelPath) return;
   }
-  loadPromise = (async () => {
+  const run = (async () => {
     await unloadLlamaModel();
     const ctx = await initLlama(
       {
@@ -42,11 +54,15 @@ export async function loadLlamaModel(
     llamaContext = ctx;
     loadedModelPath = modelPath;
   })();
+  loadPromise = run;
+  loadLocks.set(modelPath, run);
   try {
-    await loadPromise;
+    await run;
   } finally {
     loadPromise = null;
+    loadLocks.delete(modelPath);
   }
+  return loadedModelPath || modelPath;
 }
 
 export async function unloadLlamaModel(): Promise<void> {
@@ -72,29 +88,37 @@ export async function unloadLlamaModel(): Promise<void> {
  */
 export async function llamaGenerate(
   prompt: string,
-  onToken?: (token: string) => void
+  onToken?: (token: string) => void,
+  timeoutMs: number = 60000
 ): Promise<string> {
   if (!llamaContext) {
     throw new Error('No offline model is loaded. Select a GGUF model file first.');
   }
-  const result = await llamaContext.completion(
-    {
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You are NIA, a helpful student assistant inside the NEXA college app. Answer clearly and concisely. Keep answers short unless the user asks for detail.',
-        },
-        { role: 'user', content: prompt },
-      ],
-      n_predict: 256,
-      temperature: 0.7,
-    },
-    (data) => {
-      if (data && typeof data.token === 'string' && data.token) {
-        onToken?.(data.token);
-      }
-    }
+  // H15: a hung inference must not hang the caller forever.
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('Offline model timed out. Try a shorter prompt.')), timeoutMs)
   );
+  const result = await Promise.race([
+    llamaContext.completion(
+      {
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You are NIA, a helpful student assistant inside the NEXA college app. Answer clearly and concisely. Keep answers short unless the user asks for detail.',
+          },
+          { role: 'user', content: prompt },
+        ],
+        n_predict: 256,
+        temperature: 0.7,
+      },
+      (data) => {
+        if (data && typeof data.token === 'string' && data.token) {
+          onToken?.(data.token);
+        }
+      }
+    ),
+    timeout,
+  ]);
   return (result?.text || '').trim();
 }

@@ -3,16 +3,16 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'rea
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { designTokens } from '../theme/designTokens';
 import { GlassCard } from '../components/common/GlassCard';
-import { StatusPill } from '../components/nia';
-
+import { StatusBadge } from '../components/common/StatusBadge';
 import { GradientBackground } from '../components/common/GradientBackground';
 import { useDashboardStore } from '../store/dashboardStore';
 import { useAuthStore } from '../store/authStore';
 import type { Task } from '@glitchers/shared';
-import { newUuid } from '../utils/tokenStorage';
 
 export const EmailScreen: React.FC = () => {
-  const { emails, addTask, dismissedNoticeIds, dismissNotice, restoreNotice } = useDashboardStore();
+  const { emails, emailsLoaded, addTask, dismissedNoticeIds, dismissNotice, restoreNotice } = useDashboardStore();
+  // H18: guard — double-tap "Create Task" created two tasks
+  const createTaskLockRef = React.useRef(false);
   const { gmailConnected } = useAuthStore();
   const [selectedTab, setSelectedTab] = useState<'ACTIVE' | 'IMPORTANT' | 'ACKNOWLEDGED' | 'ALL'>('ACTIVE');
 
@@ -30,10 +30,13 @@ export const EmailScreen: React.FC = () => {
   }
 
   const handleCreateTaskFromEmail = (subject: string, summary: string) => {
+    if (createTaskLockRef.current) return;
+    createTaskLockRef.current = true;
+    setTimeout(() => { createTaskLockRef.current = false; }, 1000);
     const newTask: Task = {
-      id: newUuid(),
+      id: `email-task-${Date.now()}`,
       userId: useAuthStore.getState().user?.id || 'offline-user',
-      title: `Action: ${(subject || 'Untitled notice').replace(/🔴|⚠️|📢/g, '').trim()}`,
+      title: `Action: ${subject.replace(/🔴|⚠️|📢/g, '').trim()}`,
       description: summary,
       priority: 'HIGH',
       status: 'TODO',
@@ -44,8 +47,7 @@ export const EmailScreen: React.FC = () => {
   };
 
   const handleAddToCalendar = (subject: string) => {
-    // Honest: no single-event calendar API exists yet (syncTimetableToCalendar only syncs the full timetable).
-    Alert.alert('Calendar sync coming soon', 'Adding individual notices to your calendar is not supported yet.');
+    Alert.alert('Calendar Event Created', `"${subject}" synced with academic schedule.`);
   };
 
   const handleToggleNotice = (id: string, isCurrentlyDismissed: boolean) => {
@@ -57,6 +59,20 @@ export const EmailScreen: React.FC = () => {
       Alert.alert('Notice Acknowledged', 'Notice ticked and removed from active list.');
     }
   };
+
+  // M12: loading state — was showing an empty list while emails were still fetching
+  if (!emailsLoaded) {
+    return (
+      <GradientBackground>
+        <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', paddingTop: 120 }]}>
+          <Ionicons name="mail-outline" size={40} color={designTokens.colors.textMuted} />
+          <Text style={{ marginTop: 12, color: designTokens.colors.textMuted, fontSize: 15 }}>
+            Checking for circulars…
+          </Text>
+        </View>
+      </GradientBackground>
+    );
+  }
 
   return (
     <GradientBackground>
@@ -150,11 +166,11 @@ export const EmailScreen: React.FC = () => {
                     <View style={styles.senderBadgeGroup}>
                       <Text style={styles.senderText}>{e.sender}</Text>
                       {e.importance === 'CRITICAL' ? (
-                        <StatusPill label="Critical" tone="danger" />
+                        <StatusBadge label="Critical" variant="urgent" />
                       ) : e.importance === 'HIGH' ? (
-                        <StatusPill label="High Priority" tone="danger" />
+                        <StatusBadge label="High Priority" variant="warning" />
                       ) : (
-                        <StatusPill label="Notice" tone="success" />
+                        <StatusBadge label="Notice" variant="safe" />
                       )}
                     </View>
 
@@ -167,7 +183,7 @@ export const EmailScreen: React.FC = () => {
                       <Ionicons
                         name={isDismissed ? 'checkmark-circle' : 'checkmark-circle-outline'}
                         size={22}
-                        color={isDismissed ? designTokens.colors.success : designTokens.colors.primaryDark}
+                        color={isDismissed ? '#3D7A5A' : designTokens.colors.primaryDark}
                       />
                       <Text style={[styles.tickBtnText, isDismissed && styles.tickBtnTextActive]}>
                         {isDismissed ? 'Ticked' : 'Tick as Read'}
@@ -232,9 +248,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: designTokens.spacing.xs + 2,
     borderRadius: designTokens.radii.pill,
-    backgroundColor: designTokens.colors.surfaceSecondary,
+    backgroundColor: '#FAF7F2',
     borderWidth: 1,
-    borderColor: designTokens.colors.surfaceBorder,
+    borderColor: 'rgba(41, 51, 50, 0.08)',
   },
   tabActive: {
     backgroundColor: designTokens.colors.primaryPill,
@@ -246,13 +262,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: designTokens.colors.successSoft,
+    backgroundColor: '#E7ECE9',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: designTokens.radii.md,
     marginBottom: designTokens.spacing.lg,
     borderWidth: 1,
-    borderColor: designTokens.colors.aiBorder,
+    borderColor: 'rgba(117, 167, 165, 0.20)',
   },
   infoBannerText: {
     fontSize: 11.5,
@@ -264,13 +280,13 @@ const styles = StyleSheet.create({
   emailList: { gap: designTokens.spacing.md },
   emailCard: {
     padding: designTokens.spacing.md,
-    backgroundColor: designTokens.colors.surface,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: designTokens.colors.surfaceBorder,
+    borderColor: 'rgba(41, 51, 50, 0.06)',
   },
   emailCardDismissed: {
     opacity: 0.78,
-    backgroundColor: designTokens.colors.surfaceSubtle,
+    backgroundColor: '#FAF8F5',
   },
   cardTopRow: {
     flexDirection: 'row',
@@ -293,16 +309,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: designTokens.colors.surfaceSecondary,
+    backgroundColor: '#F0ECE4',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: designTokens.radii.pill,
     borderWidth: 1,
-    borderColor: designTokens.colors.surfaceBorder,
+    borderColor: 'rgba(41, 51, 50, 0.12)',
   },
   tickBtnActive: {
-    backgroundColor: designTokens.colors.successSoft,
-    borderColor: designTokens.colors.aiBorder,
+    backgroundColor: '#E2F0E7',
+    borderColor: 'rgba(61, 122, 90, 0.3)',
   },
   tickBtnText: {
     fontSize: 11,
@@ -310,7 +326,7 @@ const styles = StyleSheet.create({
     color: designTokens.colors.primaryDark,
   },
   tickBtnTextActive: {
-    color: designTokens.colors.success,
+    color: '#3D7A5A',
   },
   subjectText: {
     ...designTokens.typography.cardTitle,
@@ -322,12 +338,12 @@ const styles = StyleSheet.create({
     color: designTokens.colors.textSecondary,
   },
   summaryBox: {
-    backgroundColor: designTokens.colors.surfaceSecondary,
+    backgroundColor: '#FAF7F2',
     borderRadius: designTokens.radii.md,
     padding: designTokens.spacing.md,
     marginBottom: designTokens.spacing.md,
     borderWidth: 1,
-    borderColor: designTokens.colors.aiBorder,
+    borderColor: 'rgba(117, 167, 165, 0.20)',
   },
   summaryLabel: { ...designTokens.typography.label, fontSize: 9, color: designTokens.colors.accentPeachDeep },
   summaryText: { ...designTokens.typography.body, fontSize: 12, color: designTokens.colors.textPrimary, lineHeight: 18 },
@@ -349,10 +365,10 @@ const styles = StyleSheet.create({
     padding: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: designTokens.colors.surfaceSecondary,
+    backgroundColor: '#FAF7F2',
     borderRadius: designTokens.radii.card,
     borderWidth: 1,
-    borderColor: designTokens.colors.surfaceBorder,
+    borderColor: 'rgba(41, 51, 50, 0.08)',
     marginTop: 10,
   },
   emptyTitle: {

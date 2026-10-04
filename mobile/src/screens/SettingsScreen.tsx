@@ -1,16 +1,14 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Modal, TextInput, Image, Linking } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Modal, TextInput, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { designTokens } from '../theme/designTokens';
 import { useAuthStore } from '../store/authStore';
 import { useDashboardStore } from '../store/dashboardStore';
-import { apiClient } from '../api/client';
 import { NiaHeader, LabelCaps, StatusPill } from '../components/nia';
 import { initials } from '../utils/niaFormat';
-import { THEMES, getCurrentThemeId, persistThemeId } from '../theme/themeStore';
-import * as Updates from 'expo-updates';
 
 const C = designTokens.colors;
 
@@ -31,7 +29,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
     syncWithBackend,
     quietHours,
     setQuietHours,
-    queueOfflineAction,
   } = useDashboardStore();
 
   const [semester, setSemester] = useState('SEMESTER 5');
@@ -40,31 +37,28 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
   const [proactiveTips, setProactiveTips] = useState(true);
   const [chatStyle, setChatStyle] = useState<'concise' | 'detailed'>('concise');
   const [syncing, setSyncing] = useState(false);
-  const [currentThemeId, setCurrentThemeId] = useState(getCurrentThemeId());
 
-  const handleSelectTheme = (id: string) => {
-    const theme = THEMES.find((t) => t.id === id);
-    if (!theme || id === currentThemeId) return;
-    Alert.alert(
-      'Change theme?',
-      `Switch to "${theme.name}"? The app will restart once to apply it.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Apply',
-          onPress: async () => {
-            await persistThemeId(id);
-            setCurrentThemeId(id);
-            try {
-              await Updates.reloadAsync();
-            } catch {
-              Alert.alert('Restart needed', 'Please close and reopen the app to apply the new theme.');
-            }
-          },
-        },
-      ]
-    );
-  };
+  // H50: persist settings — they were plain useState and lost on restart
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem('@nexa/settings');
+        if (raw) {
+          const s = JSON.parse(raw);
+          if (s.semester) setSemester(s.semester);
+          if (typeof s.floatingAssistantEnabled === 'boolean') setFloatingAssistantEnabled(s.floatingAssistantEnabled);
+          if (typeof s.voiceReplies === 'boolean') setVoiceReplies(s.voiceReplies);
+          if (typeof s.proactiveTips === 'boolean') setProactiveTips(s.proactiveTips);
+          if (s.chatStyle === 'concise' || s.chatStyle === 'detailed') setChatStyle(s.chatStyle);
+        }
+      } catch { /* defaults stand */ }
+    })();
+  }, []);
+  useEffect(() => {
+    AsyncStorage.setItem('@nexa/settings', JSON.stringify({
+      semester, floatingAssistantEnabled, voiceReplies, proactiveTips, chatStyle,
+    })).catch(() => null);
+  }, [semester, floatingAssistantEnabled, voiceReplies, proactiveTips, chatStyle]);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editType, setEditType] = useState<'CGPA' | 'CREDITS'>('CGPA');
@@ -112,7 +106,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
     setModalVisible(true);
   };
 
-  const handleSaveAcademics = async () => {
+  const handleSaveAcademics = () => {
     const val = editValue.trim();
     if (editType === 'CGPA') {
       const num = parseFloat(val);
@@ -120,10 +114,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
         Alert.alert('Invalid CGPA', 'Please enter a valid CGPA between 0.00 and 10.00');
         return;
       }
-      const formatted = num.toFixed(2);
-      setCgpa(formatted);
-      // C5: queue profile update — survives offline and won't be reverted by next sync
-      queueOfflineAction({ type: 'UPDATE_PROFILE', payload: { cgpa: formatted } });
+      setCgpa(num.toFixed(2));
     } else {
       const num = parseInt(val, 10);
       if (isNaN(num) || num < 0 || num > 300) {
@@ -131,8 +122,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
         return;
       }
       setCredits(num);
-      // C5: queue profile update — survives offline and won't be reverted by next sync
-      queueOfflineAction({ type: 'UPDATE_PROFILE', payload: { creditsCompleted: num } });
     }
     setModalVisible(false);
   };
@@ -164,26 +153,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
       { text: 'Cancel', style: 'cancel' },
       { text: 'Log Out', style: 'destructive', onPress: () => logout() },
     ]);
-  };
-
-  const handleContribute = async () => {
-    // UPI deep link — Android shows the app chooser with installed UPI apps
-    // (GPay / PhonePe / Paytm / BHIM), amount pre-filled as Rs. 20.
-    const upiUrl =
-      'upi://pay?pa=kunalugale6366-1@okicici' +
-      '&pn=' + encodeURIComponent('Kunal Ugale') +
-      '&am=20&cu=INR' +
-      '&tn=' + encodeURIComponent('Support NEXA development');
-    try {
-      const supported = await Linking.canOpenURL(upiUrl);
-      if (!supported) {
-        Alert.alert('No UPI app found', 'Please install a UPI app (GPay, PhonePe, Paytm) to contribute.');
-        return;
-      }
-      await Linking.openURL(upiUrl);
-    } catch {
-      Alert.alert('Could not open', 'Please try again or pay manually to kunalugale6366-1@okicici');
-    }
   };
 
   const Row = ({ icon, label, onPress, danger, right }: { icon: string; label: string; onPress?: () => void; danger?: boolean; right?: React.ReactNode }) => (
@@ -349,43 +318,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
             <Text style={styles.rowHint}>Quick-access NIA bubble that floats over the app.</Text>
           </View>
 
-          {/* Appearance — Theme gallery */}
-          <View style={styles.sectionHead}>
-            <Text style={styles.sectionTitle}>Appearance</Text>
-            <LabelCaps>Theme</LabelCaps>
-          </View>
-          <View style={[styles.card, styles.themeCard]}>
-            <View style={styles.themeGrid}>
-              {THEMES.map((t) => {
-                const selected = t.id === currentThemeId;
-                return (
-                  <TouchableOpacity
-                    key={t.id}
-                    style={[styles.themeOption, selected && styles.themeOptionSelected]}
-                    onPress={() => handleSelectTheme(t.id)}
-                    activeOpacity={0.8}
-                  >
-                    <View style={styles.themeDots}>
-                      {t.preview.map((c, i) => (
-                        <View key={i} style={[styles.themeDot, { backgroundColor: c }]} />
-                      ))}
-                    </View>
-                    <Text style={[styles.themeName, selected && styles.themeNameSelected]} numberOfLines={1}>
-                      {t.name}
-                    </Text>
-                    <Text style={styles.themeTagline} numberOfLines={1}>{t.tagline}</Text>
-                    {selected && (
-                      <View style={styles.themeCheck}>
-                        <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            <Text style={styles.rowHint}>Pick a theme — the app restarts once to apply it.</Text>
-          </View>
-
           {/* Account actions */}
           <View style={styles.sectionHead}>
             <Text style={styles.sectionTitle}>Account</Text>
@@ -411,30 +343,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onRestartOnboard
             ) : null}
             <View style={styles.divider} />
             <Row icon="log-out-outline" label="Log Out" onPress={handleLogout} danger />
-          </View>
-
-          {/* Support NEXA — UPI contribution */}
-          <View style={styles.sectionHead}>
-            <Text style={styles.sectionTitle}>Support NEXA</Text>
-            <LabelCaps>Contribute</LabelCaps>
-          </View>
-          <View style={[styles.card, styles.contributeCard]}>
-            <View style={styles.contributeTop}>
-              <View style={styles.contributeIcon}>
-                <Ionicons name="heart" size={22} color="#FFFFFF" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.contributeTitle}>Keep NEXA free for students</Text>
-                <Text style={styles.contributeText}>
-                  NEXA banane me bahut mehnat lagi hai. Agar ye app tumhare kaam aa raha hai, to chhota sa ₹20 contribute karke support karo — har rupaya NEXA ko aur behtar banane me lagega.
-                </Text>
-              </View>
-            </View>
-            <TouchableOpacity style={styles.contributeBtn} onPress={handleContribute} activeOpacity={0.85}>
-              <Ionicons name="wallet-outline" size={18} color="#FFFFFF" />
-              <Text style={styles.contributeBtnText}>Contribute ₹20 via UPI</Text>
-            </TouchableOpacity>
-            <Text style={styles.contributeNote}>GPay / PhonePe / Paytm — koi bhi UPI app chalegi</Text>
           </View>
 
           <View style={{ height: 16 }} />
@@ -538,34 +446,4 @@ const styles = StyleSheet.create({
   modalCancelText: { fontSize: 14, fontWeight: '700', color: C.textSecondary },
   modalSave: { flex: 1, alignItems: 'center', paddingVertical: 13, borderRadius: 12, backgroundColor: C.obsidian },
   modalSaveText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
-  contributeCard: { paddingHorizontal: 16, paddingVertical: 16 },
-  contributeTop: { flexDirection: 'row', gap: 12, marginBottom: 14 },
-  contributeIcon: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: '#E11D48',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  contributeTitle: { fontSize: 15, fontWeight: '700', color: C.ink, marginBottom: 4 },
-  contributeText: { fontSize: 12.5, color: C.textSecondary, lineHeight: 18 },
-  contributeBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: C.obsidian, borderRadius: 14, paddingVertical: 14,
-  },
-  contributeBtnText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
-  contributeNote: { fontSize: 11, color: C.textSubtle, textAlign: 'center', marginTop: 8 },
-  themeCard: { paddingHorizontal: 14, paddingVertical: 14 },
-  themeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 10 },
-  themeOption: {
-    width: '31%', borderRadius: 14, borderWidth: 1.5, borderColor: C.hairline,
-    backgroundColor: C.surfaceSecondary, padding: 10, alignItems: 'center', position: 'relative',
-  },
-  themeOptionSelected: { borderColor: C.eucalyptus, backgroundColor: C.eucalyptusFaint },
-  themeDots: { flexDirection: 'row', gap: 5, marginBottom: 8 },
-  themeDot: { width: 18, height: 18, borderRadius: 9, borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)' },
-  themeName: { fontSize: 12, fontWeight: '700', color: C.textPrimary },
-  themeNameSelected: { color: C.eucalyptusDeep },
-  themeTagline: { fontSize: 10, color: C.textMuted, marginTop: 2 },
-  themeCheck: {
-    position: 'absolute', top: 6, right: 6, width: 20, height: 20, borderRadius: 10,
-    backgroundColor: C.eucalyptus, alignItems: 'center', justifyContent: 'center',
-  },
 });

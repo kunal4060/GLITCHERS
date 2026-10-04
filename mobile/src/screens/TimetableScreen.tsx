@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,6 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
-  PanResponder,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -48,29 +47,10 @@ export const TimetableScreen = ({ navigation }: { navigation?: any }) => {
   const now = new Date();
   const curMinutes = now.getHours() * 60 + now.getMinutes();
   const dayClasses = classes
-    .filter((c) => c.day.toUpperCase().slice(0, 3) === selectedDay && !c.isCancelled)
+    .filter((c) => (c.day || '').toUpperCase().slice(0, 3) === selectedDay && !c.isCancelled)
     .sort((a, b) => parseTimeToMinutes(a.startTime) - parseTimeToMinutes(b.startTime));
 
   const isToday = selectedDay === DAYS[(new Date().getDay() + 6) % 7];
-
-  // Horizontal swipe on the day's class list moves between days
-  // (swipe left -> next day, swipe right -> previous day, wraps around the week)
-  const goToDayRef = useRef<(dir: 1 | -1) => void>(() => {});
-  const goToDay = (dir: 1 | -1) => {
-    // Functional update avoids the PanResponder stale closure
-    setSelectedDay((prev) => DAYS[(DAYS.indexOf(prev) + dir + DAYS.length) % DAYS.length]);
-  };
-  goToDayRef.current = goToDay;
-  const swipeResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_e, g) =>
-        Math.abs(g.dx) > 24 && Math.abs(g.dx) > Math.abs(g.dy) * 1.4,
-      onPanResponderRelease: (_e, g) => {
-        if (g.dx < -60) goToDayRef.current(1);
-        else if (g.dx > 60) goToDayRef.current(-1);
-      },
-    })
-  ).current;
 
   const resetForm = () => {
     setSubjectName('');
@@ -93,9 +73,7 @@ export const TimetableScreen = ({ navigation }: { navigation?: any }) => {
     setAddVisible(true);
   };
 
-  const savingRef = useRef(false);
   const saveClass = () => {
-    if (savingRef.current) return;
     if (!subjectName.trim()) {
       Alert.alert('Missing subject', 'Please enter a subject name.');
       return;
@@ -104,18 +82,6 @@ export const TimetableScreen = ({ navigation }: { navigation?: any }) => {
       Alert.alert('Missing time', 'Please enter start and end times (HH:MM).');
       return;
     }
-    const timeRe = /^([01]\d|2[0-3]):[0-5]\d$/;
-    if (!timeRe.test(startTime.trim()) || !timeRe.test(endTime.trim())) {
-      Alert.alert('Invalid time', 'Use 24-hour HH:MM format (e.g. 09:30).');
-      return;
-    }
-    const [sh, sm] = startTime.split(':').map(Number);
-    const [eh, em] = endTime.split(':').map(Number);
-    if (eh * 60 + em <= sh * 60 + sm) {
-      Alert.alert('Invalid time', 'End time must be after start time.');
-      return;
-    }
-    savingRef.current = true;
     if (editingClass) {
       updateClass(editingClass.id, { subjectName, faculty, room, day, startTime, endTime });
       Alert.alert('Updated', 'Class updated.');
@@ -125,7 +91,6 @@ export const TimetableScreen = ({ navigation }: { navigation?: any }) => {
     }
     resetForm();
     setAddVisible(false);
-    setTimeout(() => { savingRef.current = false; }, 500);
   };
 
   const confirmDelete = (c: any) => {
@@ -150,19 +115,25 @@ export const TimetableScreen = ({ navigation }: { navigation?: any }) => {
       if (match) {
         const parsed = JSON.parse(match[0]);
         let added = 0;
+        const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
         for (const p of parsed) {
-          if (p.subjectName && p.startTime && p.endTime) {
+          // M7: trim AI payload fields
+          const subjectName = String(p.subjectName || '').trim();
+          const startTime = String(p.startTime || '').trim();
+          const endTime = String(p.endTime || '').trim();
+          // M6: validate AI-imported times against HH:MM — was accepting garbage like "morning"
+          if (subjectName && HHMM.test(startTime) && HHMM.test(endTime) && startTime < endTime) {
             const rawDay = String(p.day || 'MONDAY').toUpperCase();
             const dayEnum: ClassDay = (FULL_DAYS as string[]).includes(rawDay)
               ? (rawDay as ClassDay)
               : 'MONDAY';
             addClass({
-              subjectName: String(p.subjectName),
-              faculty: String(p.faculty || ''),
-              room: String(p.room || ''),
+              subjectName,
+              faculty: String(p.faculty || '').trim(),
+              room: String(p.room || '').trim(),
               day: dayEnum,
-              startTime: String(p.startTime),
-              endTime: String(p.endTime),
+              startTime,
+              endTime,
             });
             added++;
           }
@@ -202,7 +173,7 @@ export const TimetableScreen = ({ navigation }: { navigation?: any }) => {
             {DAYS.map((d) => {
               const active = d === selectedDay;
               const isCur = d === DAYS[(new Date().getDay() + 6) % 7];
-              const count = classes.filter((c) => c.day.toUpperCase().slice(0, 3) === d && !c.isCancelled).length;
+              const count = classes.filter((c) => (c.day || '').toUpperCase().slice(0, 3) === d && !c.isCancelled).length;
               return (
                 <TouchableOpacity
                   key={d}
@@ -251,8 +222,7 @@ export const TimetableScreen = ({ navigation }: { navigation?: any }) => {
             </TouchableOpacity>
           </View>
 
-          {/* Timeline — swipe left/right to change day */}
-          <View {...swipeResponder.panHandlers}>
+          {/* Timeline */}
           <View style={styles.timelineHead}>
             <Text style={styles.timelineTitle}>
               {selectedDay === DAYS[(new Date().getDay() + 6) % 7] ? "Today's" : `${selectedDay}'s`} Classes
@@ -291,7 +261,7 @@ export const TimetableScreen = ({ navigation }: { navigation?: any }) => {
                       <View style={styles.classTop}>
                         <View style={{ flex: 1 }}>
                           <Text style={[styles.classCode, active && { color: '#FFFFFF' }]}>
-                            {c.subjectName.split(' ')[0].toUpperCase().slice(0, 8)} · {formatTime12h(c.startTime)}
+                            {(c.subjectName || '').split(' ')[0].toUpperCase().slice(0, 8)} · {formatTime12h(c.startTime)}
                           </Text>
                           <Text style={[styles.className, active && { color: '#FFFFFF' }]} numberOfLines={1}>
                             {c.subjectName}
@@ -347,7 +317,6 @@ export const TimetableScreen = ({ navigation }: { navigation?: any }) => {
             })
           )}
           <View style={{ height: 8 }} />
-          </View>
         </ScrollView>
 
         {/* FAB */}
@@ -457,7 +426,7 @@ const styles = StyleSheet.create({
   },
   miniBtnText: { fontSize: 11.5, fontWeight: '700', color: C.eucalyptus },
   fab: {
-    position: 'absolute', right: 20, bottom: 158,
+    position: 'absolute', right: 20, bottom: 104,
     width: 58, height: 58, borderRadius: 29, backgroundColor: C.obsidian,
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#0F172A', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25,
