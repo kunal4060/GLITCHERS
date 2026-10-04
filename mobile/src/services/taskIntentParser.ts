@@ -21,6 +21,8 @@ export interface TaskDraft {
   confidence: 'high' | 'medium' | 'low';
   /** True when a title was found but no date — caller should ask for the date. */
   needsDate: boolean;
+  /** True when no title text remains (e.g. bare "kal") — caller should ask for the title. */
+  needsTitle?: boolean;
 }
 
 const HINDI_DAYS: Record<string, number> = {
@@ -66,6 +68,7 @@ function extractDateTime(text: string, now: Date): { date: Date | null; consumed
   const lower = text.toLowerCase();
   const consumed: string[] = [];
   let day: Date | null = null;
+  let dayFromWeekday = false;
   let hour: number | null = null;
   let minute = 0;
 
@@ -82,7 +85,7 @@ function extractDateTime(text: string, now: Date): { date: Date | null; consumed
   else if ((m = lower.match(/\bweekend\b/))) { day = nextWeekday(now, 6); eat(m); }
   else if ((m = lower.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|somvaar|somvar|mangalvaar|mangalvar|budhvaar|budhvar|gurvaar|guruvaar|shukravaar|shukravar|shanivaar|shanivar|ravivaar|itvaar)\b/))) {
     const wd = HINDI_DAYS[m[1]];
-    if (wd !== undefined) { day = nextWeekday(now, wd); eat(m); }
+    if (wd !== undefined) { day = nextWeekday(now, wd); dayFromWeekday = true; eat(m); }
   } else if ((m = lower.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\b/))) {
     const dNum = parseInt(m[1], 10);
     const mon = MONTHS[m[2].slice(0, 3)] ?? MONTHS[m[2]];
@@ -129,7 +132,9 @@ function extractDateTime(text: string, now: Date): { date: Date | null; consumed
     if (hour === null) hour = 18; else if (hour < 12) hour += 12;
     eat(m);
   } else if ((m = lower.match(/\b(raat|night)\b/))) {
-    if (hour === null) hour = 21; else if (hour < 12) hour += 12;
+    if (hour === null) hour = 21;
+    else if (hour === 12) hour = 0; // "12 baje raat" = midnight
+    else if (hour < 12) hour += 12;
     eat(m);
   }
 
@@ -145,6 +150,9 @@ function extractDateTime(text: string, now: Date): { date: Date | null; consumed
   const out = new Date(day);
   if (hour !== null) out.setHours(hour, minute, 0, 0);
   else out.setHours(9, 0, 0, 0); // sensible default: 9 AM
+  if (dayFromWeekday && out.getTime() <= now.getTime()) {
+    out.setDate(out.getDate() + 7); // "remind me monday" on Monday 3 PM -> next Monday
+  }
   return { date: out, consumed };
 }
 
@@ -176,7 +184,7 @@ function escapeRegExp(s: string): string {
 export function parseTaskIntent(raw: string, now: Date = new Date()): TaskDraft {
   const original = raw.trim();
   if (!original) {
-    return { title: '', description: '', dueDate: null, priority: 'NORMAL', confidence: 'low', needsDate: true };
+    return { title: '', description: '', dueDate: null, priority: 'NORMAL', confidence: 'low', needsDate: true, needsTitle: true };
   }
 
   // 1. Strip command prefix ("add task", "remind me to", "mujhe yaad dilao"...)
@@ -212,6 +220,7 @@ export function parseTaskIntent(raw: string, now: Date = new Date()): TaskDraft 
     priority,
     confidence,
     needsDate,
+    needsTitle: !title,
   };
 }
 

@@ -176,9 +176,13 @@ export class OfflineAIEngine {
     const now = new Date();
     const days = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
     const currentDay = days[now.getDay()];
-    const yesterday = new Date(Date.now() - 86400000);
-    const yesterdayDateStr = yesterday.toISOString().slice(0, 10);
-    const todayDateStr = now.toISOString().slice(0, 10);
+    // Local-date helper: toISOString() is UTC, which is off-by-a-day for IST 00:00-05:30.
+    const toLocalDateStr = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const yesterdayLocal = new Date(now);
+    yesterdayLocal.setDate(yesterdayLocal.getDate() - 1);
+    const yesterdayDateStr = toLocalDateStr(yesterdayLocal);
+    const todayDateStr = toLocalDateStr(now);
 
     const totalSpent = context.expenses.reduce((sum, e) => sum + Number(e.amount), 0);
     const monthlyLimit = context.budget?.monthlyLimit || 10000;
@@ -186,24 +190,22 @@ export class OfflineAIEngine {
     const daysLeft = Math.max(1, 30 - now.getDate() + 1);
     const safeDailyBurn = Math.max(0, Math.round(remaining / daysLeft));
 
-    // 1. Math solving
-    const mathSolution = this.solveMath(userMessage);
-    if (mathSolution) {
-      return {
-        message: `${mathSolution}\n\n*⚡ Computed by ${model.name} (On-Device Local Model)*`,
-        intent: 'GENERAL_QUERY',
-        offlineModelUsed: model.name,
-      };
-    }
-
-    // 2. Action: Split Expense
+    // 1. Action: Split Expense
     if (text.includes('split') && (/\d+/.test(text) || text.includes('with') || text.includes('half') || text.includes('equally'))) {
       const match = text.match(/(?:(?:rs\.?|₹|inr)\s*)?(\d+(?:\.\d{1,2})?)/i);
       const totalAmount = match ? parseFloat(match[1]) : 500;
-      let person = 'Rahul';
+      let person: string | null = null;
       const withMatch = text.match(/with\s+([A-Za-z]+)/i);
       if (withMatch && withMatch[1] && !['the', 'my', 'a', 'an'].includes(withMatch[1].toLowerCase())) {
         person = withMatch[1].charAt(0).toUpperCase() + withMatch[1].slice(1);
+      }
+      if (!person) {
+        return {
+          message: `### 🤝 Split Expense\n\n` +
+            `I can split **₹${totalAmount}** — but **with whom**? Tell me the person's name, e.g. "split 500 with Anuj"`,
+          intent: 'ADD_EXPENSE',
+          offlineModelUsed: model.name,
+        };
       }
       const myShare = Math.round(totalAmount / 2);
       const activeId = getUserId();
@@ -240,7 +242,7 @@ export class OfflineAIEngine {
       };
     }
 
-    // 3. Action: Add Expense
+    // 2. Action: Add Expense
     if (
       text.startsWith('spent') ||
       text.startsWith('paid') ||
@@ -283,7 +285,7 @@ export class OfflineAIEngine {
       };
     }
 
-    // 4. Action: Add Task
+    // 3. Action: Add Task
     if (
       (text.startsWith('remind') || text.startsWith('task') || text.startsWith('todo') || text.startsWith('add task') || text.includes('assignment due')) &&
       !text.includes('what') && !text.includes('show') && !text.includes('conclude')
@@ -322,6 +324,18 @@ export class OfflineAIEngine {
       };
     }
 
+    // 4. Math solving \u2014 checked AFTER action intents so "spent 250 + 50 on food"
+    // records an expense instead of computing 300, and prose like
+    // "my physics class is 10-11" is never treated as arithmetic.
+    const mathSolution = this.solveMath(userMessage);
+    if (mathSolution) {
+      return {
+        message: `${mathSolution}\n\n*⚡ Computed by ${model.name} (On-Device Local Model)*`,
+        intent: 'GENERAL_QUERY',
+        offlineModelUsed: model.name,
+      };
+    }
+
     // 5. Synthesize in-app data
     if (text.includes('conclude') || text.includes('summarize my app') || text.includes('overall status')) {
       const todayClasses = context.classes.filter((c) => c.day === currentDay && !c.isCancelled);
@@ -348,7 +362,7 @@ export class OfflineAIEngine {
 
     // 6. Yesterday expenses
     if (text.includes('yesterday') && (text.includes('expense') || text.includes('spent') || text.includes('amount') || text.includes('cost'))) {
-      const yExpenses = context.expenses.filter((e) => e.date.slice(0, 10) === yesterdayDateStr);
+      const yExpenses = context.expenses.filter((e) => (e.date?.slice(0, 10) || 'unknown date') === yesterdayDateStr);
       const sum = yExpenses.reduce((s, e) => s + Number(e.amount), 0);
       let reply = `### 💳 Yesterday's Expenses\n\n`;
       if (yExpenses.length === 0) {
@@ -958,22 +972,37 @@ export class OfflineAIEngine {
         `**Result**: **${res}** (${pct}% of ${total})`;
     }
 
-    // 4. Basic arithmetic: e.g. "What is 250 * 18?" or "1500 / 12"
-    const arithMatch = text.match(/(?:what is|calculate|solve)?\s*([0-9]+(?:\.[0-9]+)?)\s*([\+\-\*\/x×÷\^])\s*([0-9]+(?:\.[0-9]+)?)/i);
-    if (arithMatch) {
-      const n1 = parseFloat(arithMatch[1]);
-      const op = arithMatch[2];
-      const n2 = parseFloat(arithMatch[3]);
-      let res = 0;
-      if (op === '+' || op === 'plus') res = n1 + n2;
-      else if (op === '-' || op === 'minus') res = n1 - n2;
-      else if (op === '*' || op === 'x' || op === '×') res = n1 * n2;
-      else if (op === '/' || op === '÷') res = n2 !== 0 ? n1 / n2 : 0;
-      else if (op === '^') res = Math.pow(n1, n2);
+    // 4. Basic arithmetic: e.g. "250 * 18" or "what is 1500 / 12?"
+    // ONLY when the ENTIRE message is a math expression — never a substring of
+    // prose, so "my physics class is 10-11" is not hijacked as 10-11.
+    const exprText = text
+      .replace(/^(?:what is|calculate|compute|solve)\s+/i, '')
+      .replace(/\?+\s*$/, '')
+      .trim();
+    const looksLikeMath =
+      /^[\d\s+\-*/().^%x×÷]+$/i.test(exprText) && /[+\-*/^%x×÷]/i.test(exprText);
+    if (looksLikeMath) {
+      const arithMatch = exprText.match(/^([0-9]+(?:\.[0-9]+)?)\s*([\+\-\*\/x×÷\^])\s*([0-9]+(?:\.[0-9]+)?)$/i);
+      if (arithMatch) {
+        const n1 = parseFloat(arithMatch[1]);
+        const op = arithMatch[2];
+        const n2 = parseFloat(arithMatch[3]);
+        if ((op === '/' || op === '÷') && n2 === 0) {
+          return `### 🧮 Arithmetic Calculation\n\n` +
+            `**Expression**: ${n1} ${op} ${n2}\n\n` +
+            `**Result**: Division by zero is undefined. \u26a0\ufe0f`;
+        }
+        let res = 0;
+        if (op === '+') res = n1 + n2;
+        else if (op === '-') res = n1 - n2;
+        else if (op === '*' || op === 'x' || op === '×') res = n1 * n2;
+        else if (op === '/' || op === '÷') res = n1 / n2;
+        else if (op === '^') res = Math.pow(n1, n2);
 
-      return `### 🧮 Arithmetic Calculation\n\n` +
-        `**Expression**: ${n1} ${op} ${n2}\n\n` +
-        `**Result**: **${Math.round(res * 1000) / 1000}**`;
+        return `### 🧮 Arithmetic Calculation\n\n` +
+          `**Expression**: ${n1} ${op} ${n2}\n\n` +
+          `**Result**: **${Math.round(res * 1000) / 1000}**`;
+      }
     }
 
     return null;

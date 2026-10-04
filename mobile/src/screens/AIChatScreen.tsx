@@ -364,8 +364,17 @@ export const AIChatScreen = ({ navigation }: { navigation?: any }) => {
         };
       }
 
-      // Safety Guard: If no action card was created but the user clearly asked for a task or expense
-      if (!actionCard) {
+      // Safety Guard: If no action card was created but the user clearly asked for a task or expense.
+      // Never create records from question-like messages ("did I spend more than 500 on food?",
+      // "what tasks did I complete?") — those are queries, not instructions.
+      const isQuestionLike = (s: string) => {
+        const t = s.trim().toLowerCase();
+        return (
+          t.endsWith('?') ||
+          /^(did|do|does|is|are|was|were|am|what|how|when|where|why|which|who|whom|whose|can|could|would|should|have|has|had)\b/.test(t)
+        );
+      };
+      if (!actionCard && !isQuestionLike(textToSend)) {
         const lower = textToSend.toLowerCase();
         if (
           lower.startsWith('spent') ||

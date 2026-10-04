@@ -53,7 +53,14 @@ export const CalendarScreen: React.FC = () => {
   const filteredEvents = events.filter((ev) => {
     if (filter === 'TODAY') {
       if (ev.type === 'CLASS') return ev.day === todayDay;
-      if (ev.type === 'TASK') return ev.dueDate ? ev.dueDate.slice(0, 10) === todayDateStr : false;
+      if (ev.type === 'TASK') {
+        if (!ev.dueDate) return false;
+        // Compare in local calendar terms: slicing an ISO string reads the UTC date,
+        // which drifts a day near midnight IST.
+        const d = new Date(ev.dueDate);
+        const localStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        return localStr === todayDateStr;
+      }
     }
     if (filter === 'WEEK') {
       if (ev.type === 'CLASS') return true;

@@ -99,10 +99,19 @@ export const TasksScreen = ({ navigation }: { navigation?: any }) => {
       Alert.alert('Missing title', 'Give the task a name.');
       return;
     }
+    let dueIso: string | undefined;
+    if (dueDate) {
+      const parsed = new Date(dueDate + 'T23:59:00');
+      if (isNaN(parsed.getTime())) {
+        Alert.alert('Invalid date', 'Please enter a valid date (YYYY-MM-DD).');
+        return;
+      }
+      dueIso = parsed.toISOString();
+    }
     const payload = {
       title: title.trim(),
       description: description.trim(),
-      dueDate: dueDate ? new Date(dueDate + 'T23:59:00').toISOString() : undefined,
+      dueDate: dueIso,
       priority,
     };
     if (editing) {

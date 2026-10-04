@@ -13,11 +13,9 @@ import { AIChatScreen } from '../screens/AIChatScreen';
 // Secondary Stack & Deep Feature Screens
 import { AttendanceScreen } from '../screens/AttendanceScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
-import { ExamsAndAssignmentsScreen } from '../screens/ExamsAndAssignmentsScreen';
 import { CalendarScreen } from '../screens/CalendarScreen';
 import { EmailScreen } from '../screens/EmailScreen';
 import { DocumentsScreen } from '../screens/DocumentsScreen';
-import { SearchScreen } from '../screens/SearchScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { PrivacyScreen } from '../screens/PrivacyScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
@@ -182,10 +180,8 @@ export const RootNavigator: React.FC = () => {
       />
       <Stack.Screen name="Attendance" component={AttendanceScreen} options={{ title: 'Attendance & Bunker' }} />
       <Stack.Screen name="Email" component={EmailScreen} options={{ title: 'University Circulars' }} />
-      <Stack.Screen name="Exams" component={ExamsAndAssignmentsScreen} options={{ title: 'Exams & Assignments' }} />
       <Stack.Screen name="Calendar" component={CalendarScreen} options={{ title: 'Academic Calendar' }} />
       <Stack.Screen name="Docs" component={DocumentsScreen} options={{ title: 'Document Intelligence' }} />
-      <Stack.Screen name="Search" component={SearchScreen} options={{ title: 'Global Search' }} />
       <Stack.Screen name="Alerts" component={NotificationsScreen} options={{ title: 'Notifications' }} />
       <Stack.Screen
         name="AITaskCreator"

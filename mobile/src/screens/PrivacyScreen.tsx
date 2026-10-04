@@ -13,11 +13,18 @@ const C = designTokens.colors;
 export const PrivacyScreen: React.FC = () => {
   const { user, gmailConnected, calendarConnected, setGoogleConnections, logout } = useAuthStore();
 
-  const handleToggleGmail = () => {
+  const handleToggleGmail = async () => {
     const next = !gmailConnected;
     setGoogleConnections(next, calendarConnected);
     // M30: actually pause/resume server-side sync, not just the local flag.
-    apiClient.updateGoogleServices({ gmailConnected: next, calendarConnected }).catch(() => null);
+    // Revert the UI if the server rejects it — don't claim a connected state we don't have.
+    try {
+      await apiClient.updateGoogleServices({ gmailConnected: next, calendarConnected });
+    } catch {
+      setGoogleConnections(gmailConnected, calendarConnected);
+      Alert.alert('Update failed', 'Could not update the Gmail sync setting. Please try again.');
+      return;
+    }
     Alert.alert(
       next ? 'Gmail Connected' : 'Gmail Disconnected',
       next
@@ -26,10 +33,16 @@ export const PrivacyScreen: React.FC = () => {
     );
   };
 
-  const handleToggleCalendar = () => {
+  const handleToggleCalendar = async () => {
     const next = !calendarConnected;
     setGoogleConnections(gmailConnected, next);
-    apiClient.updateGoogleServices({ gmailConnected, calendarConnected: next }).catch(() => null);
+    try {
+      await apiClient.updateGoogleServices({ gmailConnected, calendarConnected: next });
+    } catch {
+      setGoogleConnections(gmailConnected, calendarConnected);
+      Alert.alert('Update failed', 'Could not update the Calendar sync setting. Please try again.');
+      return;
+    }
     Alert.alert(
       next ? 'Google Calendar Connected' : 'Google Calendar Disconnected',
       next
@@ -70,10 +83,13 @@ export const PrivacyScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             // H2: actually delete server-side before wiping local state.
+            // Only log out + announce success when the server confirms; otherwise stay signed in.
             try {
               await apiClient.deleteAccount();
             } catch (err) {
               console.warn('Server-side account deletion failed:', err);
+              Alert.alert('Delete failed', "Couldn't delete server data — try again.");
+              return;
             }
             logout();
             Alert.alert('Account Deleted', 'All student data has been wiped.');

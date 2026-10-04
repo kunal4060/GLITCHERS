@@ -127,6 +127,8 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
     { key: 'finance', label: 'Initializing student budget & expense records', done: false, inProgress: false },
     { key: 'email_processing', label: 'Queuing university email filter', done: false, inProgress: false },
   ]);
+  // Guards against double-tap re-running the initialization pipeline.
+  const [isInitializing, setIsInitializing] = useState(false);
 
   // Sync state if step changes
   useEffect(() => {
@@ -217,8 +219,8 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
       day: manualDay,
       startTime: manualStartTime.trim(),
       endTime: manualEndTime.trim(),
-      room: manualRoom.trim() || 'AB1-204',
-      faculty: manualFaculty.trim() || 'Faculty Member',
+      room: manualRoom.trim(),
+      faculty: manualFaculty.trim(),
       classType: 'LECTURE',
     };
 
@@ -234,8 +236,11 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
 
   // Run Real Backend Idempotent Initialization
   const runInitializationPipeline = async () => {
-    markStepDone('FLOATING_ASSISTANT');
-    setActiveStep('INITIAL_PROCESSING');
+    if (isInitializing) return;
+    setIsInitializing(true);
+    try {
+      markStepDone('FLOATING_ASSISTANT');
+      setActiveStep('INITIAL_PROCESSING');
 
     const payload = {
       profile: {
@@ -264,8 +269,9 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
       floatingAssistantEnabled,
     };
 
-    // Trigger backend idempotent initialization job in background (never blocks UI)
-    apiClient.initializeWorkspace(payload).catch(() => null);
+    // Start backend initialization; animate progress meanwhile, then wait for
+    // the real result before completing onboarding (no fire-and-forget).
+    const initPromise = apiClient.initializeWorkspace(payload).catch(() => null);
 
     // Sequentially animate progress smoothly
     for (let i = 0; i < processingStages.length; i++) {
@@ -280,6 +286,8 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
         )
       );
     }
+
+    await initPromise;
 
     setGoogleConnections(gmailEnabled, calendarEnabled);
     completeOnboarding(payload.profile as any);
@@ -300,6 +308,9 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
     });
 
     goToStep('COMPLETE', 'INITIAL_PROCESSING');
+    } finally {
+      setIsInitializing(false);
+    }
   };
 
   // Step Progress Calculation
@@ -834,16 +845,6 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                 </View>
               </View>
 
-              {/* Conflict Detection Banner */}
-              {classes.length >= 2 && (
-                <View style={styles.conflictNoticeBox}>
-                  <Ionicons name="checkmark-circle-outline" size={18} color={C.primary} />
-                  <Text style={styles.conflictNoticeText}>
-                    Schedule Conflict Engine active: No overlapping class collisions detected.
-                  </Text>
-                </View>
-              )}
-
               {/* Class List */}
               <View style={styles.classList}>
                 {classes.map((item, idx) => (
@@ -1116,8 +1117,9 @@ export const OnboardingScreen: React.FC<{ onComplete: () => void }> = ({ onCompl
                   <Text style={styles.secondaryButtonText}>Back</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.primaryButton, { flex: 2 }]}
+                  style={[styles.primaryButton, { flex: 2 }, isInitializing && { opacity: 0.6 }]}
                   onPress={runInitializationPipeline}
+                  disabled={isInitializing}
                 >
                   <Text style={styles.primaryButtonText}>Prepare My AI (NIA)</Text>
                 </TouchableOpacity>

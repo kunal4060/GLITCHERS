@@ -127,17 +127,25 @@ export const LoginScreen: React.FC = () => {
   };
 
   const handleDirectDemoLogin = async () => {
-    const emailToUse = customEmail.trim() || 'student@university.edu';
-    let nameToUse = customName.trim();
-    if (!nameToUse) {
-      const prefix = emailToUse.split('@')[0];
-      nameToUse = prefix
-        .split(/[._-]/)
-        .filter(Boolean)
-        .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-        .join(' ') || 'Student User';
+    try {
+      const emailToUse = customEmail.trim() || 'student@university.edu';
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailToUse)) {
+        Alert.alert('Invalid email', 'Please enter a valid email address.');
+        return;
+      }
+      let nameToUse = customName.trim();
+      if (!nameToUse) {
+        const prefix = emailToUse.split('@')[0];
+        nameToUse = prefix
+          .split(/[._-]/)
+          .filter(Boolean)
+          .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+          .join(' ') || 'Student User';
+      }
+      await loginWithGoogle(emailToUse, nameToUse);
+    } catch (err: any) {
+      Alert.alert('Login failed', err?.message || 'Could not sign in. Please try again.');
     }
-    await loginWithGoogle(emailToUse, nameToUse);
   };
 
   return (

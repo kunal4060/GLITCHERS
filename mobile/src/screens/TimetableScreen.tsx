@@ -100,6 +100,17 @@ export const TimetableScreen = ({ navigation }: { navigation?: any }) => {
       Alert.alert('Missing time', 'Please enter start and end times (HH:MM).');
       return;
     }
+    const timeRe = /^([01]\d|2[0-3]):[0-5]\d$/;
+    if (!timeRe.test(startTime.trim()) || !timeRe.test(endTime.trim())) {
+      Alert.alert('Invalid time', 'Use 24-hour HH:MM format (e.g. 09:30).');
+      return;
+    }
+    const [sh, sm] = startTime.split(':').map(Number);
+    const [eh, em] = endTime.split(':').map(Number);
+    if (eh * 60 + em <= sh * 60 + sm) {
+      Alert.alert('Invalid time', 'End time must be after start time.');
+      return;
+    }
     if (editingClass) {
       updateClass(editingClass.id, { subjectName, faculty, room, day, startTime, endTime });
       Alert.alert('Updated', 'Class updated.');

@@ -88,13 +88,22 @@ export const DocumentsScreen: React.FC = () => {
 
   const handleConvertToTask = (doc: DocItem) => {
     const currentUserId = useAuthStore.getState().user?.id || 'offline-user';
+    let dueIso: string | undefined;
+    if (doc.extractedDeadline) {
+      const parsed = new Date(doc.extractedDeadline + 'T23:59:00');
+      if (isNaN(parsed.getTime())) {
+        Alert.alert('Invalid deadline', 'The extracted deadline is not a valid date. The task will be added without a due date.');
+      } else {
+        dueIso = parsed.toISOString();
+      }
+    }
     addTask({
       id: String(Date.now()),
       userId: currentUserId,
       title: doc.actionItem || `Review ${doc.title}`,
       priority: 'HIGH',
       status: 'TODO',
-      dueDate: doc.extractedDeadline ? new Date(doc.extractedDeadline + 'T23:59:00').toISOString() : undefined,
+      dueDate: dueIso,
     } as any);
     Alert.alert('Task Created', 'Added to your task list.');
   };

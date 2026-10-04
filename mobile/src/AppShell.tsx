@@ -5,6 +5,7 @@ import React from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { RootNavigator } from './navigation/RootNavigator';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { FloatingAssistantOverlay } from './components/FloatingAssistantOverlay';
 import { GradientBackground } from './components/common/GradientBackground';
 import { designTokens } from './theme/designTokens';
@@ -27,11 +28,13 @@ export default function AppShell() {
 
   return (
     <GradientBackground>
-      <NavigationContainer theme={navigationTheme}>
-        <StatusBar style={isDark ? 'light' : 'dark'} />
-        <RootNavigator />
-        <FloatingAssistantOverlay />
-      </NavigationContainer>
+      <ErrorBoundary>
+        <NavigationContainer theme={navigationTheme}>
+          <StatusBar style={isDark ? 'light' : 'dark'} />
+          <RootNavigator />
+          <FloatingAssistantOverlay />
+        </NavigationContainer>
+      </ErrorBoundary>
     </GradientBackground>
   );
 }

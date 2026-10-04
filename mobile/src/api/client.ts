@@ -351,6 +351,10 @@ class ApiClient {
     return this.patch<any>('/settings', data);
   }
 
+  public async registerPushToken(token: string) {
+    return this.post<any>('/notifications/push-token', { token });
+  }
+
   public async scanBill(imageBase64: string, mimeType: string = 'image/jpeg') {
     return this.post<{
       success: boolean;

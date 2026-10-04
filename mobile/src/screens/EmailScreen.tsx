@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'rea
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { designTokens } from '../theme/designTokens';
 import { GlassCard } from '../components/common/GlassCard';
-import { StatusBadge } from '../components/common/StatusBadge';
+import { StatusPill } from '../components/nia';
+
 import { GradientBackground } from '../components/common/GradientBackground';
 import { useDashboardStore } from '../store/dashboardStore';
 import { useAuthStore } from '../store/authStore';
@@ -42,7 +43,8 @@ export const EmailScreen: React.FC = () => {
   };
 
   const handleAddToCalendar = (subject: string) => {
-    Alert.alert('Calendar Event Created', `"${subject}" synced with academic schedule.`);
+    // Honest: no single-event calendar API exists yet (syncTimetableToCalendar only syncs the full timetable).
+    Alert.alert('Calendar sync coming soon', 'Adding individual notices to your calendar is not supported yet.');
   };
 
   const handleToggleNotice = (id: string, isCurrentlyDismissed: boolean) => {
@@ -147,11 +149,11 @@ export const EmailScreen: React.FC = () => {
                     <View style={styles.senderBadgeGroup}>
                       <Text style={styles.senderText}>{e.sender}</Text>
                       {e.importance === 'CRITICAL' ? (
-                        <StatusBadge label="Critical" variant="urgent" />
+                        <StatusPill label="Critical" tone="danger" />
                       ) : e.importance === 'HIGH' ? (
-                        <StatusBadge label="High Priority" variant="warning" />
+                        <StatusPill label="High Priority" tone="danger" />
                       ) : (
-                        <StatusBadge label="Notice" variant="safe" />
+                        <StatusPill label="Notice" tone="success" />
                       )}
                     </View>
 

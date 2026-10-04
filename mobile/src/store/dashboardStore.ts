@@ -24,6 +24,10 @@ const ensureUuid = (id?: string): string => (id && UUID_RE.test(id) ? id : newUu
 export const splitShare = (totalAmount: number): number =>
   Math.round((totalAmount / 2) * 100) / 100;
 
+// C7: in-flight guard for flushOfflineQueue — prevents overlapping flushes
+// from double-sending the same queued actions.
+let isFlushingQueue = false;
+
 export interface ChatMessage {
   id: string;
   sender: 'user' | 'assistant';
@@ -116,14 +120,14 @@ interface DashboardState {
 
   offlineSyncQueue: Array<{
     id: string;
-    type: 'CREATE_EXPENSE' | 'CREATE_TASK' | 'SPLIT_EXPENSE' | 'CREATE_DEBT';
+    type: 'CREATE_EXPENSE' | 'CREATE_TASK' | 'SPLIT_EXPENSE' | 'CREATE_DEBT' | 'DELETE_TASK' | 'DELETE_EXPENSE' | 'DELETE_CLASS' | 'PAY_DEBT';
     payload: any;
     timestamp: string;
     synced: boolean;
   }>;
   isOnline: boolean;
   setIsOnline: (online: boolean) => void;
-  queueOfflineAction: (action: { type: 'CREATE_EXPENSE' | 'CREATE_TASK' | 'SPLIT_EXPENSE' | 'CREATE_DEBT'; payload: any }) => void;
+  queueOfflineAction: (action: { type: 'CREATE_EXPENSE' | 'CREATE_TASK' | 'SPLIT_EXPENSE' | 'CREATE_DEBT' | 'DELETE_TASK' | 'DELETE_EXPENSE' | 'DELETE_CLASS' | 'PAY_DEBT'; payload: any }) => void;
   flushOfflineQueue: () => Promise<{ syncedCount: number }>;
 
   syncWithBackend: () => Promise<void>;
@@ -145,6 +149,20 @@ export const useDashboardStore = create<DashboardState>()(
           dismissedNoticeIds: [],
           chatMessages: [],
           offlineSyncQueue: [],
+          // S12: clear ALL persisted user-data fields — otherwise user B sees
+          // user A's cgpa/attendance/etc. on a shared device after logout.
+          cgpa: '',
+          credits: 0,
+          avatarUrl: null,
+          quietHours: true,
+          attendance: {},
+          aiMode: 'AUTO',
+          activeOfflineModel: '',
+          downloadedModels: [],
+          downloadProgress: {},
+          loadedModelFile: null,
+          isLoading: false,
+          isBackendConnected: false,
         });
       },
       cgpa: '',
@@ -195,19 +213,10 @@ export const useDashboardStore = create<DashboardState>()(
             ? Array.from(new Set([...s.downloadedModels, loadedModelFile.modelId || loadedModelFile.name]))
             : s.downloadedModels,
         })),
+      // ponytail: no real download happens here yet — this just registers the
+      // model id. The fake staged progress (15→45→80→100 on timers) was removed.
+      // Upgrade path: implement actual Hugging Face download with real progress.
       downloadOfflineModel: async (modelId: string) => {
-        set((s) => ({
-          downloadProgress: { ...s.downloadProgress, [modelId]: 15 },
-        }));
-        await new Promise((r) => setTimeout(r, 250));
-        set((s) => ({
-          downloadProgress: { ...s.downloadProgress, [modelId]: 45 },
-        }));
-        await new Promise((r) => setTimeout(r, 300));
-        set((s) => ({
-          downloadProgress: { ...s.downloadProgress, [modelId]: 80 },
-        }));
-        await new Promise((r) => setTimeout(r, 250));
         set((s) => ({
           downloadProgress: { ...s.downloadProgress, [modelId]: 100 },
           downloadedModels: Array.from(new Set([...s.downloadedModels, modelId])),
@@ -229,47 +238,67 @@ export const useDashboardStore = create<DashboardState>()(
         set((s) => ({ offlineSyncQueue: [...s.offlineSyncQueue, item] }));
       },
       flushOfflineQueue: async () => {
-        const pending = get().offlineSyncQueue.filter((q) => !q.synced);
-        if (pending.length === 0) return { syncedCount: 0 };
+        // C7: in-flight guard — a second concurrent flush would re-send the
+        // same pending items before the first marks them done.
+        if (isFlushingQueue) return { syncedCount: 0 };
+        isFlushingQueue = true;
+        try {
+          const pending = get().offlineSyncQueue.filter((q) => !q.synced);
+          if (pending.length === 0) return { syncedCount: 0 };
 
-        // H3: only items that actually synced are marked synced — failures
-        // stay queued for the next flush instead of being silently dropped.
-        const succeeded = new Set<string>();
-        for (const item of pending) {
-          try {
-            if (item.type === 'CREATE_EXPENSE') {
-              await apiClient.createExpense({ id: item.payload.id, ...item.payload });
-            } else if (item.type === 'CREATE_TASK') {
-              await apiClient.createTask({ id: item.payload.id, ...item.payload });
-            } else if (item.type === 'CREATE_DEBT') {
-              await apiClient.createDebt({ id: item.payload.id, ...item.payload });
-            } else if (item.type === 'SPLIT_EXPENSE') {
-              const { totalAmount, description, person } = item.payload;
-              await apiClient.createExpense({
-                id: newUuid(),
-                amount: totalAmount,
-                category: 'FOOD',
-                description: `${description} (Split with ${person})`,
-              });
-              await apiClient.createDebt({
-                id: newUuid(),
-                person,
-                amount: splitShare(totalAmount),
-                type: 'OWES_ME',
-                notes: `Split for ${description}`,
-              });
+          // H3: only items that actually synced are removed — failures
+          // stay queued for the next flush instead of being silently dropped.
+          const succeeded = new Set<string>();
+          for (const item of pending) {
+            try {
+              if (item.type === 'CREATE_EXPENSE') {
+                await apiClient.createExpense({ id: item.payload.id, ...item.payload });
+              } else if (item.type === 'CREATE_TASK') {
+                await apiClient.createTask({ id: item.payload.id, ...item.payload });
+              } else if (item.type === 'CREATE_DEBT') {
+                await apiClient.createDebt({ id: item.payload.id, ...item.payload });
+              } else if (item.type === 'SPLIT_EXPENSE') {
+                // C4: reuse the ids minted when the split was created locally,
+                // so the server copy dedupes with the optimistic local one
+                // instead of creating duplicates. (Older queued items without
+                // ids fall back to fresh UUIDs.)
+                const { expenseId, debtId, totalAmount, description, person } = item.payload;
+                await apiClient.createExpense({
+                  id: expenseId || newUuid(),
+                  amount: totalAmount,
+                  category: 'FOOD',
+                  description: `${description} (Split with ${person})`,
+                });
+                await apiClient.createDebt({
+                  id: debtId || newUuid(),
+                  person,
+                  amount: splitShare(totalAmount),
+                  type: 'OWES_ME',
+                  notes: `Split for ${description}`,
+                });
+              } else if (item.type === 'DELETE_TASK') {
+                await apiClient.deleteTask(item.payload.id);
+              } else if (item.type === 'DELETE_EXPENSE') {
+                await apiClient.deleteExpense(item.payload.id);
+              } else if (item.type === 'DELETE_CLASS') {
+                await apiClient.deleteClass(item.payload.id);
+              } else if (item.type === 'PAY_DEBT') {
+                await apiClient.payDebt(item.payload.id);
+              }
+              succeeded.add(item.id);
+            } catch (err) {
+              console.warn('[dashboardStore] flushOfflineQueue item failed:', item.type, err);
             }
-            succeeded.add(item.id);
-          } catch (err) {
-            console.warn('Offline push item failed:', err);
           }
+          // C7: remove synced items from the queue instead of just marking
+          // them — the queue no longer grows unbounded.
+          set((s) => ({
+            offlineSyncQueue: s.offlineSyncQueue.filter((item) => !succeeded.has(item.id)),
+          }));
+          return { syncedCount: succeeded.size };
+        } finally {
+          isFlushingQueue = false;
         }
-        set((s) => ({
-          offlineSyncQueue: s.offlineSyncQueue.map((item) =>
-            succeeded.has(item.id) ? { ...item, synced: true } : item
-          ),
-        }));
-        return { syncedCount: succeeded.size };
       },
 
       isHydrated: false,
@@ -363,7 +392,12 @@ export const useDashboardStore = create<DashboardState>()(
         set((s) => ({
           tasks: s.tasks.filter((t) => t.id !== taskId),
         }));
-        apiClient.deleteTask(taskId).catch(() => null);
+        // C5: on failure, queue the delete so the next flush retries it —
+        // otherwise the item is resurrected by the next sync merge.
+        apiClient.deleteTask(taskId).catch((e) => {
+          console.warn('[dashboardStore] deleteTask failed:', e?.message);
+          get().queueOfflineAction({ type: 'DELETE_TASK', payload: { id: taskId } });
+        });
       },
 
       updateTask: (taskId, updates) => {
@@ -396,7 +430,11 @@ export const useDashboardStore = create<DashboardState>()(
         set((s) => ({
           classes: s.classes.filter((c) => c.id !== classId),
         }));
-        apiClient.deleteClass(classId).catch(() => null);
+        // C5: on failure, queue the delete so the next flush retries it.
+        apiClient.deleteClass(classId).catch((e) => {
+          console.warn('[dashboardStore] deleteClass failed:', e?.message);
+          get().queueOfflineAction({ type: 'DELETE_CLASS', payload: { id: classId } });
+        });
       },
 
       addExpense: async (expense, opts) => {
@@ -425,7 +463,11 @@ export const useDashboardStore = create<DashboardState>()(
         set((s) => ({
           expenses: s.expenses.filter((e) => e.id !== expenseId),
         }));
-        apiClient.deleteExpense(expenseId).catch(() => null);
+        // C5: on failure, queue the delete so the next flush retries it.
+        apiClient.deleteExpense(expenseId).catch((e) => {
+          console.warn('[dashboardStore] deleteExpense failed:', e?.message);
+          get().queueOfflineAction({ type: 'DELETE_EXPENSE', payload: { id: expenseId } });
+        });
       },
 
       splitExpense: (totalAmount, description, person) => {
@@ -461,8 +503,14 @@ export const useDashboardStore = create<DashboardState>()(
           amount: totalAmount,
           category: 'FOOD',
           description: `${description} (Split with ${person})`,
-        }).catch(() => {
-          get().queueOfflineAction({ type: 'SPLIT_EXPENSE', payload: { totalAmount, description, person } });
+        }).catch((e) => {
+          console.warn('[dashboardStore] splitExpense createExpense failed:', e?.message);
+          // C4: queue with the ids already minted above — flushOfflineQueue
+          // reuses them so the server copy dedupes with the local one.
+          get().queueOfflineAction({
+            type: 'SPLIT_EXPENSE',
+            payload: { expenseId: newExp.id, debtId: newDebt.id, totalAmount, description, person },
+          });
         });
 
         apiClient.createDebt({
@@ -471,7 +519,9 @@ export const useDashboardStore = create<DashboardState>()(
           amount: half,
           type: 'OWES_ME',
           notes: `Split for ${description}`,
-        }).catch(() => null);
+        }).catch((e) => {
+          console.warn('[dashboardStore] splitExpense createDebt failed:', e?.message);
+        });
       },
 
       addDebt: async (debt) => {
@@ -494,7 +544,11 @@ export const useDashboardStore = create<DashboardState>()(
         set((s) => ({
           debts: s.debts.map((d) => (d.id === debtId ? { ...d, status: 'PAID', paidAmount: d.amount } : d)),
         }));
-        apiClient.payDebt(debtId).catch(() => null);
+        // C5: on failure, queue the pay action so the next flush retries it.
+        apiClient.payDebt(debtId).catch((e) => {
+          console.warn('[dashboardStore] markDebtPaid failed:', e?.message);
+          get().queueOfflineAction({ type: 'PAY_DEBT', payload: { id: debtId } });
+        });
       },
 
       syncWithBackend: async () => {
@@ -526,10 +580,10 @@ export const useDashboardStore = create<DashboardState>()(
               const unsynced = localClasses.filter((c) => c.id && !backendIds.has(c.id));
               set({ classes: [...incoming, ...unsynced], isBackendConnected: true });
               if (unsynced.length > 0) {
-                apiClient.saveTimetableClasses(unsynced).catch(() => null);
+                apiClient.saveTimetableClasses(unsynced).catch((e) => console.warn('[dashboardStore] syncWithBackend saveTimetableClasses failed:', e?.message));
               }
             } else if (localClasses.length > 0) {
-              apiClient.saveTimetableClasses(localClasses).catch(() => null);
+              apiClient.saveTimetableClasses(localClasses).catch((e) => console.warn('[dashboardStore] syncWithBackend saveTimetableClasses failed:', e?.message));
             } else {
               set({ isBackendConnected: true });
             }
@@ -541,10 +595,8 @@ export const useDashboardStore = create<DashboardState>()(
             const localTasks = get().tasks;
             if (backendTasks.length > 0) {
               const backendIds = new Set(backendTasks.map((t) => t.id));
-              const backendTitles = new Set(backendTasks.map((t) => t.title.toLowerCase().trim()));
-              const unsynced = localTasks.filter(
-                (t) => !backendIds.has(t.id) && !backendTitles.has(t.title.toLowerCase().trim())
-              );
+              // S10: dedupe by id only — two different tasks may share a title.
+              const unsynced = localTasks.filter((t) => !backendIds.has(t.id));
               set({ tasks: [...backendTasks, ...unsynced] });
               for (const t of unsynced) {
                 apiClient.createTask({
@@ -553,7 +605,7 @@ export const useDashboardStore = create<DashboardState>()(
                   priority: t.priority,
                   dueDate: t.dueDate,
                   description: t.description,
-                }).catch(() => null);
+                }).catch((e) => console.warn('[dashboardStore] syncWithBackend createTask failed:', e?.message));
               }
             } else if (localTasks.length > 0) {
               for (const t of localTasks) {
@@ -563,7 +615,7 @@ export const useDashboardStore = create<DashboardState>()(
                   priority: t.priority,
                   dueDate: t.dueDate,
                   description: t.description,
-                }).catch(() => null);
+                }).catch((e) => console.warn('[dashboardStore] syncWithBackend createTask failed:', e?.message));
               }
             }
           }
@@ -583,7 +635,7 @@ export const useDashboardStore = create<DashboardState>()(
                   category: e.category,
                   description: e.description,
                   merchant: e.merchant || undefined,
-                }).catch(() => null);
+                }).catch((err) => console.warn('[dashboardStore] syncWithBackend createExpense failed:', err?.message));
               }
             } else if (localExps.length > 0) {
               for (const e of localExps) {
@@ -593,7 +645,7 @@ export const useDashboardStore = create<DashboardState>()(
                   category: e.category,
                   description: e.description,
                   merchant: e.merchant || undefined,
-                }).catch(() => null);
+                }).catch((err) => console.warn('[dashboardStore] syncWithBackend createExpense failed:', err?.message));
               }
             }
           }
@@ -611,6 +663,17 @@ export const useDashboardStore = create<DashboardState>()(
               const backendIds = new Set(backendDebts.map((d) => d.id));
               const unsynced = localDebts.filter((d) => !backendIds.has(d.id));
               set({ debts: [...backendDebts, ...unsynced] });
+              // S8: always push unsynced local debts — previously they were
+              // only pushed when the backend returned zero debts.
+              for (const d of unsynced) {
+                apiClient.createDebt({
+                  id: d.id,
+                  person: d.person,
+                  amount: Number(d.amount),
+                  type: d.type,
+                  notes: d.notes || undefined,
+                }).catch((e) => console.warn('[dashboardStore] syncWithBackend createDebt failed:', e?.message));
+              }
             } else if (localDebts.length > 0) {
               for (const d of localDebts) {
                 apiClient.createDebt({
@@ -619,7 +682,7 @@ export const useDashboardStore = create<DashboardState>()(
                   amount: Number(d.amount),
                   type: d.type,
                   notes: d.notes || undefined,
-                }).catch(() => null);
+                }).catch((e) => console.warn('[dashboardStore] syncWithBackend createDebt failed:', e?.message));
               }
             }
           }
@@ -654,11 +717,14 @@ export const useDashboardStore = create<DashboardState>()(
             });
           }
 
-          // 7. Chat messages: keep recent messages intact
+          // 7. Chat messages: merge — keep offline-composed local messages (C6).
+          // Dedupe by id: local-only messages first, then backend messages.
           if (chatRes.status === 'fulfilled' && chatRes.value?.messages) {
-            const backendMsgs = chatRes.value.messages;
+            const backendMsgs: ChatMessage[] = chatRes.value.messages;
             if (backendMsgs.length > 0) {
-              set({ chatMessages: backendMsgs });
+              const backendIds = new Set(backendMsgs.map((m) => m.id));
+              const localOnly = get().chatMessages.filter((m) => m.id && !backendIds.has(m.id));
+              set({ chatMessages: [...localOnly, ...backendMsgs] });
             }
           }
 

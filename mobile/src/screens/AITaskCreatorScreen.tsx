@@ -471,7 +471,7 @@ const styles = StyleSheet.create({
   assistantText: { color: C.ink },
   userText: { color: '#FFFFFF' },
   msgTime: { fontSize: 10, color: C.textSubtle, marginTop: 6 },
-  msgTimeUser: { color: 'rgba(255,255,255,0.55)', textAlign: 'right' },
+  msgTimeUser: { color: C.textSubtle, textAlign: 'right' },
   loadingBubble: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   loadingText: { fontSize: 12.5, color: C.textSecondary, fontStyle: 'italic' },
   draftCard: {
