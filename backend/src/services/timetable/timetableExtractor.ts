@@ -51,8 +51,11 @@ export function extractClassesFromText(rawText: string, userId = 'u1'): ClassSes
       }
     }
 
-    // Time pattern match (e.g. "10:00 - 11:00" or "10:00AM - 11:00AM" or "10-11")
-    const timeRegex = /(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*(?:-|to)\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i;
+    // Time pattern match (e.g. "10:00 - 11:00" or "10:00AM - 11:00AM").
+    // H3: REQUIRE a colon or am/pm on both sides, with word boundaries — the
+    // old bare "\d{1,2}-\d{1,2}" pattern grabbed "1-20" inside room codes like
+    // "AB1-204" and fabricated phantom 01:00–20:00 classes.
+    const timeRegex = /\b(\d{1,2}:\d{2}\s*(?:am|pm)?)\s*(?:-|to)\s*(\d{1,2}:\d{2}\s*(?:am|pm)?)\b/i;
     const timeMatch = line.match(timeRegex);
 
     if (timeMatch) {

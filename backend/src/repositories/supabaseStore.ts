@@ -1045,7 +1045,9 @@ export class SupabaseStore {
             actionItem: d.action_item || undefined,
             extractedDeadline: d.extracted_deadline || undefined,
             scheduleChange: d.schedule_change || undefined,
-            isProcessed: d.processed ?? true,
+            // M20: the DB `processed` column means dismissed only. isProcessed is
+            // an app-level flag (AI pipeline handled it) and is never conflated.
+            isProcessed: false,
             isDismissed: d.processed ?? false,
             dismissedAt: d.processed ? d.created_at : undefined,
           }));
@@ -1091,7 +1093,8 @@ export class SupabaseStore {
           action_item: e.actionItem || null,
           extracted_deadline: e.extractedDeadline || null,
           schedule_change: e.scheduleChange || null,
-          processed: e.isDismissed ?? (e.isProcessed ?? false),
+          // M20: persist dismissal only — never conflate isProcessed into this bit
+          processed: e.isDismissed ?? false,
         }));
 
         await supabase.from('emails').upsert(rows, { onConflict: 'id' });
@@ -1180,6 +1183,20 @@ export class SupabaseStore {
     }
 
     return prepared;
+  }
+
+  // M1 (mobile): clear the user's budget from both stores.
+  public async clearBudget(userId: string): Promise<void> {
+    inMemoryStore.budgets.delete(userId);
+
+    const supabase = getSupabaseClient();
+    if (supabase && UUID_REGEX.test(userId)) {
+      try {
+        await supabase.from('budgets').delete().eq('user_id', userId);
+      } catch (err) {
+        console.warn('SupabaseStore.clearBudget warning:', err);
+      }
+    }
   }
 
   // ==========================================
@@ -1455,19 +1472,22 @@ export class SupabaseStore {
 
   public async deleteExam(userId: string, examId: string): Promise<boolean> {
     const list = inMemoryStore.exams.get(userId) || [];
+    const existed = list.some((e) => e.id === examId);
     inMemoryStore.exams.set(userId, list.filter((e) => e.id !== examId));
 
     const supabase = getSupabaseClient();
     if (supabase && UUID_REGEX.test(userId)) {
       try {
-        await supabase.from('exams').delete().eq('id', examId).eq('user_id', userId);
-        return true;
+        const { error, count } = await supabase.from('exams').delete({ count: 'exact' }).eq('id', examId).eq('user_id', userId);
+        if (error) throw error;
+        return (count ?? 0) > 0 || existed;
       } catch (err) {
         console.warn('SupabaseStore.deleteExam warning:', err);
+        return false;
       }
     }
 
-    return true;
+    return existed;
   }
 
   // ==========================================
@@ -1488,8 +1508,8 @@ export class SupabaseStore {
           user_id: userId,
           google_id: data.googleId,
           email: data.email,
-          access_token: data.accessToken || null,
-          refresh_token: data.refreshToken || null,
+          ...(data.accessToken ? { access_token: data.accessToken } : {}),
+          ...(data.refreshToken ? { refresh_token: data.refreshToken } : {}),
           scopes: data.scopes || ['userinfo.email', 'userinfo.profile', 'openid'],
           gmail_connected: true,
           calendar_connected: true,

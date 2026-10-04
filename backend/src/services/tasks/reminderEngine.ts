@@ -77,3 +77,20 @@ export function isInQuietHours(date: Date, quietHours: QuietHours): boolean {
     return currentMinutes >= startMinutes || currentMinutes <= endMinutes;
   }
 }
+
+/**
+ * M13: push reminders that land inside quiet hours to just after quiet hours
+ * end, so 3 AM pings don't fire. Runs after generateReminderTimes.
+ */
+export function applyQuietHours(reminders: ScheduledReminder[], quietHours: QuietHours): ScheduledReminder[] {
+  if (!quietHours?.enabled) return reminders;
+  return reminders.map((r) => {
+    if (!isInQuietHours(r.reminderTime, quietHours)) return r;
+    const [endHour, endMin] = quietHours.endTime.split(':').map(Number);
+    const shifted = new Date(r.reminderTime);
+    shifted.setHours(endHour, endMin, 0, 0);
+    // If the shift lands before the original time (edge case), keep the original
+    if (shifted.getTime() <= r.reminderTime.getTime()) return r;
+    return { ...r, reminderTime: shifted, offsetLabel: `${r.offsetLabel} (after quiet hours)` };
+  });
+}

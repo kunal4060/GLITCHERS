@@ -9,6 +9,17 @@ export interface BudgetStatus {
   alertLevel: 'NORMAL' | 'WARNING_75' | 'CRITICAL_90' | 'EXCEEDED_100';
 }
 
+/**
+ * H2: Budget math must only consider the budget's own month. Previously every
+ * caller summed ALL-TIME expenses and labeled it "this month", so from month
+ * 2 on every user looked permanently over budget. One shared helper — all
+ * budget calculations go through it.
+ */
+export function filterExpensesByMonth(expenses: Expense[], month?: string | null): Expense[] {
+  if (!month) return expenses;
+  return expenses.filter((e) => typeof e.date === 'string' && e.date.slice(0, 7) === month);
+}
+
 export function calculateTotalSpent(expenses: Expense[]): number {
   return expenses
     .filter((e) => e.type === 'EXPENSE')
@@ -26,7 +37,9 @@ export function calculateCategoryBreakdown(expenses: Expense[]): Record<string, 
 }
 
 export function calculateBudgetStatus(budget: Budget, expenses: Expense[]): BudgetStatus {
-  const totalSpent = calculateTotalSpent(expenses);
+  // H2: only this budget's month counts toward "spent this month"
+  const monthExpenses = filterExpensesByMonth(expenses, (budget as { month?: string }).month);
+  const totalSpent = calculateTotalSpent(monthExpenses);
 
   // Guard against division by zero when no monthly limit is configured
   if (!budget.monthlyLimit || budget.monthlyLimit <= 0) {
@@ -100,7 +113,9 @@ export function calculateBurnRateForecast(
   daysPassedInMonth = 15,
   daysRemainingInMonth = 15
 ): BurnRateForecast {
-  const totalSpent = calculateTotalSpent(expenses);
+  // H2: forecast from this budget's month only
+  const monthExpenses = filterExpensesByMonth(expenses, (budget as { month?: string }).month);
+  const totalSpent = calculateTotalSpent(monthExpenses);
   const remaining = Math.max(0, budget.monthlyLimit - totalSpent);
   const safeDaysRemaining = Math.max(1, daysRemainingInMonth);
   const safeDaysPassed = Math.max(1, daysPassedInMonth);
@@ -117,7 +132,7 @@ export function calculateBurnRateForecast(
   }
 
   // Determine top category
-  const breakdown = calculateCategoryBreakdown(expenses);
+  const breakdown = calculateCategoryBreakdown(monthExpenses);
   let topCategory: string | null = null;
   let highestAmount = 0;
   for (const [cat, amt] of Object.entries(breakdown)) {

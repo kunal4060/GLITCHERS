@@ -35,7 +35,7 @@ export const expenseRoutes: FastifyPluginAsync = async (fastify) => {
 
     if (body.text && !amount) {
       const parsed = geminiAssistant.parseNaturalExpense(body.text);
-      amount = parsed.amount;
+      amount = parsed.amount ?? undefined;
       category = parsed.category;
       description = parsed.description;
     }
@@ -82,6 +82,11 @@ export const expenseRoutes: FastifyPluginAsync = async (fastify) => {
 
     if (!imageBase64) {
       return reply.status(400).send({ error: 'imageBase64 is required to scan bill' });
+    }
+
+    // H6: ~5MB base64 cap — larger payloads spike memory and Gemini cost
+    if (imageBase64.length > 7000000) {
+      return reply.status(413).send({ error: 'Image too large (max ~5MB)' });
     }
 
     const cleanBase64 = imageBase64.replace(/^data:image\/[a-z]+;base64,/, '');

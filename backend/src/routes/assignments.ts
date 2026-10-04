@@ -30,6 +30,12 @@ export const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: 'Title, subject, and deadline are required' });
     }
 
+    // M16: validate priority against the enum so memory/DB can't diverge
+    const validPriorities: Array<Assignment['priority']> = ['LOW', 'NORMAL', 'HIGH', 'EXTREMELY_IMPORTANT'];
+    if (priority && !validPriorities.includes(priority)) {
+      return reply.status(400).send({ error: `Invalid priority. Must be one of: ${validPriorities.join(', ')}` });
+    }
+
     const newAssignment: Assignment = {
       id: randomUUID(),
       userId,
@@ -57,6 +63,12 @@ export const assignmentRoutes: FastifyPluginAsync = async (fastify) => {
       const found = assignments.find((a) => a.id === id);
       if (!found) return reply.status(404).send({ error: 'Assignment not found' });
       return { assignment: found };
+    }
+
+    // M16: validate status against the enum
+    const validStatuses: Array<Assignment['status']> = ['PENDING', 'SUBMITTED', 'GRADED'];
+    if (!validStatuses.includes(status)) {
+      return reply.status(400).send({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
     }
 
     const assignment = await supabaseStore.updateAssignmentStatus(userId, id, status);

@@ -4,7 +4,7 @@ import { env } from '../config/env.js';
 
 export const healthRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/health', async (request, reply) => {
-    let dbStatus = 'healthy';
+    let dbStatus: 'healthy' | 'degraded' | 'unreachable' = 'healthy';
     let dbProvider = 'in-memory';
 
     const supabase = getSupabaseClient();
@@ -13,17 +13,26 @@ export const healthRoutes: FastifyPluginAsync = async (fastify) => {
       try {
         const { error } = await supabase.from('profiles').select('id').limit(1);
         if (error && error.code !== 'PGRST116') {
-          dbStatus = `degraded: ${error.message}`;
+          // M33: log internals server-side; never leak them to unauthenticated callers
+          console.warn('Health DB probe degraded:', error.message);
+          dbStatus = 'degraded';
         }
       } catch (err: any) {
-        dbStatus = `unreachable: ${err.message || err}`;
+        console.warn('Health DB probe unreachable:', err?.message || err);
+        dbStatus = 'unreachable';
       }
     }
 
     const memoryUsage = process.memoryUsage();
 
+    // M33: top-level status must reflect the DB state, not always "ok"
+    const status = dbStatus === 'healthy' ? 'ok' : 'degraded';
+    if (status !== 'ok') {
+      reply.code(503);
+    }
+
     return {
-      status: dbStatus.startsWith('unreachable') ? 'degraded' : 'ok',
+      status,
       service: 'NEXA Fastify Backend',
       version: '1.0.0',
       environment: env.NODE_ENV,

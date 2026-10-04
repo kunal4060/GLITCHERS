@@ -15,12 +15,26 @@ import { googleService } from '../services/google/googleService.js';
 export const emailRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', authMiddleware);
 
+  // M8: per-user Gmail sync debounce timestamps (60s)
+  const gmailSyncTimestamps = new Map<string, number>();
+
   async function syncGmailIfAvailable(userId: string) {
     inMemoryStore.ensureStudentData(userId);
+    // M8: debounce — don't hit Gmail on every GET /emails (quota burn). 60s per user.
+    const lastSync = gmailSyncTimestamps.get(userId) || 0;
+    if (Date.now() - lastSync < 60_000) return;
     // getValidAccessToken refreshes via the persisted refresh_token when the
     // in-memory access token is expired or was wiped by a backend restart.
-    const token = await googleService.getValidAccessToken(userId);
+    let token: string | undefined;
+    try {
+      token = await googleService.getValidAccessToken(userId);
+    } catch (err: any) {
+      // M6: refresh token revoked → user must re-login; skip sync quietly.
+      if (String(err?.message).includes('GOOGLE_REAUTH_REQUIRED')) return;
+      throw err;
+    }
     if (!token) return;
+    gmailSyncTimestamps.set(userId, Date.now());
 
     try {
       const realMsgs = await googleService.fetchRecentEmails(token, 8);
@@ -80,7 +94,10 @@ export const emailRoutes: FastifyPluginAsync = async (fastify) => {
     const emailSummary: EmailSummary = {
       id: randomUUID(),
       userId,
-      providerMessageId: providerMessageId || `msg_${Date.now()}`,
+      // H8: client-supplied ids are namespaced 'manual:' so saveEmails'
+      // deterministicUuid('gmail:' + id) can never collide with — and
+      // overwrite — a real Gmail row's id.
+      providerMessageId: `manual:${providerMessageId || `msg_${Date.now()}`}`,
       sender,
       subject,
       receivedAt: new Date().toISOString(),
@@ -90,7 +107,9 @@ export const emailRoutes: FastifyPluginAsync = async (fastify) => {
       actionRequired: scheduleChange.hasScheduleChange || urgency === 'CRITICAL' || urgency === 'HIGH',
       actionItem: scheduleChange.hasScheduleChange ? 'Schedule updated per faculty notice' : undefined,
       scheduleChange: scheduleChange.hasScheduleChange ? scheduleChange : undefined,
-      isProcessed: true,
+      // M20: isProcessed=false so synced emails appear in summaries; dismissal
+      // is tracked separately via isDismissed (DB `processed` column).
+      isProcessed: false,
     };
 
     const emails = inMemoryStore.emails.get(userId) || [];
@@ -137,7 +156,12 @@ export const emailRoutes: FastifyPluginAsync = async (fastify) => {
     for (const e of stored) {
       if (e?.id) byId.set(e.id, e);
     }
+    let allEmails: EmailSummary[];
     if (clientEmails && Array.isArray(clientEmails) && clientEmails.length > 0) {
+      // Summarize EXACTLY the notices the client is showing. Merging
+      // server-stored emails here made the home summary describe notices
+      // the user can't see (stale/hidden items).
+      allEmails = clientEmails.filter((e) => e && e.id);
       let added = false;
       for (const e of clientEmails) {
         if (e?.id && !byId.has(e.id)) {
@@ -148,11 +172,14 @@ export const emailRoutes: FastifyPluginAsync = async (fastify) => {
       if (added) {
         await supabaseStore.saveEmails(userId, Array.from(byId.values())).catch(() => null);
       }
+    } else {
+      allEmails = Array.from(byId.values());
     }
-    const allEmails = Array.from(byId.values());
 
-    // Only summarize active (non-dismissed) notices
-    const emails = allEmails.filter((e) => !e.isDismissed && !(e as any).processed);
+    // Only summarize active (non-dismissed, non-processed) notices
+    // M9: cap at 20 emails so the prompt can't grow unbounded (quota + 30s worker hold)
+    // M20: use the canonical flags — the DB `processed` column now means dismissed only
+    const emails = allEmails.filter((e) => !e.isDismissed && !e.isProcessed).slice(0, 20);
 
     if (emails.length === 0) {
       return {

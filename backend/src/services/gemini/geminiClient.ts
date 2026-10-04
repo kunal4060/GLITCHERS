@@ -110,13 +110,25 @@ export class GeminiAssistant {
     const debts = dbDebts.length ? dbDebts : (inMemoryStore.debts.get(userId) || []);
     const emails = dbEmails.length ? dbEmails : (inMemoryStore.emails.get(userId) || []);
 
-    const todayExpenses = expenses.filter((e) => e.date.slice(0, 10) === todayDateStr);
-    const yesterdayExpenses = expenses.filter((e) => e.date.slice(0, 10) === yesterdayDateStr);
-    const totalSpent = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
-    const monthlyLimit = budget?.monthlyLimit || 10000;
-    const remaining = monthlyLimit - totalSpent;
+    // M28: drop malformed records before building context — one bad row
+    // (non-string date, NaN amount) used to poison the whole chat request
+    const cleanExpenses = expenses.filter(
+      (e) => e && typeof e.date === 'string' && Number.isFinite(Number(e.amount))
+    );
+
+    const todayExpenses = cleanExpenses.filter((e) => e.date.slice(0, 10) === todayDateStr);
+    const yesterdayExpenses = cleanExpenses.filter((e) => e.date.slice(0, 10) === yesterdayDateStr);
+    // H2: budget math over the budget's own month only; never invent a
+    // ₹10,000 limit when the user hasn't set one.
+    const budgetMonth = (budget as { month?: string } | null)?.month;
+    const monthExpenses = budgetMonth
+      ? cleanExpenses.filter((e) => e.date.slice(0, 7) === budgetMonth)
+      : cleanExpenses;
+    const totalSpent = monthExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+    const monthlyLimit: number | null = budget?.monthlyLimit && budget.monthlyLimit > 0 ? budget.monthlyLimit : null;
+    const remaining = monthlyLimit !== null ? monthlyLimit - totalSpent : null;
     const daysLeft = Math.max(1, 30 - now.getDate() + 1);
-    const safeDailyBurn = Math.max(0, Math.round(remaining / daysLeft));
+    const safeDailyBurn = monthlyLimit !== null ? Math.max(0, Math.round((remaining as number) / daysLeft)) : null;
 
     return {
       now,
@@ -127,7 +139,7 @@ export class GeminiAssistant {
       yesterdayDateStr,
       profile,
       classes,
-      expenses,
+      expenses: cleanExpenses,
       todayExpenses,
       yesterdayExpenses,
       totalSpent,
@@ -147,7 +159,10 @@ export class GeminiAssistant {
    * or answer in-app questions using ChatGPT-grade Gemini reasoning with live student context.
    */
   public async processStudentQuery(userId: string, userMessage: string): Promise<AIChatResponse> {
-    const text = userMessage.trim().toLowerCase();
+    // H4: cap user message length — a multi-MB message would be embedded into
+    // every prompt (× 3 model attempts) and burn quota / memory.
+    const cappedMessage = userMessage.length > 2000 ? userMessage.slice(0, 2000) : userMessage;
+    const text = cappedMessage.trim().toLowerCase();
 
     // -------------------------------------------------------------
     // PART 1: ACTION TOOLS (Mutations in database)
@@ -155,7 +170,28 @@ export class GeminiAssistant {
 
     // 1. Cross-Module Split Expense (e.g. "Spent 500 on dinner with Rahul. Split it equally")
     if (text.includes('split') && (/\d+/.test(text) || text.includes('with') || text.includes('half') || text.includes('equally'))) {
-      const parsed = this.parseSplitExpense(userMessage);
+      const parsed = this.parseSplitExpense(cappedMessage);
+      // H10: ask instead of inventing — no amount or no person, no record.
+      if (parsed.totalAmount == null) {
+        return {
+          message: 'Kitne rupaye ka split karna hai? Amount batao — jaise "split 600 with Rahul".',
+          intent: 'ADD_EXPENSE',
+          toolExecuted: 'split_expense',
+          data: null,
+          requiresConfirmation: false,
+          confirmationPayload: null,
+        };
+      }
+      if (!parsed.person) {
+        return {
+          message: `₹${parsed.totalAmount} ka split kiske saath karna hai? Naam batao.`,
+          intent: 'ADD_EXPENSE',
+          toolExecuted: 'split_expense',
+          data: null,
+          requiresConfirmation: false,
+          confirmationPayload: null,
+        };
+      }
       const toolResult = await toolRegistry.split_expense(userId, parsed);
       return {
         message: toolResult.message || `Split ₹${parsed.totalAmount} for ${parsed.description} with ${parsed.person}.`,
@@ -186,7 +222,18 @@ export class GeminiAssistant {
         text.match(/\b(food|dinner|lunch|canteen|coffee|chai|tea|breakfast|biryani|pizza|burger|snack|auto|cab|uber|ola|bus|metro|petrol|fuel|stationery|book|books|print|printout|xerox|groceries|swiggy|zomato)\b/i)
       )
     ) {
-      const parsed = this.parseNaturalExpense(userMessage);
+      const parsed = this.parseNaturalExpense(cappedMessage);
+      // H10: no amount found → ask, never invent ₹100.
+      if (parsed.amount == null) {
+        return {
+          message: 'Kitne rupaye kharch kiye? Amount batao — jaise "spent 250 on dinner".',
+          intent: 'ADD_EXPENSE',
+          toolExecuted: 'add_expense',
+          data: null,
+          requiresConfirmation: false,
+          confirmationPayload: null,
+        };
+      }
       const toolResult = await toolRegistry.add_expense(userId, parsed);
       return {
         message: toolResult.message || `Expense recorded: ₹${parsed.amount} for ${parsed.description}. Added to your expense tracker.`,
@@ -221,7 +268,9 @@ export class GeminiAssistant {
       !text.includes('what') && !text.includes('show')
     ) {
       const priority = text.includes('extremely') || text.includes('urgent') ? 'EXTREMELY_IMPORTANT' : 'HIGH';
-      const toolResult = await toolRegistry.update_task_priority(userId, { priority });
+      // M27: extract which task — never let the tool guess the most recent one
+      const titleGuess = text.replace(/extremely important|high priority|prioritize|prioritise|urgent|mark|make|this|that|the|task|as/gi, '').trim();
+      const toolResult = await toolRegistry.update_task_priority(userId, { priority, titleMatch: titleGuess || undefined });
       return {
         message: toolResult.message || `Task priority updated to ${priority}.`,
         intent: 'UPDATE_TASK',
@@ -265,23 +314,19 @@ export class GeminiAssistant {
     }
 
     // 7. Create Task Action
+    // H11: ONLY explicit imperative triggers create tasks. "write a poem",
+    // "i need to understand recursion", or questions about assignments must
+    // never silently create tasks.
     if (
-      (
-        text.startsWith('remind me') ||
-        text.startsWith('remember to') ||
-        text.startsWith('i need to') ||
-        text.startsWith('i have to') ||
-        text.startsWith('add task') ||
-        text.startsWith('create task') ||
-        text.match(/\b(submit|prepare|write|upload)\b/i) ||
-        (text.includes('assignment') && !text.includes('what') && !text.includes('show') && !text.includes('list')) ||
-        (text.includes('lab report') && !text.includes('what') && !text.includes('show'))
-      ) &&
-      !text.includes('what tasks') &&
-      !text.includes('show tasks') &&
-      !text.includes('list tasks')
+      text.startsWith('remind me') ||
+      text.startsWith('remember to') ||
+      text.startsWith('add task') ||
+      text.startsWith('create task') ||
+      text.startsWith('add a task') ||
+      text.startsWith('create a task') ||
+      text.startsWith('todo')
     ) {
-      const taskParsed = this.parseNaturalTask(userMessage);
+      const taskParsed = this.parseNaturalTask(cappedMessage);
       const toolResult = await toolRegistry.create_task(userId, taskParsed);
       return {
         message: toolResult.message || `Task "${taskParsed.title}" scheduled successfully. Added to your task manager.`,
@@ -295,10 +340,21 @@ export class GeminiAssistant {
 
     // 8. Add Debt Action
     if (text.includes('borrowed') || text.includes('lent') || text.includes('owes me') || text.includes('i owe')) {
-      const debtParsed = this.parseNaturalDebt(userMessage);
+      const debtParsed = this.parseNaturalDebt(cappedMessage);
       if (!debtParsed.person) {
         return {
           message: `Who is this debt with? I couldn't tell the person's name — please say it like "Rahul owes me 500" or "I owe Rahul 500".`,
+          intent: 'ADD_DEBT',
+          toolExecuted: 'add_debt',
+          data: null,
+          requiresConfirmation: false,
+          confirmationPayload: null,
+        };
+      }
+      // H10: no amount → ask, never invent ₹100 (fixes "borrowed a book" → ₹100 debt).
+      if (debtParsed.amount == null) {
+        return {
+          message: `Kitne rupaye ka udhaar hai ${debtParsed.person} ke saath? Amount batao.`,
           intent: 'ADD_DEBT',
           toolExecuted: 'add_debt',
           data: null,
@@ -320,7 +376,7 @@ export class GeminiAssistant {
     // 9. Calendar Event Action — parse the real event from the user's message.
     // Never use hardcoded values; if details are missing, ask for them.
     if (text.includes('calendar') && (text.includes('add') || text.includes('event') || text.includes('schedule class'))) {
-      const cal = this.parseCalendarRequest(userMessage);
+      const cal = this.parseCalendarRequest(cappedMessage);
       const missing: string[] = [];
       if (!cal.title) missing.push('a title');
       if (!cal.startTime) missing.push('a date and time (e.g. "tomorrow at 10 AM")');
@@ -372,7 +428,7 @@ STUDENT LIVE APP DATABASE:
 ${context.classes.length ? context.classes.map((c) => `• ${c.subjectName} on ${c.day} at ${c.startTime} - ${c.endTime} in room ${c.room || 'AB1-204'} (Faculty: ${c.faculty})`).join('\n') : 'No classes scheduled.'}
 
 [EXPENSE TRACKER & RECENT SPENDING]:
-${context.expenses.map((e) => {
+${context.expenses.slice(-50).map((e) => {
   const isToday = e.date.slice(0, 10) === context.todayDateStr;
   const isYesterday = e.date.slice(0, 10) === context.yesterdayDateStr;
   const rel = isToday ? 'TODAY' : isYesterday ? 'YESTERDAY' : new Date(e.date).toLocaleDateString();
@@ -380,16 +436,16 @@ ${context.expenses.map((e) => {
 }).join('\n')}
 
 [MONTHLY BUDGET]:
-• Monthly Limit: ₹${context.monthlyLimit}
+${context.monthlyLimit !== null ? `• Monthly Limit: ₹${context.monthlyLimit}
 • Total Spent this month: ₹${context.totalSpent}
 • Remaining Allowance: ₹${context.remaining}
-• Safe Daily Burn Rate: ₹${context.safeDailyBurn}/day (${context.daysLeft} days left)
+• Safe Daily Burn Rate: ₹${context.safeDailyBurn}/day (${context.daysLeft} days left)` : '• No budget set by the student yet. If asked about budget, say no budget is set — never invent a limit.'}
 
 [TASK MANAGER & PENDING ASSIGNMENTS]:
-${context.tasks.filter((t) => t.status !== 'COMPLETED').map((t) => `• [${t.priority}] ${t.title} (Due: ${t.dueDate ? new Date(t.dueDate).toLocaleDateString() : 'Upcoming'})`).join('\n')}
+${context.tasks.filter((t) => t.status !== 'COMPLETED').slice(0, 20).map((t) => `• [${t.priority}] ${t.title} (Due: ${t.dueDate ? new Date(t.dueDate).toLocaleDateString() : 'Upcoming'})`).join('\n')}
 
 [DEBTS & SPLITS]:
-${context.debts.map((d) => `• ${d.person}: ₹${d.amount} (${d.type === 'OWES_ME' ? 'Owes student' : 'Student owes'}) - ${d.status}`).join('\n')}
+${context.debts.slice(0, 20).map((d) => `• ${d.person}: ₹${d.amount} (${d.type === 'OWES_ME' ? 'Owes student' : 'Student owes'}) - ${d.status}`).join('\n')}
 
 INSTRUCTIONS:
 1. UNIVERSAL KNOWLEDGE: Answer ANY and ALL questions from the student on any topic whatsoever (coding, algorithms, computer science, general science, physics, chemistry, history, literature, study tips, writing, career advice, conceptual explanations, mathematics, reasoning). Never restrict yourself to only student database questions. Answer with comprehensive clarity, high quality, and formatting.
@@ -404,7 +460,7 @@ INSTRUCTIONS:
       for (const modelName of this.candidateModels) {
         try {
           const model = this.genAI.getGenerativeModel({ model: modelName });
-          const geminiRes = await model.generateContent(`${systemPrompt}\n\nStudent message: "${userMessage}"`);
+          const geminiRes = await model.generateContent(`${systemPrompt}\n\nStudent message: "${cappedMessage}"`);
           const geminiReply = geminiRes.response.text();
 
           if (geminiReply && geminiReply.trim()) {
@@ -439,7 +495,7 @@ INSTRUCTIONS:
     // -------------------------------------------------------------
 
     // Math solver fallback
-    const mathSolved = this.solveMathLocally(userMessage);
+    const mathSolved = this.solveMathLocally(cappedMessage);
     if (mathSolved) {
       return {
         message: mathSolved,
@@ -451,11 +507,14 @@ INSTRUCTIONS:
 
     // Conclude all app data fallback
     if (text.includes('conclude') || (text.includes('summarize') && text.includes('data')) || text.includes('overview') || text.includes('analysis')) {
-      const reply = `### 📊 Student Life Executive Summary\n\n` +
-        `**💰 Financial Health**:\n` +
-        `• Monthly Budget: ₹${context.monthlyLimit.toLocaleString()}\n` +
-        `• Spent: ₹${context.totalSpent.toLocaleString()} (${Math.round((context.totalSpent / context.monthlyLimit) * 100)}% used)\n` +
-        `• Remaining Allowance: **₹${context.remaining.toLocaleString()}** (Safe daily burn: **₹${context.safeDailyBurn}/day**)\n\n` +
+      // H2: when no budget is set, say so — never present a fabricated limit.
+      const budgetLine = context.monthlyLimit !== null
+        ? `**💰 Financial Health**:\n` +
+          `• Monthly Budget: ₹${context.monthlyLimit.toLocaleString()}\n` +
+          `• Spent: ₹${context.totalSpent.toLocaleString()} (${Math.round((context.totalSpent / context.monthlyLimit) * 100)}% used)\n` +
+          `• Remaining Allowance: **₹${(context.remaining ?? 0).toLocaleString()}** (Safe daily burn: **₹${context.safeDailyBurn ?? 0}/day**)\n\n`
+        : `**💰 Financial Health**:\n• No budget set yet — tell me your monthly limit and I'll track it.\n• Spent this month: ₹${context.totalSpent.toLocaleString()}\n\n`;
+      const reply = `### 📊 Student Life Executive Summary\n\n` + budgetLine +
         `**📚 Academic Schedule**:\n` +
         `• Registered Courses: ${context.classes.length} classes active across the week.\n` +
         `• Today (${context.currentDay}): ${context.classes.filter((c) => c.day === context.currentDay).length} class(es).\n\n` +
@@ -541,7 +600,10 @@ INSTRUCTIONS:
 
     // Q4: Budget inquiry
     if (text.includes('budget') || text.includes('remaining') || text.includes('allowance') || text.includes('balance') || text.includes('afford')) {
-      const reply = `**Monthly Budget Status**:\n• Monthly Limit: ₹${context.monthlyLimit.toLocaleString()}\n• Spent So Far: ₹${context.totalSpent.toLocaleString()}\n• **Remaining Allowance**: ₹${context.remaining.toLocaleString()}\n• Safe Daily Burn: ₹${context.safeDailyBurn}/day (${context.daysLeft} days remaining in month)`;
+      // H2: no fabricated ₹10,000 — say "no budget set" when there is none.
+      const reply = context.monthlyLimit !== null
+        ? `**Monthly Budget Status**:\n• Monthly Limit: ₹${context.monthlyLimit.toLocaleString()}\n• Spent So Far: ₹${context.totalSpent.toLocaleString()}\n• **Remaining Allowance**: ₹${(context.remaining ?? 0).toLocaleString()}\n• Safe Daily Burn: ₹${context.safeDailyBurn ?? 0}/day (${context.daysLeft} days remaining in month)`
+        : `**Monthly Budget Status**:\n• No budget set yet. Spent this month: ₹${context.totalSpent.toLocaleString()}\n• Tell me your monthly limit (e.g. "set budget 8000") and I'll track it for you.`;
       return {
         message: reply,
         intent: 'GET_BUDGET',
@@ -638,11 +700,15 @@ Rules:
               ? rawTotal
               : items.reduce((s: number, i: { price: number }) => s + (Number(i.price) || 0), 0);
             if (total > 0) {
+              // M26: normalize + validate the AI's category — raw values like
+              // "food " or invented strings break every === 'FOOD' filter
+              const rawCat = String(parsed.category || '').trim().toUpperCase();
+              const validCats = ['FOOD', 'TRANSPORT', 'EDUCATION', 'SHOPPING', 'ENTERTAINMENT', 'HOSTEL', 'BILLS', 'GROCERIES', 'OTHER'];
               parsedResult = {
                 merchant: parsed.merchant || 'Store Receipt',
                 items: items.length > 0 ? items : [{ name: 'Purchases', price: total }],
                 total,
-                category: (parsed.category || 'OTHER') as Expense['category'],
+                category: (validCats.includes(rawCat) ? rawCat : 'OTHER') as Expense['category'],
                 summary: parsed.summary || `Receipt from ${parsed.merchant || 'Merchant'}`,
               };
               break;
@@ -771,8 +837,9 @@ Format your answer with clean, beautiful Markdown (clear headings with ###, bull
   }> {
     let classes: any[] = [];
 
-    const normalizeDay = (day: any): string => {
-      if (!day || typeof day !== 'string') return 'MONDAY';
+    const normalizeDay = (day: any): string | null => {
+      // M29: null for unrecognizable days instead of silently defaulting to MONDAY
+      if (!day || typeof day !== 'string') return null;
       const upper = day.toUpperCase().trim();
       if (upper.includes('MON')) return 'MONDAY';
       if (upper.includes('TUE')) return 'TUESDAY';
@@ -781,17 +848,20 @@ Format your answer with clean, beautiful Markdown (clear headings with ###, bull
       if (upper.includes('FRI')) return 'FRIDAY';
       if (upper.includes('SAT')) return 'SATURDAY';
       if (upper.includes('SUN')) return 'SUNDAY';
-      return 'MONDAY';
+      return null;
     };
 
-    const normalizeTime = (time: any, defaultVal: string): string => {
-      if (!time || typeof time !== 'string') return defaultVal;
+    // M29: return null for unparseable times instead of inventing a default —
+    // a fabricated 10:00 class is worse than skipping the row.
+    const normalizeTime = (time: any): string | null => {
+      if (!time || typeof time !== 'string') return null;
       const t = time.trim();
       const match12 = t.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$/i);
       if (match12) {
         let hours = parseInt(match12[1], 10);
         const mins = match12[2] ? parseInt(match12[2], 10) : 0;
         const ampm = match12[3] ? match12[3].toUpperCase() : null;
+        if (hours < 1 || hours > 12 || mins < 0 || mins > 59) return null;
         if (ampm === 'PM' && hours < 12) hours += 12;
         if (ampm === 'AM' && hours === 12) hours = 0;
         return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
@@ -800,9 +870,10 @@ Format your answer with clean, beautiful Markdown (clear headings with ###, bull
       if (match24) {
         const hours = parseInt(match24[1], 10);
         const mins = parseInt(match24[2], 10);
+        if (hours < 0 || hours > 23 || mins < 0 || mins > 59) return null;
         return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
       }
-      return defaultVal;
+      return null;
     };
 
     if (this.genAI && base64Data) {
@@ -858,16 +929,26 @@ RULES:
           if (parsed) {
             const rawClasses = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.classes) ? parsed.classes : []);
             if (rawClasses.length > 0) {
-              classes = rawClasses.map((c: any) => ({
-                subjectName: String(c.subjectName || c.courseName || c.subject || c.course || 'Class').trim(),
-                day: normalizeDay(c.day),
-                startTime: normalizeTime(c.startTime, '10:00'),
-                endTime: normalizeTime(c.endTime, '11:00'),
-                room: c.room ? String(c.room).trim() : 'AB1-204',
-                faculty: c.faculty ? String(c.faculty).trim() : 'Faculty Member',
-                classType: String(c.classType || 'LECTURE').toUpperCase().includes('LAB') ? 'LAB' : 'LECTURE',
-                slot: c.slot ? String(c.slot).trim().toUpperCase() : undefined,
-              }));
+              classes = rawClasses
+                .map((c: any) => {
+                  // M29: skip rows with unparseable times/days instead of inventing
+                  // 10:00 defaults, AB1-204 rooms, or "Faculty Member" names
+                  const startTime = normalizeTime(c.startTime);
+                  const endTime = normalizeTime(c.endTime);
+                  const day = normalizeDay(c.day);
+                  if (!startTime || !endTime || !day) return null;
+                  return {
+                    subjectName: String(c.subjectName || c.courseName || c.subject || c.course || '').trim() || 'Untitled Class',
+                    day,
+                    startTime,
+                    endTime,
+                    room: c.room ? String(c.room).trim() : null,
+                    faculty: c.faculty ? String(c.faculty).trim() : null,
+                    classType: String(c.classType || 'LECTURE').toUpperCase().includes('LAB') ? 'LAB' : 'LECTURE',
+                    slot: c.slot ? String(c.slot).trim().toUpperCase() : undefined,
+                  };
+                })
+                .filter((c: object | null): c is object => c !== null);
               console.log(`[Timetable Vision] Successfully extracted ${classes.length} classes via ${modelName}`);
               break;
             }
@@ -933,9 +1014,12 @@ RULES:
     return null;
   }
 
-  public parseNaturalExpense(text: string): { amount: number; category: any; description: string; merchant?: string } {
-    const amountMatch = text.match(/(?:(?:rs\.?|₹|inr)\s*)?(\d+(?:\.\d{1,2})?)(?:\s*(?:rs|rupees|bucks|inr))?/i);
-    const amount = amountMatch ? parseFloat(amountMatch[1]) : 100;
+  public parseNaturalExpense(text: string): { amount: number | null; category: any; description: string; merchant?: string } {
+    // H10: strip commas ("₹1,200" was parsed as ₹1); never invent ₹100 when
+    // no amount is present — amount: null tells the caller to ask the user.
+    const cleanText = text.replace(/,/g, '');
+    const amountMatch = cleanText.match(/(?:(?:rs\.?|₹|inr)\s*)?(\d+(?:\.\d{1,2})?)(?:\s*(?:rs|rupees|bucks|inr))?/i);
+    const amount = amountMatch ? parseFloat(amountMatch[1]) : null;
 
     let category: any = 'OTHER';
     const lower = text.toLowerCase();
@@ -973,11 +1057,14 @@ RULES:
     return { amount, category, description };
   }
 
-  public parseSplitExpense(text: string): { totalAmount: number; description: string; person: string; category?: any } {
-    const amountMatch = text.match(/(?:(?:rs\.?|₹|inr)\s*)?(\d+(?:\.\d{1,2})?)/i);
-    const totalAmount = amountMatch ? parseFloat(amountMatch[1]) : 500;
+  public parseSplitExpense(text: string): { totalAmount: number | null; description: string; person: string; category?: any } {
+    // H10: never invent amount 500 or person 'Rahul' — null/'' means the
+    // caller asks the user instead of recording fiction.
+    const cleanText = text.replace(/,/g, '');
+    const amountMatch = cleanText.match(/(?:(?:rs\.?|₹|inr)\s*)?(\d+(?:\.\d{1,2})?)/i);
+    const totalAmount = amountMatch ? parseFloat(amountMatch[1]) : null;
 
-    let person = 'Rahul';
+    let person = '';
     const withMatch = text.match(/with\s+([A-Za-z]+)/i);
     if (withMatch && withMatch[1] && !['the', 'my', 'a', 'an'].includes(withMatch[1].toLowerCase())) {
       person = withMatch[1].charAt(0).toUpperCase() + withMatch[1].slice(1);
@@ -1127,12 +1214,20 @@ RULES:
     return out;
   }
 
-  public parseNaturalDebt(text: string): { person: string; type: 'OWES_ME' | 'I_OWE'; amount: number; notes?: string } {
-    const amountMatch = text.match(/(?:(?:rs\.?|₹|inr)\s*)?(\d+(?:\.\d{1,2})?)/i);
-    const amount = amountMatch ? parseFloat(amountMatch[1]) : 100;
+  public parseNaturalDebt(text: string): { person: string; type: 'OWES_ME' | 'I_OWE'; amount: number | null; notes?: string } {
+    // H10: strip commas; amount: null (not ₹100) when no amount is present.
+    const cleanText = text.replace(/,/g, '');
+    const amountMatch = cleanText.match(/(?:(?:rs\.?|₹|inr)\s*)?(\d+(?:\.\d{1,2})?)/i);
+    const amount = amountMatch ? parseFloat(amountMatch[1]) : null;
 
     const lower = text.toLowerCase();
-    const isOwesMe = lower.includes('borrowed from me') || lower.includes('owes me');
+    // H10: fix direction — "Rahul borrowed 500" means Rahul owes ME;
+    // "I lent Rahul 500" means Rahul owes me; only "I borrowed" = I owe.
+    const isOwesMe =
+      lower.includes('owes me') ||
+      lower.includes('borrowed from me') ||
+      lower.includes('lent') ||
+      (lower.includes('borrowed') && !/\bi\s+borrowed\b/.test(lower));
     const type = isOwesMe ? 'OWES_ME' : 'I_OWE';
 
     // Never invent a person: empty string means "could not parse", and the

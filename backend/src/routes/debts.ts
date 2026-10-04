@@ -35,7 +35,7 @@ export const debtRoutes: FastifyPluginAsync = async (fastify) => {
       const parsed = geminiAssistant.parseNaturalDebt(body.text);
       person = parsed.person;
       type = parsed.type;
-      amount = parsed.amount;
+      amount = parsed.amount ?? undefined;
       notes = parsed.notes;
     }
 
@@ -71,9 +71,17 @@ export const debtRoutes: FastifyPluginAsync = async (fastify) => {
 
     if (!debt) return reply.status(404).send({ error: 'Debt not found' });
 
-    const payAmount = req.body.paidAmount !== undefined ? Number(req.body.paidAmount) : Number(debt.amount);
-    if (!Number.isFinite(payAmount) || payAmount <= 0) {
+    // M14: guard against empty/undefined body — req.body.paidAmount would 500
+    const { paidAmount } = req.body || {};
+    const requested = paidAmount !== undefined ? Number(paidAmount) : Number(debt.amount);
+    if (!Number.isFinite(requested) || requested <= 0) {
       return reply.status(400).send({ error: 'paidAmount must be a positive number' });
+    }
+    // M30: cap payment at the remaining amount — no overpayment
+    const remaining = Math.max(0, Number(debt.amount) - Number(debt.paidAmount || 0));
+    const payAmount = Math.min(requested, remaining);
+    if (payAmount <= 0) {
+      return reply.status(400).send({ error: 'Debt is already fully paid' });
     }
 
     const newPaidTotal = Number(debt.paidAmount || 0) + payAmount;
@@ -89,8 +97,21 @@ export const debtRoutes: FastifyPluginAsync = async (fastify) => {
       const userId = req.userId!;
       const { totalAmount, description, numberOfPeople, friends } = req.body || {};
 
-      if (!totalAmount || totalAmount <= 0 || !numberOfPeople || numberOfPeople < 2 || !description) {
-        return reply.status(400).send({ error: 'Valid totalAmount, description and at least 2 people required' });
+      // H5: strict validation — "abc" amounts must not become NaN rows, and
+      // numberOfPeople: 1e9 must not OOM the server via Array.from.
+      const numTotal = Number(totalAmount);
+      const numPeople = Number(numberOfPeople);
+      if (!Number.isFinite(numTotal) || numTotal <= 0) {
+        return reply.status(400).send({ error: 'totalAmount must be a valid positive number' });
+      }
+      if (!Number.isInteger(numPeople) || numPeople < 2 || numPeople > 50) {
+        return reply.status(400).send({ error: 'numberOfPeople must be an integer between 2 and 50' });
+      }
+      if (typeof description !== 'string' || !description.trim()) {
+        return reply.status(400).send({ error: 'description is required' });
+      }
+      if (friends !== undefined && (!Array.isArray(friends) || friends.length > 50)) {
+        return reply.status(400).send({ error: 'friends must be an array of at most 50 names' });
       }
 
       const peopleList = friends && friends.length > 0 ? friends : Array.from({ length: numberOfPeople - 1 }, (_, i) => `Friend ${i + 1}`);

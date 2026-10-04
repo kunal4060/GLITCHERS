@@ -20,6 +20,11 @@ export const chatbotRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: 'Valid message string is required' });
     }
 
+    // H6: reject absurd payloads before they hit the AI pipeline
+    if (message.length > 20000) {
+      return reply.status(413).send({ error: 'Message too large (max 20000 characters)' });
+    }
+
     // M6 fix: never persist the user message before the Gemini call succeeds,
     // and never 500 on an AI failure. On error, store both messages with a
     // fallback assistant reply and return 200 — no orphan, no crash.

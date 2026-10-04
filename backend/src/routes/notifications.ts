@@ -32,7 +32,8 @@ export const notificationRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.patch<{ Body: { quietHours?: Partial<QuietHours>; universityDomain?: string } }>('/preferences', async (req) => {
     const userId = req.userId!;
-    await supabaseStore.saveUserPreferences(userId, req.body);
+    // M15: default to {} so an empty body can't 500
+    await supabaseStore.saveUserPreferences(userId, req.body || {});
     const updated = await supabaseStore.getUserPreferences(userId);
     return updated;
   });

@@ -222,6 +222,17 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.patch<{ Body: Record<string, any> }>('/profile', { preHandler: authMiddleware }, async (req, reply) => {
     const userId = req.userId!;
     const body = req.body || {};
+    // H9: mass-assignment guard — only user-editable profile fields may be
+    // patched. id/email/onboarding flags/timestamps are never client-writable.
+    const ALLOWED_PROFILE_FIELDS = new Set([
+      'fullName', 'avatarUrl', 'university', 'course', 'year', 'semester',
+      'section', 'cgpa', 'creditsCompleted', 'creditsCurrent', 'studentId',
+      'universityDomain',
+    ]);
+    const rejected = Object.keys(body).filter((k) => !ALLOWED_PROFILE_FIELDS.has(k));
+    if (rejected.length > 0) {
+      return reply.status(400).send({ error: `Fields not allowed in profile update: ${rejected.join(', ')}` });
+    }
     const updated = await supabaseStore.updateProfile(userId, body);
     return { user: updated };
   });
@@ -296,8 +307,18 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     return { connection };
   });
 
-  fastify.delete('/account', { preHandler: authMiddleware }, async (req) => {
+  fastify.delete('/account', { preHandler: authMiddleware }, async (req, reply) => {
     const userId = req.userId!;
+
+    // M32: re-auth for account deletion — no password system exists (Google
+    // OAuth), so require the user to type their account email as confirmation.
+    // This stops CSRF / stolen-session / accidental deletes.
+    const { confirmation } = (req.body || {}) as { confirmation?: string };
+    const profile = await supabaseStore.getProfile(userId).catch(() => null);
+    const accountEmail = (profile?.email || inMemoryStore.profiles.get(userId)?.email || '').toLowerCase();
+    if (!confirmation || confirmation.toLowerCase().trim() !== accountEmail || !accountEmail) {
+      return reply.status(400).send({ error: 'Please type your account email to confirm deletion' });
+    }
 
     // Clear any cached Google tokens so no background sync can touch this account
     try {

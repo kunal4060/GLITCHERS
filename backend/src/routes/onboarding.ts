@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { inMemoryStore } from '../repositories/inMemoryStore.js';
 import { supabaseStore } from '../repositories/supabaseStore.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { getISTDateStr } from '../utils/dates.js';
 import { randomUUID } from 'crypto';
 import type {
   OnboardingStep,
@@ -164,15 +165,27 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
       // Only when explicitly sent does /initialize mark onboarding complete.
       complete?: boolean;
     };
-  }>('/initialize', async (req) => {
+  }>('/initialize', async (req, reply) => {
     const userId = req.userId!;
     const body = req.body || {};
+
+    // M21: never reset completed onboarding — return early instead of rebuilding state
+    const priorState = (await supabaseStore.getOnboardingState(userId)) || inMemoryStore.onboardingStates.get(userId);
+    if (priorState?.isComplete && body.complete !== true) {
+      return { success: true, alreadyComplete: true, isComplete: true };
+    }
+
     const jobId = randomUUID();
 
     // M12 fix: completion must be explicit — never force isComplete/completedSteps.
     const explicitlyComplete = body.complete === true;
 
-    const job: InitializationJob = {
+    // M21: declared outside try so the catch block can mark it failed
+    let job: InitializationJob | null = null;
+
+    try {
+
+    job = {
       id: jobId,
       userId,
       status: 'PROCESSING',
@@ -308,7 +321,8 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
           userId,
           monthlyLimit: monthlyBudget,
           currentSpending: 0,
-          month: new Date().toISOString().slice(0, 7),
+          // M12: IST month so 00:00–05:30 IST near month boundaries lands in the right month
+          month: getISTDateStr().slice(0, 7),
           categoryLimits: {},
           alertThresholds: [75, 90, 100],
         };
@@ -366,6 +380,15 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
       job,
       isComplete: explicitlyComplete,
     };
+    } catch (err: any) {
+      // M21: never leave the client hanging — mark the job failed and report
+      if (job) {
+        job.status = 'FAILED';
+        job.stepStatuses.error = { status: 'FAILED', message: 'Initialization failed. Please try again.' };
+        await supabaseStore.saveInitializationJob(job).catch(() => null);
+      }
+      return reply.status(500).send({ error: 'Onboarding initialization failed. Please try again.' });
+    }
   });
 
   /**
@@ -373,10 +396,15 @@ export const onboardingRoutes: FastifyPluginAsync = async (fastify) => {
    * Polling endpoint for real progress updates on preparation screen
    */
   fastify.get<{ Params: { jobId: string } }>('/jobs/:jobId', async (req, reply) => {
+    const userId = req.userId!;
     const { jobId } = req.params;
     const job = (await supabaseStore.getInitializationJob(jobId)) || inMemoryStore.initializationJobs.get(jobId);
     if (!job) {
       return reply.status(404).send({ error: 'Job not found' });
+    }
+    // M31: ownership check — don't leak another user's job progress
+    if (job.userId !== userId) {
+      return reply.status(403).send({ error: 'Access denied' });
     }
     return { job };
   });

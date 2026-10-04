@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { inMemoryStore } from '../repositories/inMemoryStore.js';
 import { supabaseStore } from '../repositories/supabaseStore.js';
 import { authMiddleware } from '../middleware/auth.js';
-import { generateReminderTimes } from '../services/tasks/reminderEngine.js';
+import { generateReminderTimes, applyQuietHours } from '../services/tasks/reminderEngine.js';
 import { geminiAssistant } from '../services/gemini/geminiClient.js';
 import type { Task } from '@glitchers/shared';
 import { randomUUID } from 'crypto';
@@ -54,7 +54,12 @@ export const taskRoutes: FastifyPluginAsync = async (fastify) => {
       };
 
       const savedTask = await supabaseStore.createTask(userId, newTask);
-      const reminders = generateReminderTimes(savedTask);
+      // M13: shift reminders out of quiet hours so 3 AM pings don't fire
+      const prefs = await supabaseStore.getUserPreferences(userId).catch(() => null);
+      const reminders = applyQuietHours(
+        generateReminderTimes(savedTask),
+        prefs?.quietHours || { enabled: true, startTime: '23:00', endTime: '07:00', criticalBypass: true }
+      );
 
       return {
         task: savedTask,

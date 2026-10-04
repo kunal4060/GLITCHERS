@@ -60,39 +60,55 @@ export class GoogleService {
       if (!supabase) return undefined;
       const { data } = await supabase
         .from('google_accounts')
-        .select('access_token, refresh_token')
+        .select('access_token, refresh_token, token_expires_at')
         .eq('user_id', userId)
         .maybeSingle();
 
       if (!data?.refresh_token) {
         // No refresh token persisted (e.g. logged in before this fix) —
-        // fall back to the stored access token; user may need to re-login.
+        // fall back to the stored access token only if it hasn't expired.
+        // M10: never return a stored token without checking its expiry.
+        if (data?.access_token && data?.token_expires_at) {
+          if (new Date(data.token_expires_at).getTime() > Date.now() + 60_000) {
+            return data.access_token;
+          }
+          return undefined; // stored token expired and no refresh token → must re-login
+        }
         return data?.access_token || undefined;
       }
 
       this.oauth2Client.setCredentials({ refresh_token: data.refresh_token });
       const { credentials } = await this.oauth2Client.refreshAccessToken();
       const newToken: string | undefined = credentials.access_token;
-      if (!newToken) return data?.access_token || undefined;
+      if (!newToken) return undefined;
 
-      const expiresIn = Math.max(
-        300,
-        Math.floor(((credentials.expiry_date || 0) - Date.now()) / 1000) || 3600
-      );
-      this.setUserAccessToken(userId, newToken, expiresIn);
+      // M5: cache only for the token's real remaining lifetime (minus a skew
+      // buffer). Never cache a nearly-dead token — return it uncached instead.
+      const rawSecs = Math.floor(((credentials.expiry_date || 0) - Date.now()) / 1000);
+      if (rawSecs > 90) {
+        const expiresIn = rawSecs - 30;
+        this.setUserAccessToken(userId, newToken, expiresIn);
 
-      await supabase
-        .from('google_accounts')
-        .update({
-          access_token: newToken,
-          token_expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('user_id', userId);
+        await supabase
+          .from('google_accounts')
+          .update({
+            access_token: newToken,
+            token_expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', userId);
+      }
 
       return newToken;
-    } catch (err) {
-      console.warn('Google token refresh warning:', (err as any)?.message || err);
+    } catch (err: any) {
+      // M6: invalid_grant means the refresh token is revoked/dead — clear the
+      // cached token and signal re-auth instead of retrying forever.
+      const msg = String(err?.message || err);
+      if (/invalid_grant/i.test(msg)) {
+        this.userTokens.delete(userId);
+        throw new Error('GOOGLE_REAUTH_REQUIRED');
+      }
+      console.warn('Google token refresh warning:', msg);
       return undefined;
     }
   }

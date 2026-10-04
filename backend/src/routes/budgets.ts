@@ -42,18 +42,29 @@ export const budgetRoutes: FastifyPluginAsync = async (fastify) => {
     const userId = req.userId!;
     const { monthlyLimit, categoryLimits } = req.body || {};
 
-    if (!monthlyLimit || monthlyLimit <= 0) {
+    // M17: reject Infinity/NaN and validate categoryLimits
+    const limit = Number(monthlyLimit);
+    if (!Number.isFinite(limit) || limit <= 0) {
       return reply.status(400).send({ error: 'Valid monthlyLimit is required' });
+    }
+    let cleanCategoryLimits: Record<string, number> = {};
+    if (categoryLimits && typeof categoryLimits === 'object') {
+      for (const [k, v] of Object.entries(categoryLimits)) {
+        const n = Number(v);
+        if (typeof k === 'string' && k.trim() && Number.isFinite(n) && n >= 0) {
+          cleanCategoryLimits[k.trim()] = n;
+        }
+      }
     }
 
     const currentMonth = getISTDateStr().slice(0, 7);
     const budget: Budget = {
       id: randomUUID(),
       userId,
-      monthlyLimit: Number(monthlyLimit),
+      monthlyLimit: limit,
       currentSpending: 0,
       month: currentMonth,
-      categoryLimits: categoryLimits || {},
+      categoryLimits: cleanCategoryLimits,
       alertThresholds: [75, 90, 100],
     };
 
@@ -65,5 +76,12 @@ export const budgetRoutes: FastifyPluginAsync = async (fastify) => {
       budget: savedBudget,
       status,
     };
+  });
+
+  // M1 (mobile): clear the user's budget.
+  fastify.delete('/', async (req) => {
+    const userId = req.userId!;
+    await supabaseStore.clearBudget(userId);
+    return { ok: true };
   });
 };

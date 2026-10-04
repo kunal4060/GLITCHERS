@@ -23,10 +23,12 @@ export const settingsRoutes: FastifyPluginAsync = async (fastify) => {
     '/',
     async (req) => {
       const userId = req.userId!;
+      // M15: default to {} so an empty body can't 500
+      const body = req.body || {};
       await supabaseStore.saveUserPreferences(userId, {
-        universityDomain: req.body.universityDomain,
-        quietHours: req.body.quietHours,
-        floatingAssistantEnabled: req.body.floatingAssistantEnabled,
+        universityDomain: body.universityDomain,
+        quietHours: body.quietHours,
+        floatingAssistantEnabled: body.floatingAssistantEnabled,
       });
 
       const updated = await supabaseStore.getUserPreferences(userId);

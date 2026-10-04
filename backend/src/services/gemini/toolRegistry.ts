@@ -1,6 +1,7 @@
 import { inMemoryStore } from '../../repositories/inMemoryStore.js';
 import { supabaseStore } from '../../repositories/supabaseStore.js';
 import { calculateBudgetStatus, calculateDebtTotals } from '../finance/calculator.js';
+import { getISTDay } from '../../utils/dates.js';
 import type { Task, Expense, Debt } from '@glitchers/shared';
 import { randomUUID } from 'crypto';
 
@@ -28,7 +29,8 @@ export interface ToolExecutionResult {
 export const toolRegistry = {
   get_today_schedule: async (userId: string): Promise<ToolExecutionResult> => {
     const days = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
-    const currentDay = days[new Date().getDay()];
+    // M11: server runs UTC — use IST weekday so 00:00–05:30 IST shows the right day
+    const currentDay = days[getISTDay()];
     const dbClasses = await supabaseStore.getClasses(userId).catch(() => []);
     const classes = dbClasses.length ? dbClasses : (inMemoryStore.classes.get(userId) || []);
     const todayClasses = classes.filter((c) => c.day === currentDay && !c.isCancelled);
@@ -46,7 +48,8 @@ export const toolRegistry = {
 
   get_tomorrow_schedule: async (userId: string): Promise<ToolExecutionResult> => {
     const days = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
-    const tomorrowDay = days[(new Date().getDay() + 1) % 7];
+    // M11: IST weekday (see get_today_schedule)
+    const tomorrowDay = days[(getISTDay() + 1) % 7];
     const dbClasses = await supabaseStore.getClasses(userId).catch(() => []);
     const classes = dbClasses.length ? dbClasses : (inMemoryStore.classes.get(userId) || []);
     const tomorrowClasses = classes.filter((c) => c.day === tomorrowDay && !c.isCancelled);
@@ -104,11 +107,20 @@ export const toolRegistry = {
     userId: string,
     payload: { titleMatch?: string; priority: Task['priority'] }
   ): Promise<ToolExecutionResult> => {
+    // M27: validate the priority enum — never persist a garbage value
+    const validPriorities: Array<Task['priority']> = ['LOW', 'NORMAL', 'HIGH', 'EXTREMELY_IMPORTANT'];
+    if (!validPriorities.includes(payload.priority)) {
+      return { toolName: 'update_task_priority', success: false, result: null, message: `Invalid priority "${payload.priority}".` };
+    }
+    // M27: require a task identifier — silently defaulting to the most recent
+    // task could escalate the wrong task
+    const titleMatch = (payload.titleMatch || '').trim();
+    if (!titleMatch) {
+      return { toolName: 'update_task_priority', success: false, result: null, message: 'Which task should I update? Please name it.' };
+    }
     const dbTasks = await supabaseStore.getTasks(userId).catch(() => []);
     const userTasks = dbTasks.length ? dbTasks : (inMemoryStore.tasks.get(userId) || []);
-    const task = payload.titleMatch
-      ? userTasks.find((t) => t.title.toLowerCase().includes(payload.titleMatch!.toLowerCase()))
-      : userTasks[userTasks.length - 1]; // defaults to most recent task
+    const task = userTasks.find((t) => t.title.toLowerCase().includes(titleMatch.toLowerCase()));
 
     if (!task) {
       return { toolName: 'update_task_priority', success: false, result: null, message: 'No matching task found to update priority.' };
@@ -178,13 +190,23 @@ export const toolRegistry = {
 
   add_expense: async (
     userId: string,
-    payload: { amount: number; category: Expense['category']; description: string; merchant?: string }
+    payload: { amount: number | null; category: Expense['category']; description: string; merchant?: string }
   ): Promise<ToolExecutionResult> => {
+    // H10: never record a null/invalid amount
+    const amt = Number(payload.amount);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      return {
+        toolName: 'add_expense',
+        success: false,
+        result: null,
+        message: 'Please provide a valid expense amount.',
+      };
+    }
     const expenses = inMemoryStore.expenses.get(userId) || [];
     const newExpense: Expense = {
       id: randomUUID(),
       userId,
-      amount: Number(payload.amount),
+      amount: amt,
       category: payload.category || 'OTHER',
       description: payload.description,
       merchant: payload.merchant || null,
@@ -245,7 +267,7 @@ export const toolRegistry = {
 
   split_expense: async (
     userId: string,
-    payload: { totalAmount: number; description: string; person: string; category?: Expense['category'] }
+    payload: { totalAmount: number | null; description: string; person: string; category?: Expense['category'] }
   ): Promise<ToolExecutionResult> => {
     const total = Number(payload.totalAmount);
     if (!Number.isFinite(total) || total <= 0) {
@@ -332,15 +354,25 @@ export const toolRegistry = {
 
   add_debt: async (
     userId: string,
-    payload: { person: string; type: 'OWES_ME' | 'I_OWE'; amount: number; notes?: string }
+    payload: { person: string; type: 'OWES_ME' | 'I_OWE'; amount: number | null; notes?: string }
   ): Promise<ToolExecutionResult> => {
+    // H10: never record a null/invalid amount or empty person
+    const amt = Number(payload.amount);
+    if (!payload.person || !Number.isFinite(amt) || amt <= 0) {
+      return {
+        toolName: 'add_debt',
+        success: false,
+        result: null,
+        message: 'Please provide a valid person and amount for the debt.',
+      };
+    }
     const debts = inMemoryStore.debts.get(userId) || [];
     const newDebt: Debt = {
       id: randomUUID(),
       userId,
       person: payload.person,
       type: payload.type,
-      amount: Number(payload.amount),
+      amount: amt,
       status: 'PENDING',
       paidAmount: 0,
       notes: payload.notes || null,
@@ -405,13 +437,41 @@ export const toolRegistry = {
         message: 'Cannot create a calendar event without a title and a start time.',
       };
     }
+    // M34: validate dates — reject unparseable times and zero/negative duration
+    const startMs = new Date(startTime).getTime();
+    if (!Number.isFinite(startMs)) {
+      return {
+        toolName: 'create_calendar_event',
+        success: false,
+        result: null,
+        message: `Could not understand the start time "${startTime}". Please give a valid date/time.`,
+      };
+    }
+    const endRaw = (payload.endTime || '').trim();
+    const endMs = endRaw ? new Date(endRaw).getTime() : startMs;
+    if (!Number.isFinite(endMs)) {
+      return {
+        toolName: 'create_calendar_event',
+        success: false,
+        result: null,
+        message: `Could not understand the end time "${endRaw}". Please give a valid date/time.`,
+      };
+    }
+    if (endRaw && endMs <= startMs) {
+      return {
+        toolName: 'create_calendar_event',
+        success: false,
+        result: null,
+        message: 'The event end time must be after its start time.',
+      };
+    }
 
     const saved = await supabaseStore
       .saveCalendarEvent(userId, {
         id: randomUUID(),
         title,
         startTime,
-        endTime: (payload.endTime || '').trim() || startTime,
+        endTime: endRaw || startTime,
         location: (payload.location || '').trim() || null,
         source: 'MANUAL',
       })

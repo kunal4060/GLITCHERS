@@ -47,6 +47,14 @@ export const documentRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: 'Document title is required' });
     }
 
+    // H6: payload caps — ~5MB file, 100KB text content
+    if (typeof fileBase64 === 'string' && fileBase64.length > 7000000) {
+      return reply.status(413).send({ error: 'File too large (max ~5MB)' });
+    }
+    if (typeof content === 'string' && content.length > 100000) {
+      return reply.status(413).send({ error: 'Content too large (max 100KB)' });
+    }
+
     // Real AI extraction for image documents (photo of a circular/notice).
     // PDFs and other files are stored honestly without fake AI claims.
     let extractedDeadline: string | null = null;
@@ -64,7 +72,9 @@ export const documentRoutes: FastifyPluginAsync = async (fastify) => {
         if (parsed.action) actionItem = parsed.action;
         processed = true;
       } catch (err: any) {
-        extractedNotes = `AI extraction failed: ${err?.message || 'unknown error'}. Document stored.`;
+        // M23: don't leak raw error internals; log server-side instead
+        console.warn('Document AI extraction failed:', err?.message || err);
+        extractedNotes = 'AI extraction failed. Document stored.';
       }
     }
 

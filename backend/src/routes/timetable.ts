@@ -58,15 +58,25 @@ export const timetableRoutes: FastifyPluginAsync = async (fastify) => {
     const extractedClasses = extractClassesFromText(text, userId);
 
     const currentClasses = await supabaseStore.getClasses(userId);
-    const merged = [...currentClasses, ...extractedClasses];
+    // M22: dedupe extracted classes against existing so re-upload doesn't double them
+    const seen = new Set(
+      currentClasses.map((c) => `${(c.day || '').toUpperCase()}|${c.startTime}|${(c.subjectName || '').toLowerCase()}`)
+    );
+    const fresh = extractedClasses.filter((c) => {
+      const key = `${(c.day || '').toUpperCase()}|${c.startTime}|${(c.subjectName || '').toLowerCase()}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    const merged = [...currentClasses, ...fresh];
     await supabaseStore.saveClasses(userId, merged);
 
     const conflicts = detectScheduleConflicts(merged);
 
     return {
       success: true,
-      extractedCount: extractedClasses.length,
-      extractedClasses,
+      extractedCount: fresh.length,
+      extractedClasses: fresh,
       conflicts,
     };
   });
@@ -76,6 +86,10 @@ export const timetableRoutes: FastifyPluginAsync = async (fastify) => {
       const { imageBase64, mimeType } = req.body || {};
       if (!imageBase64) {
         return reply.code(400).send({ success: false, error: 'No image provided', classes: [], conflicts: [] });
+      }
+      // H6: ~5MB base64 cap
+      if (typeof imageBase64 === 'string' && imageBase64.length > 7000000) {
+        return reply.code(413).send({ success: false, error: 'Image too large (max ~5MB)', classes: [], conflicts: [] });
       }
       const { geminiAssistant } = await import('../services/gemini/geminiClient.js');
       const result = await geminiAssistant.analyzeTimetableImage(imageBase64, mimeType);
@@ -88,9 +102,10 @@ export const timetableRoutes: FastifyPluginAsync = async (fastify) => {
       };
     } catch (err: any) {
       console.error('Error analyzing timetable image:', err);
+      // M23: never leak raw error internals to clients
       return reply.code(500).send({
         success: false,
-        error: err.message || 'Timetable analysis failed',
+        error: 'Timetable analysis failed',
         classes: [],
         conflicts: [],
       });

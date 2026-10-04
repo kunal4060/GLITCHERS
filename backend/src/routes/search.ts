@@ -21,17 +21,20 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
     // M10 fix: query the persistent stores via supabaseStore (Supabase-backed,
     // falling back to its in-memory cache) and merge with the request-scoped
     // in-memory store so search works after a restart.
-    const [sbClasses, sbTasks, sbExpenses, sbEmails] = await Promise.all([
+    const [sbClasses, sbTasks, sbExpenses, sbDebts, sbEmails] = await Promise.all([
       supabaseStore.getClasses(userId),
       supabaseStore.getTasks(userId),
       supabaseStore.getExpenses(userId),
+      supabaseStore.getDebts(userId),
       supabaseStore.getEmails(userId),
     ]);
 
     const classes = [...(inMemoryStore.classes.get(userId) || []), ...sbClasses];
     const tasks = [...(inMemoryStore.tasks.get(userId) || []), ...sbTasks];
     const expenses = [...(inMemoryStore.expenses.get(userId) || []), ...sbExpenses];
-    const debts = inMemoryStore.debts.get(userId) || [];
+    // M24: debts via supabaseStore too (falls back to its in-memory cache) —
+    // inMemory-only missed every Supabase-backed debt row.
+    const debts = [...(inMemoryStore.debts.get(userId) || []), ...sbDebts];
     const emails = [...(inMemoryStore.emails.get(userId) || []), ...sbEmails];
 
     const matchedClasses = classes
