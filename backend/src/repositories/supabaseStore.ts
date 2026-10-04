@@ -596,7 +596,11 @@ export class SupabaseStore {
       userId,
     }));
 
-    inMemoryStore.classes.set(userId, prepared);
+    // Merge with existing (don't wipe local classes when syncing a partial list)
+    const existing = inMemoryStore.classes.get(userId) || [];
+    const byId = new Map(existing.map((c) => [c.id, c]));
+    for (const c of prepared) byId.set(c.id, c);
+    inMemoryStore.classes.set(userId, [...byId.values()]);
 
     const supabase = getSupabaseClient();
     if (supabase && UUID_REGEX.test(userId) && prepared.length > 0) {
