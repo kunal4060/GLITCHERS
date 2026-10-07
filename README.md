@@ -90,4 +90,4 @@ Proprietary and confidential. Developed for NEXA.
 
 ---
 
-*Made by **Shaurya Kumar***
+*Made by **KUMAR SHAURYA***
