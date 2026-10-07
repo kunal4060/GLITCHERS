@@ -87,3 +87,7 @@ Full architecture details live in `ARCHITECTURE.md`.
 ## License
 
 Proprietary and confidential. Developed for NEXA.
+
+---
+
+*Made by **Shaurya Kumar***
