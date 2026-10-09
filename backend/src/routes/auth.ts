@@ -55,7 +55,12 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     return { url: googleService.getAuthUrl(returnUrl) };
   });
 
-  fastify.post<{ Body: { email?: string; name?: string; idToken?: string } }>('/login', async (req, reply) => {
+  // SECURITY: strict per-route limit — login is the brute-force entry point
+  // (global limit is 200/min, far too generous here)
+  fastify.post<{ Body: { email?: string; name?: string; idToken?: string } }>(
+    '/login',
+    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
+    async (req, reply) => {
     const { email, name, idToken } = req.body || {};
 
     if (idToken) {

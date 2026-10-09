@@ -457,6 +457,12 @@ export class SupabaseStore {
   public async updateTask(userId: string, taskId: string, updates: Partial<Task>): Promise<Task | null> {
     const supabase = getSupabaseClient();
 
+    // SECURITY: mass-assignment guard — strip identity fields so a crafted
+    // body can't reassign the task to another user or change its id.
+    // (Covers both the PATCH route and the sync-batch UPDATE path.)
+    const { id: _ignoredId, userId: _ignoredUserId, ...safeUpdates } = updates || {};
+    const cleanUpdates: Partial<Task> = safeUpdates;
+
     // Look up the task: in-memory cache first, then Supabase (source of truth).
     const list = inMemoryStore.tasks.get(userId) || [];
     const idx = list.findIndex((t) => t.id === taskId);
@@ -497,8 +503,8 @@ export class SupabaseStore {
       return null;
     }
 
-    const updated: Task = { ...existing, ...updates };
-    if (updates.status === 'COMPLETED' && !updated.completedAt) {
+    const updated: Task = { ...existing, ...cleanUpdates };
+    if (cleanUpdates.status === 'COMPLETED' && !updated.completedAt) {
       updated.completedAt = new Date().toISOString();
     }
 
@@ -514,12 +520,12 @@ export class SupabaseStore {
         await supabase
           .from('tasks')
           .update({
-            ...(updates.title !== undefined ? { title: updates.title } : {}),
-            ...(updates.description !== undefined ? { description: updates.description } : {}),
-            ...(updates.priority !== undefined ? { priority: updates.priority } : {}),
-            ...(updates.status !== undefined ? { status: updates.status } : {}),
-            ...(updates.dueDate !== undefined ? { due_date: updates.dueDate } : {}),
-            ...(updates.completedAt !== undefined || updates.status === 'COMPLETED'
+            ...(cleanUpdates.title !== undefined ? { title: cleanUpdates.title } : {}),
+            ...(cleanUpdates.description !== undefined ? { description: cleanUpdates.description } : {}),
+            ...(cleanUpdates.priority !== undefined ? { priority: cleanUpdates.priority } : {}),
+            ...(cleanUpdates.status !== undefined ? { status: cleanUpdates.status } : {}),
+            ...(cleanUpdates.dueDate !== undefined ? { due_date: cleanUpdates.dueDate } : {}),
+            ...(cleanUpdates.completedAt !== undefined || cleanUpdates.status === 'COMPLETED'
               ? { completed_at: updated.completedAt || new Date().toISOString() }
               : {}),
           })
@@ -805,6 +811,11 @@ export class SupabaseStore {
   public async updateDebt(userId: string, debtId: string, updates: Partial<Debt>): Promise<Debt | null> {
     const supabase = getSupabaseClient();
 
+    // SECURITY: mass-assignment guard — strip identity fields so a crafted
+    // sync payload can't reassign the debt to another user or change its id.
+    const { id: _ignoredId, userId: _ignoredUserId, ...safeUpdates } = updates || {};
+    const cleanUpdates: Partial<Debt> = safeUpdates;
+
     const list = inMemoryStore.debts.get(userId) || [];
     const idx = list.findIndex((d) => d.id === debtId);
 
@@ -843,7 +854,7 @@ export class SupabaseStore {
       return null;
     }
 
-    const updated: Debt = { ...existing, ...updates };
+    const updated: Debt = { ...existing, ...cleanUpdates };
 
     if (idx !== -1) {
       list[idx] = updated;
@@ -857,9 +868,9 @@ export class SupabaseStore {
         await supabase
           .from('debts')
           .update({
-            ...(updates.status !== undefined ? { status: updates.status } : {}),
-            ...(updates.paidAmount !== undefined ? { paid_amount: updates.paidAmount } : {}),
-            ...(updates.notes !== undefined ? { notes: updates.notes } : {}),
+            ...(cleanUpdates.status !== undefined ? { status: cleanUpdates.status } : {}),
+            ...(cleanUpdates.paidAmount !== undefined ? { paid_amount: cleanUpdates.paidAmount } : {}),
+            ...(cleanUpdates.notes !== undefined ? { notes: cleanUpdates.notes } : {}),
           })
           .eq('id', debtId)
           .eq('user_id', userId);

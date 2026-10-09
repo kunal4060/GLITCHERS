@@ -12,7 +12,7 @@ export const chatbotRoutes: FastifyPluginAsync = async (fastify) => {
     return { messages };
   });
 
-  fastify.post<{ Body: { message: string } }>('/chat', async (req, reply) => {
+  fastify.post<{ Body: { message: string } }>('/chat', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req, reply) => {
     const userId = req.userId!;
     const { message } = req.body || {};
 
@@ -54,7 +54,7 @@ export const chatbotRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  fastify.post<{ Body: { imageBase64: string; mimeType?: string; message?: string } }>('/analyze-image', async (req, reply) => {
+  fastify.post<{ Body: { imageBase64: string; mimeType?: string; message?: string } }>('/analyze-image', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
     const userId = req.userId!;
     const { imageBase64, mimeType = 'image/jpeg', message = '' } = req.body || {};
 

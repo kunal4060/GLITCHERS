@@ -21,14 +21,6 @@ for (const p of candidates) {
 }
 dotenv.config();
 
-function decodeFallback(b64: string): string {
-  try {
-    return Buffer.from(b64, 'base64').toString('utf-8');
-  } catch {
-    return '';
-  }
-}
-
 const EnvSchema = z.object({
   PORT: z.coerce.number().default(5000),
   HOST: z.string().trim().default('0.0.0.0'),

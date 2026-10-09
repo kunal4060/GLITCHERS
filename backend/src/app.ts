@@ -31,15 +31,17 @@ export function buildApp(): FastifyInstance {
   });
 
   // CORS — restrict to known app origins (open CORS + credentials = any site can call the API)
-  const ALLOWED_ORIGINS = [
+  // SECURITY: exact origin match — prefix matching would allow
+  // https://kunal4060.github.io.evil.com to pass as https://kunal4060.github.io
+  const ALLOWED_ORIGINS = new Set([
     'http://localhost:8082',
     'http://localhost:19006',
     'http://localhost:5000',
     'https://kunal4060.github.io',
-  ];
+  ]);
   app.register(cors, {
     origin: (origin, cb) => {
-      if (!origin || ALLOWED_ORIGINS.some((o) => origin.startsWith(o))) {
+      if (!origin || ALLOWED_ORIGINS.has(origin)) {
         cb(null, true);
       } else {
         cb(new Error('Not allowed by CORS'), false);
@@ -82,10 +84,21 @@ export function buildApp(): FastifyInstance {
   app.register(attendanceRoutes, { prefix: '/api/attendance' });
 
   // Error Handler
+  // SECURITY: never leak internal error details (DB errors, paths, stack
+  // fragments) to clients on 5xx — log server-side, send a generic message.
   app.setErrorHandler((error: any, request, reply) => {
-    reply.status(error.statusCode || 500).send({
-      error: error.name || 'InternalServerError',
-      message: error.message || 'An unexpected error occurred',
+    const statusCode = error.statusCode || 500;
+    if (statusCode >= 500) {
+      request.log?.error?.(error);
+      reply.status(statusCode).send({
+        error: 'InternalServerError',
+        message: 'An unexpected error occurred',
+      });
+      return;
+    }
+    reply.status(statusCode).send({
+      error: error.name || 'BadRequest',
+      message: error.message || 'Bad request',
     });
   });
 
