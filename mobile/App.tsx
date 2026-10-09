@@ -1,3 +1,4 @@
+// OTA trigger: security hardening release 2026-10-09 (no-op)
 import React, { Suspense, useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
